@@ -116,6 +116,19 @@ Potential features in the future:
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/yellow_img.png)](https://www.buymeacoffee.com/3dfosi)
 
 
+### 🏷️ Changelog
+---
+
+**01-19-2026 - v0.1.1**
+
+- Compile AppImage with Ubuntu 22.04 instead to improve compatibility with older systems
+
+
+**01-16-2026 - v0.1.0**
+
+- First release - ALPHA
+
+
 ### 📑 Terms of Use & Privacy Policy
 ---
 
