@@ -237,21 +237,25 @@
   async function handleReauthorize() {
     if (!editAccount) return
 
+    // Capture account details before async operations (editAccount could become stale)
+    const accountId = editAccount.id
+    const accountName = editAccount.name
+
     reauthorizing = true
     reauthorizeSuccess = false
     try {
-      await oauthStore.reauthorize(editAccount.id)
+      await oauthStore.reauthorize(accountId)
       reauthorizeSuccess = true
       addToast({
         type: 'success',
-        message: `${editAccount.name} re-authorized successfully! Syncing...`,
+        message: `${accountName} re-authorized successfully! Syncing...`,
         duration: 5000,
       })
       // Trigger a sync to verify the new token works
-      await accountStore.syncAccount(editAccount.id)
+      await accountStore.syncAccount(accountId)
       addToast({
         type: 'success',
-        message: `${editAccount.name} sync completed`,
+        message: `${accountName} sync completed`,
         duration: 3000,
       })
     } catch (err) {

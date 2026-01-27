@@ -27,7 +27,7 @@
     onSelect: (e?: MouseEvent) => void
     onCheck: (checked: boolean) => void
     onClearSelection: () => void  // Clear multi-select when right-clicking unchecked row
-    onActionComplete?: () => void
+    onActionComplete?: (autoSelectNext?: boolean) => void
     onReply?: (mode: 'reply' | 'reply-all' | 'forward', messageId: string) => void
   }
 

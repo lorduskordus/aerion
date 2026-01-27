@@ -37,7 +37,7 @@
     folderType: string
     isStarred: boolean
     isRead: boolean
-    onActionComplete?: () => void
+    onActionComplete?: (autoSelectNext?: boolean) => void
     onReply?: (mode: 'reply' | 'reply-all' | 'forward', messageId: string) => void
     onOpenChange?: (open: boolean) => void
     children?: Snippet
@@ -156,7 +156,7 @@
     try {
       await Archive(messageIds)
       toasts.success('Archived', [{ label: 'Undo', onClick: handleUndo }])
-      onActionComplete?.()
+      onActionComplete?.(true)
     } catch (err) {
       toasts.error(`Failed to archive: ${err}`)
     }
@@ -169,7 +169,7 @@
       try {
         await Trash(messageIds)
         toasts.success('Moved to trash', [{ label: 'Undo', onClick: handleUndo }])
-        onActionComplete?.()
+        onActionComplete?.(true)
       } catch (err) {
         toasts.error(`Failed to delete: ${err}`)
       }
@@ -181,7 +181,7 @@
       await DeletePermanently(messageIds)
       toasts.success('Permanently deleted')
       showDeleteConfirm = false
-      onActionComplete?.()
+      onActionComplete?.(true)
     } catch (err) {
       toasts.error(`Failed to delete: ${err}`)
       showDeleteConfirm = false
@@ -199,7 +199,7 @@
         await MarkAsSpam(messageIds)
         toasts.success('Marked as spam', [{ label: 'Undo', onClick: handleUndo }])
       }
-      onActionComplete?.()
+      onActionComplete?.(true)
     } catch (err) {
       toasts.error(`Failed to ${isSpamFolder ? 'mark as not spam' : 'mark as spam'}: ${err}`)
     }
@@ -239,7 +239,7 @@
     try {
       await MoveToFolder(messageIds, destFolderId)
       toasts.success(`Moved to ${folderName}`, [{ label: 'Undo', onClick: handleUndo }])
-      onActionComplete?.()
+      onActionComplete?.(true)
     } catch (err) {
       toasts.error(`Failed to move: ${err}`)
     }

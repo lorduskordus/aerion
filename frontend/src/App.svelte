@@ -103,6 +103,8 @@
       return null
     }
 
+    // Check if folders are loaded before searching
+    if (!acc.folders || acc.folders.length === 0) return null
     return searchTree(acc.folders)
   }
 

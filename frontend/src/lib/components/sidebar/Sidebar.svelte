@@ -237,6 +237,9 @@
       // 2. Add each account's inbox (under unified section) - only if unified section is expanded
       if (isUnifiedInboxExpanded()) {
         for (const accWithFolders of accountStore.accounts) {
+          // Skip if account is not fully loaded yet (can happen during reauth)
+          if (!accWithFolders.account) continue
+
           const findInbox = (trees: folder.FolderTree[]): folder.Folder | null => {
             for (const tree of trees) {
               if (tree.folder?.type === 'inbox') return tree.folder
@@ -264,6 +267,9 @@
 
     // 3. Add account headers and their folders
     for (const accWithFolders of accountStore.accounts) {
+      // Skip if account is not fully loaded yet (can happen during reauth)
+      if (!accWithFolders.account) continue
+
       // Always add the account header (so user can navigate to it and expand)
       items.push({
         type: 'account-header',

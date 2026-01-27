@@ -103,15 +103,6 @@
       }
     })
 
-    // Listen for messages:moved events (e.g., spam/not spam actions)
-    EventsOn('messages:moved', () => {
-      // Always reload when messages are moved to ensure current folder view is updated
-      // This handles cases like marking as spam/not spam where messages leave the current folder
-      const totalLoaded = Math.max(conversations.length, PAGE_SIZE)
-      offset = 0
-      loadConversations(totalLoaded)
-    })
-
     // Listen for message flag changes (e.g., marked as read)
     EventsOn('messages:flagsChanged', (data: { messageIds: string[], isRead: boolean }) => {
       // Update conversations locally instead of reloading from DB
@@ -161,7 +152,6 @@
   onDestroy(() => {
     EventsOff('folder:synced')
     EventsOff('messages:updated')
-    EventsOff('messages:moved')
     EventsOff('messages:flagsChanged')
     EventsOff('fts:progress')
     EventsOff('fts:complete')

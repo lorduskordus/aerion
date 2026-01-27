@@ -1,5 +1,12 @@
 # CHANGELOG
 
+**v0.1.4 - 01-26-2026**
+---
+
+- Fixed delete flow regression
+- Fixed null reference errors
+
+
 **v0.1.3 - 01-25-2026**
 ---
 
