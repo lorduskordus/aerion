@@ -74,37 +74,34 @@ export function insertSignatureIntoContent(
   mode: ComposeMode,
   placement: string = 'above'
 ): string {
-  // For new messages, start fresh - replace empty paragraph with just a line break
-  if (mode === 'new') {
-    // Check if content is effectively empty (just an empty paragraph)
-    const isEmpty = content === '<p></p>' || content === '' || content === '<p><br></p>'
-    if (isEmpty) {
-      // Start with cursor position, one blank line, then signature
-      return '<p><br></p>' + signatureHtml
-    } else {
-      // Append with one blank line before signature
-      return content + '<br><br>' + signatureHtml
+  if (placement === 'above') {
+    // Look for a citation line ("On DATE, SENDER wrote:") to insert signature above it.
+    // Search for "wrote:" followed by optional <br> and closing </p> tag.
+    // This works regardless of compose mode or whether TipTap preserves blockquotes.
+    const wroteMatch = content.match(/wrote:\s*(<br[^>]*>)?\s*<\/p>/i)
+    if (wroteMatch && wroteMatch.index !== undefined) {
+      const before = content.substring(0, wroteMatch.index)
+      const pStart = before.lastIndexOf('<p')
+      if (pStart > -1) {
+        const quotedContent = content.substring(pStart)
+        return '<p><br></p>' + signatureHtml + '<p><br></p>' + quotedContent
+      }
+    }
+
+    // Fallback: try blockquote
+    const blockquoteIndex = content.indexOf('<blockquote')
+    if (blockquoteIndex > -1) {
+      const blockquote = content.substring(blockquoteIndex)
+      return '<p><br></p>' + signatureHtml + '<p><br></p>' + blockquote
     }
   }
 
-  // Reply/Forward: insert based on placement setting
-  if (placement === 'above') {
-    // Insert signature above quoted content
-    // Find the blockquote (quoted content) and insert before it
-    const blockquoteIndex = content.indexOf('<blockquote')
-    if (blockquoteIndex > -1) {
-      // Insert signature with one blank line, then quoted content
-      const beforeQuote = content.substring(0, blockquoteIndex)
-      const quote = content.substring(blockquoteIndex)
-      return beforeQuote + signatureHtml + '<br><br>' + quote
-    } else {
-      // No blockquote found, append at end with one blank line
-      return content + '<br><br>' + signatureHtml
-    }
-  } else {
-    // Insert signature below quoted content (at the very end)
-    return content + '<br><br>' + signatureHtml
+  // New message or no quoted content found
+  const isEmpty = content === '<p></p>' || content === '' || content === '<p><br></p>'
+  if (isEmpty) {
+    return '<p><br></p>' + signatureHtml
   }
+  return content + '<br><br>' + signatureHtml
 }
 
 /**

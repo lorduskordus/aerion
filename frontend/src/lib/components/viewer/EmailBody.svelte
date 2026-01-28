@@ -84,19 +84,16 @@
       
       window.addEventListener('message', function(e) {
         if (e.data?.type === 'inline-images' && e.data.images) {
-          console.log('[iframe] Received inline images:', Object.keys(e.data.images));
           var images = e.data.images;
           var replaced = 0;
           Object.keys(images).forEach(function(cid) {
             var img = document.querySelector('img[data-cid="' + cid + '"]');
-            console.log('[iframe] Looking for cid:', cid, 'found:', !!img);
             if (img) {
               img.src = images[cid];
               img.removeAttribute('data-cid');
               replaced++;
             }
           });
-          console.log('[iframe] Replaced', replaced, 'images');
           if (replaced > 0) {
             attachImageHandlers();
             setTimeout(sendHeight, 50);
@@ -105,11 +102,10 @@
           }
         }
       });
-      
+
       window.addEventListener('load', function() {
         attachImageHandlers();
         sendHeight();
-        console.log('[iframe] Sending ready signal');
         window.parent.postMessage({ type: 'iframe-ready' }, '*');
       });
       
@@ -209,7 +205,6 @@ ${processedHtml}
     if (event.data?.type === 'iframe-height' && iframeElement) {
       iframeElement.style.height = `${event.data.height + 20}px`
     } else if (event.data?.type === 'iframe-ready') {
-      console.log('[EmailBody] Iframe ready')
       iframeReady = true
     } else if (event.data?.type === 'open-link') {
       const url = event.data.url as string
@@ -261,7 +256,6 @@ ${processedHtml}
 
   function sendInlineImagesToIframe(images: Record<string, string>) {
     if (iframeElement?.contentWindow && Object.keys(images).length > 0) {
-      console.log('[EmailBody] Sending images to iframe:', Object.keys(images))
       // Use spread operator to create plain object from Svelte 5 $state proxy
       // This is needed because postMessage uses structured clone which can't handle proxies
       iframeElement.contentWindow.postMessage({
@@ -323,7 +317,6 @@ ${processedHtml}
   // Reset state when messageId changes
   $effect(() => {
     const id = messageId
-    console.log('[EmailBody] Message changed to:', id)
     iframeReady = false
     lastSentMessageId = null
     inlineAttachments = {}
@@ -334,26 +327,21 @@ ${processedHtml}
     const id = messageId
     const html = bodyHtml
     const hasCid = html ? /src=["']cid:([^"']+)["']/i.test(html) : false
-    
-    console.log('[EmailBody] Fetch check:', { id, hasCid, htmlLen: html?.length })
-    
+
     if (!id || !hasCid) {
       return
     }
-    
+
     // Check memory cache first
     const cached = getCached(id)
     if (cached && Object.keys(cached).length > 0) {
-      console.log('[EmailBody] Cache hit:', Object.keys(cached))
       inlineAttachments = cached
       return
     }
-    
-    console.log('[EmailBody] Fetching from backend...')
+
     GetInlineAttachments(id)
       .then((result: Record<string, string>) => {
         const data = result || {}
-        console.log('[EmailBody] Received:', Object.keys(data))
         inlineAttachments = data
         if (Object.keys(data).length > 0) {
           setCache(id, data)
@@ -368,9 +356,8 @@ ${processedHtml}
   $effect(() => {
     const html = bodyHtml
     const blocked = imagesBlocked
-    
+
     if (iframeElement && html) {
-      console.log('[EmailBody] Building iframe content')
       const content = buildIframeContent(html)
       iframeElement.srcdoc = content
       iframeReady = false
@@ -384,9 +371,7 @@ ${processedHtml}
     const images = inlineAttachments
     const id = messageId
     const alreadySent = lastSentMessageId === id
-    
-    console.log('[EmailBody] Send check:', { ready, imageCount: Object.keys(images).length, alreadySent })
-    
+
     if (ready && Object.keys(images).length > 0 && !alreadySent) {
       sendInlineImagesToIframe(images)
       lastSentMessageId = id

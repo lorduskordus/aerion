@@ -1140,11 +1140,12 @@ func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error
 		}
 	}
 
-	// First get the account ID from the folder
+	// First get the account ID and folder type
 	var accountID string
-	err := s.db.QueryRow("SELECT account_id FROM folders WHERE id = ?", folderID).Scan(&accountID)
+	var folderType string
+	err := s.db.QueryRow("SELECT account_id, folder_type FROM folders WHERE id = ?", folderID).Scan(&accountID, &folderType)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get account ID: %w", err)
+		return nil, fmt.Errorf("failed to get account ID and folder type: %w", err)
 	}
 
 	// Normalize the thread ID for comparison
@@ -1156,23 +1157,30 @@ func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error
 
 	// Get conversation summary across ALL folders in this account
 	// This includes sent messages, drafts, etc.
+	// Exclude messages in Trash folder unless we're viewing Trash
 	// Use COALESCE to handle NULL values from aggregate functions when no rows match
-	summaryQuery := `
+	trashFilter := ""
+	if folderType != "trash" {
+		trashFilter = "AND f.folder_type != 'trash'"
+	}
+	summaryQuery := fmt.Sprintf(`
 		SELECT
-			COALESCE(MIN(subject), '') as subject,
-			COALESCE(MAX(snippet), '') as snippet,
+			COALESCE(MIN(m.subject), '') as subject,
+			COALESCE(MAX(m.snippet), '') as snippet,
 			COUNT(*) as message_count,
-			COALESCE(SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END), 0) as unread_count,
-			COALESCE(MAX(CASE WHEN has_attachments = 1 THEN 1 ELSE 0 END), 0) as has_attachments,
-			COALESCE(MAX(CASE WHEN is_starred = 1 THEN 1 ELSE 0 END), 0) as is_starred,
-			MAX(date) as latest_date
-		FROM messages
-		WHERE account_id = ? AND (
-			REPLACE(REPLACE(COALESCE(thread_id, id), '<', ''), '>', '') = ?
-			OR REPLACE(REPLACE(message_id, '<', ''), '>', '') = ?
-			OR REPLACE(REPLACE(in_reply_to, '<', ''), '>', '') = ?
+			COALESCE(SUM(CASE WHEN m.is_read = 0 THEN 1 ELSE 0 END), 0) as unread_count,
+			COALESCE(MAX(CASE WHEN m.has_attachments = 1 THEN 1 ELSE 0 END), 0) as has_attachments,
+			COALESCE(MAX(CASE WHEN m.is_starred = 1 THEN 1 ELSE 0 END), 0) as is_starred,
+			MAX(m.date) as latest_date
+		FROM messages m
+		INNER JOIN folders f ON m.folder_id = f.id
+		WHERE m.account_id = ? AND (
+			REPLACE(REPLACE(COALESCE(m.thread_id, m.id), '<', ''), '>', '') = ?
+			OR REPLACE(REPLACE(m.message_id, '<', ''), '>', '') = ?
+			OR REPLACE(REPLACE(m.in_reply_to, '<', ''), '>', '') = ?
 		)
-	`
+		%s
+	`, trashFilter)
 
 	c := &Conversation{ThreadID: threadID}
 	var latestDateStr sql.NullString
@@ -1198,20 +1206,23 @@ func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error
 
 	// Get all messages in the thread from ALL folders in this account
 	// This gives us the complete conversation including sent replies
-	messagesQuery := `
-		SELECT id, account_id, folder_id, uid, message_id, in_reply_to, references_list, thread_id,
-		       subject, from_name, from_email, to_list, cc_list, bcc_list, reply_to, date,
-		       snippet, is_read, is_starred, is_answered, is_forwarded, is_draft, is_deleted,
-		       size, has_attachments, body_text, body_html, body_fetched,
-		       read_receipt_to, read_receipt_handled, received_at
-		FROM messages
-		WHERE account_id = ? AND (
-			REPLACE(REPLACE(COALESCE(thread_id, id), '<', ''), '>', '') = ?
-			OR REPLACE(REPLACE(message_id, '<', ''), '>', '') = ?
-			OR REPLACE(REPLACE(in_reply_to, '<', ''), '>', '') = ?
+	// Exclude messages in Trash folder unless we're viewing Trash
+	messagesQuery := fmt.Sprintf(`
+		SELECT m.id, m.account_id, m.folder_id, m.uid, m.message_id, m.in_reply_to, m.references_list, m.thread_id,
+		       m.subject, m.from_name, m.from_email, m.to_list, m.cc_list, m.bcc_list, m.reply_to, m.date,
+		       m.snippet, m.is_read, m.is_starred, m.is_answered, m.is_forwarded, m.is_draft, m.is_deleted,
+		       m.size, m.has_attachments, m.body_text, m.body_html, m.body_fetched,
+		       m.read_receipt_to, m.read_receipt_handled, m.received_at
+		FROM messages m
+		INNER JOIN folders f ON m.folder_id = f.id
+		WHERE m.account_id = ? AND (
+			REPLACE(REPLACE(COALESCE(m.thread_id, m.id), '<', ''), '>', '') = ?
+			OR REPLACE(REPLACE(m.message_id, '<', ''), '>', '') = ?
+			OR REPLACE(REPLACE(m.in_reply_to, '<', ''), '>', '') = ?
 		)
-		ORDER BY date ASC
-	`
+		%s
+		ORDER BY m.date ASC
+	`, trashFilter)
 
 	rows, err := s.db.Query(messagesQuery, accountID, normalizedThreadID, normalizedThreadID, normalizedThreadID)
 	if err != nil {

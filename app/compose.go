@@ -13,6 +13,7 @@ import (
 	"github.com/hkdb/aerion/internal/folder"
 	"github.com/hkdb/aerion/internal/imap"
 	"github.com/hkdb/aerion/internal/logging"
+	"github.com/hkdb/aerion/internal/message"
 	"github.com/hkdb/aerion/internal/smtp"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -309,15 +310,21 @@ func (a *App) PrepareReply(messageID, mode string) (*smtp.ComposeMessage, error)
 	var to, cc []smtp.Address
 	selfEmails := make(map[string]bool)
 	for _, id := range identities {
-		selfEmails[strings.ToLower(id.Email)] = true
+		selfEmails[strings.ToLower(strings.TrimSpace(id.Email))] = true
 	}
 
-	originalFrom := []smtp.Address{{Name: msg.FromName, Address: msg.FromEmail}}
+	originalFrom := []smtp.Address{{Name: msg.FromName, Address: strings.TrimSpace(msg.FromEmail)}}
 
 	switch mode {
 	case "reply":
 		// Reply to sender only
 		to = filterSelfAddresses(originalFrom, selfEmails)
+
+		// Defensive fix: if reply resulted in no recipients (replying to self),
+		// include the original sender anyway
+		if len(to) == 0 && len(originalFrom) > 0 {
+			to = originalFrom
+		}
 	case "reply-all":
 		// Reply to sender
 		to = filterSelfAddresses(originalFrom, selfEmails)
@@ -328,12 +335,19 @@ func (a *App) PrepareReply(messageID, mode string) (*smtp.ComposeMessage, error)
 		originalCc := parseAddressList(msg.CcList)
 		toSet := make(map[string]bool)
 		for _, addr := range to {
-			toSet[strings.ToLower(addr.Address)] = true
+			toSet[strings.ToLower(strings.TrimSpace(addr.Address))] = true
 		}
 		for _, addr := range filterSelfAddresses(originalCc, selfEmails) {
-			if !toSet[strings.ToLower(addr.Address)] {
+			if !toSet[strings.ToLower(strings.TrimSpace(addr.Address))] {
 				cc = append(cc, addr)
 			}
+		}
+
+		// Defensive fix: if reply-all resulted in no recipients at all,
+		// include the original sender even if it matches a self email
+		// (this can happen when replying to your own sent messages)
+		if len(to) == 0 && len(cc) == 0 && len(originalFrom) > 0 {
+			to = originalFrom
 		}
 	case "forward":
 		// Leave To empty for user to fill in
@@ -356,18 +370,30 @@ func (a *App) PrepareReply(messageID, mode string) (*smtp.ComposeMessage, error)
 	} else {
 		// Reply format
 		citation := fmt.Sprintf("On %s, %s wrote:", dateStr, sender)
-		htmlBody = fmt.Sprintf("<br><br>%s<br><blockquote type=\"cite\">%s</blockquote>", escapeHTML(citation), msg.BodyHTML)
+		htmlBody = fmt.Sprintf("<p><br></p><p>%s</p><blockquote type=\"cite\">%s</blockquote>", escapeHTML(citation), msg.BodyHTML)
 		textBody = fmt.Sprintf("\n\n%s\n%s", citation, quoteText(msg.BodyText))
 	}
 
+	// Build References header per RFC 5322:
+	// References = parent's References + parent's Message-ID
+	var refs []string
+	if msg.References != "" {
+		// References are stored as a JSON array in the DB
+		json.Unmarshal([]byte(msg.References), &refs)
+	}
+	if msg.MessageID != "" {
+		refs = append(refs, ensureAngleBrackets(msg.MessageID))
+	}
+
 	return &smtp.ComposeMessage{
-		From:      from,
-		To:        to,
-		Cc:        cc,
-		Subject:   subject,
-		HTMLBody:  htmlBody,
-		TextBody:  textBody,
-		InReplyTo: msg.MessageID,
+		From:       from,
+		To:         to,
+		Cc:         cc,
+		Subject:    subject,
+		HTMLBody:   htmlBody,
+		TextBody:   textBody,
+		InReplyTo:  ensureAngleBrackets(msg.MessageID),
+		References: refs,
 	}, nil
 }
 
@@ -496,9 +522,18 @@ func parseAddressList(s string) []smtp.Address {
 		return nil
 	}
 
-	// Try JSON format first
-	var addrs []smtp.Address
-	if err := json.Unmarshal([]byte(s), &addrs); err == nil {
+	// Try JSON format first - the DB stores addresses with "email" field (message.Address),
+	// but we need to return smtp.Address which uses "address" field
+	var msgAddrs []message.Address
+	if err := json.Unmarshal([]byte(s), &msgAddrs); err == nil {
+		// Convert message.Address to smtp.Address
+		var addrs []smtp.Address
+		for _, msgAddr := range msgAddrs {
+			addrs = append(addrs, smtp.Address{
+				Name:    strings.TrimSpace(msgAddr.Name),
+				Address: strings.TrimSpace(msgAddr.Email),
+			})
+		}
 		return addrs
 	}
 
@@ -515,12 +550,12 @@ func parseAddressList(s string) []smtp.Address {
 			end := strings.Index(part, ">")
 			if start > 0 && end > start {
 				name := strings.TrimSpace(part[:start])
-				email := part[start+1 : end]
+				email := strings.TrimSpace(part[start+1 : end])
 				result = append(result, smtp.Address{Name: name, Address: email})
 				continue
 			}
 		}
-		result = append(result, smtp.Address{Address: part})
+		result = append(result, smtp.Address{Address: strings.TrimSpace(part)})
 	}
 	return result
 }
@@ -529,7 +564,8 @@ func parseAddressList(s string) []smtp.Address {
 func filterSelfAddresses(addrs []smtp.Address, selfEmails map[string]bool) []smtp.Address {
 	var result []smtp.Address
 	for _, addr := range addrs {
-		if !selfEmails[strings.ToLower(addr.Address)] {
+		lowerAddr := strings.ToLower(strings.TrimSpace(addr.Address))
+		if !selfEmails[lowerAddr] {
 			result = append(result, addr)
 		}
 	}
@@ -543,6 +579,21 @@ func escapeHTML(s string) string {
 	s = strings.ReplaceAll(s, ">", "&gt;")
 	s = strings.ReplaceAll(s, "\"", "&quot;")
 	return s
+}
+
+// ensureAngleBrackets wraps a Message-ID in angle brackets if not already present
+func ensureAngleBrackets(msgID string) string {
+	if msgID == "" {
+		return ""
+	}
+	msgID = strings.TrimSpace(msgID)
+	if !strings.HasPrefix(msgID, "<") {
+		msgID = "<" + msgID
+	}
+	if !strings.HasSuffix(msgID, ">") {
+		msgID = msgID + ">"
+	}
+	return msgID
 }
 
 // quoteText adds > prefix to each line for plain text quoting

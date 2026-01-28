@@ -114,8 +114,6 @@
   onMount(async () => {
     // Listen for notification click events from backend
     EventsOn('notification:clicked', (data: { accountId: string; folderId: string; threadId: string }) => {
-      console.log('[App] Notification clicked:', data)
-
       // Find folder info for display
       const folderInfo = findFolderById(data.accountId, data.folderId)
 

@@ -90,8 +90,6 @@ class OAuthStore {
 
     // Listen for reauth required events (token refresh failed)
     EventsOn('oauth:reauth-required', async (data: { accountId: string; provider: string; error: string }) => {
-      console.warn(`OAuth re-authorization required for account ${data.accountId}: ${data.error}`)
-
       // Get account name for better UX
       let accountName = data.provider
       try {

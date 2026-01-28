@@ -107,7 +107,6 @@
 
     // Listen for folder count changes to update unified inbox count
     const unsubscribe = EventsOn('folders:countsChanged', (data: Record<string, number>) => {
-      console.log('[Sidebar] folders:countsChanged event received:', data)
       loadUnifiedInboxCount()
     })
 
@@ -120,7 +119,6 @@
   async function loadUnifiedInboxCount() {
     try {
       const count = await GetUnifiedInboxUnreadCount()
-      console.log('[Sidebar] loadUnifiedInboxCount:', count)
       unifiedUnreadCount = count
     } catch (err) {
       console.error('Failed to load unified inbox count:', err)

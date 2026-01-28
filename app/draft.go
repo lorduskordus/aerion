@@ -146,6 +146,14 @@ func (a *App) syncDraftToIMAP(localDraft *draft.Draft, msg smtp.ComposeMessage) 
 		Str("id", localDraft.ID).
 		Uint32("imap_uid", uint32(uid)).
 		Msg("Draft synced to IMAP")
+
+	// Sync the Drafts folder so the main window's message list shows the updated draft
+	// Do this after IMAP upload completes to ensure the draft is available
+	if err := a.SyncFolder(localDraft.AccountID, draftsFolder.ID); err != nil {
+		log.Warn().Err(err).Str("folderID", draftsFolder.ID).Msg("Failed to sync Drafts folder after draft save")
+	} else {
+		log.Debug().Str("folderID", draftsFolder.ID).Msg("Synced Drafts folder after draft save")
+	}
 }
 
 // SyncPendingDrafts syncs any pending drafts for an account

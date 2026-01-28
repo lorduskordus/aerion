@@ -175,12 +175,10 @@ class AccountStore {
     
     window.addEventListener('online', () => {
       this.isOnline = true
-      console.log('[AccountStore] Connection restored - back online')
     })
-    
+
     window.addEventListener('offline', () => {
       this.isOnline = false
-      console.log('[AccountStore] Connection lost - now offline')
     })
   }
 

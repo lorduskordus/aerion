@@ -1,5 +1,18 @@
 # CHANGELOG
 
+**v0.1.6 - 01-28-2026**
+---
+
+- Fixed signature insertion on reply
+- Fixed replies not being tracked in conversations
+- Fixed ghost recipient on reply-All 
+- Cleaned up console.log/warn in frontend
+- Added ability to delete single message from conversation
+- Sync draft folder after saving draft from inline composer
+- Reload conversation viewer after saving draft
+- Added keyboard driven single message delete (focus on conversation viewer pane --> tab to msg --> delete)
+
+
 **v0.1.5 - 01-27-2026**
 ---
 

@@ -46,9 +46,12 @@
   let conversation = $state<messageModels.Conversation | null>(null)
   let loading = $state(false)
   let error = $state<string | null>(null)
-  
+
   // Track which messages are expanded (unread messages auto-expand)
   let expandedMessages = $state<Set<string>>(new Set())
+
+  // Track focused message for keyboard deletion
+  let focusedMessageId = $state<string | null>(null)
   
   // Read receipt policy and tracking
   let readReceiptPolicy = $state<'never' | 'ask' | 'always'>('ask')
@@ -124,10 +127,22 @@
     )
 
     cleanupFunctions.push(
-      EventsOn('messages:deleted', (messageIds: string[]) => {
+      EventsOn('messages:deleted', async (messageIds: string[]) => {
         if (conversation?.messages?.some(m => messageIds.includes(m.id))) {
-          // Clear conversation if messages deleted
-          conversation = null
+          // Check how many messages were deleted
+          const deletedCount = conversation.messages.filter(m => messageIds.includes(m.id)).length
+          const remainingCount = conversation.messages.length - deletedCount
+
+          if (remainingCount === 0) {
+            // All messages deleted - navigate away
+            conversation = null
+            onActionComplete?.(true)
+          } else {
+            // Some messages remain - reload conversation
+            if (threadId && folderId) {
+              await loadConversation(threadId, folderId)
+            }
+          }
         }
       })
     )
@@ -140,6 +155,65 @@
         }
       })
     )
+
+    cleanupFunctions.push(
+      EventsOn('folder:synced', (data: { accountId: string; folderId: string }) => {
+        // Reload conversation if it's from the same account
+        // (conversations can span multiple folders: Inbox, Sent, Drafts, etc.)
+        if (threadId && folderId && accountId && data.accountId === accountId) {
+          loadConversation(threadId, folderId)
+        }
+      })
+    )
+
+    // Keyboard handler for message navigation and deletion
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle if viewer pane is focused
+      if (!isFocused) return
+
+      // Handle Tab for message navigation
+      if (e.key === 'Tab' && conversation?.messages) {
+        e.preventDefault()
+
+        const messageIds = conversation.messages.map(m => m.id)
+        const currentIndex = focusedMessageId ? messageIds.indexOf(focusedMessageId) : -1
+
+        if (e.shiftKey) {
+          // Shift+Tab - navigate backward
+          if (currentIndex > 0) {
+            focusedMessageId = messageIds[currentIndex - 1]
+            // Focus the message element
+            document.querySelector(`[data-message-id="${focusedMessageId}"]`)?.focus()
+          } else {
+            // At first message, clear focus to let Tab navigate out
+            focusedMessageId = null
+          }
+        } else {
+          // Tab - navigate forward
+          if (currentIndex < messageIds.length - 1) {
+            focusedMessageId = messageIds[currentIndex + 1]
+            // Focus the message element
+            document.querySelector(`[data-message-id="${focusedMessageId}"]`)?.focus()
+          } else if (currentIndex === -1 && messageIds.length > 0) {
+            // No message focused yet, focus first message
+            focusedMessageId = messageIds[0]
+            document.querySelector(`[data-message-id="${focusedMessageId}"]`)?.focus()
+          }
+        }
+        return
+      }
+
+      // Handle delete for focused message
+      if (focusedMessageId && (e.key === 'Delete' || e.key === 'Backspace')) {
+        e.preventDefault()
+        handleDeleteFocusedMessage()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    cleanupFunctions.push(() => {
+      window.removeEventListener('keydown', handleKeyDown)
+    })
   })
 
   onDestroy(() => {
@@ -178,23 +252,9 @@
     loading = true
     error = null
 
-    console.log('[ConversationViewer] Loading conversation:', { threadId: tid, folderId: fid })
-
     try {
       conversation = await GetConversation(tid, fid)
-      
-      console.log('[ConversationViewer] Loaded conversation:', {
-        subject: conversation?.subject,
-        messageCount: conversation?.messages?.length,
-        messages: conversation?.messages?.map(m => ({
-          id: m.id,
-          subject: m.subject,
-          bodyTextLen: m.bodyText?.length || 0,
-          bodyHtmlLen: m.bodyHtml?.length || 0,
-          threadId: m.threadId
-        }))
-      })
-      
+
       // Auto-expand unread messages and the last message
       if (conversation?.messages) {
         const newExpanded = new Set<string>()
@@ -402,7 +462,7 @@
   async function handleConfirmPermanentDelete() {
     if (!conversation?.messages) return
     const messageIds = conversation.messages.map(m => m.id)
-    
+
     try {
       await DeletePermanently(messageIds)
       toasts.success('Permanently deleted')
@@ -411,6 +471,35 @@
     } catch (err) {
       toasts.error(`Failed to delete: ${err}`)
       showDeleteConfirm = false
+    }
+  }
+
+  // Delete the currently focused message (via keyboard)
+  async function handleDeleteFocusedMessage() {
+    if (!focusedMessageId) return
+
+    if (isTrashFolder) {
+      // Permanent delete from trash
+      try {
+        await DeletePermanently([focusedMessageId])
+        toasts.success('Permanently deleted')
+        focusedMessageId = null
+        // Will auto-reload via messages:deleted event
+      } catch (err) {
+        toasts.error(`Failed to delete: ${err}`)
+      }
+    } else {
+      // Move to trash (undoable)
+      try {
+        await Trash([focusedMessageId])
+        toasts.success('Moved to trash', [
+          { label: 'Undo', onClick: handleUndo }
+        ])
+        focusedMessageId = null
+        // Will auto-reload via messages:deleted event
+      } catch (err) {
+        toasts.error(`Failed to delete: ${err}`)
+      }
     }
   }
 
@@ -641,11 +730,21 @@
     window.dispatchEvent(new CustomEvent('open-always-load-dropdown'))
   }
 
-  // Handle action completion from context menu
-  function handleContextMenuActionComplete() {
+  // Handle action completion from context menu (per-message)
+  async function handleContextMenuActionComplete() {
     // Reload conversation after context menu action
     if (threadId && folderId) {
-      loadConversation(threadId, folderId)
+      try {
+        await loadConversation(threadId, folderId)
+
+        // If conversation no longer exists or has no messages, navigate away
+        if (!conversation || !conversation.messages || conversation.messages.length === 0) {
+          onActionComplete?.(true) // Auto-select next conversation
+        }
+      } catch (err) {
+        // Conversation deleted or error loading - navigate away
+        onActionComplete?.(true)
+      }
     }
   }
 
@@ -820,21 +919,11 @@
 
     <!-- Conversation Content -->
     <div bind:this={contentContainerRef} class="flex-1 min-h-0 overflow-y-auto scrollbar-thin" onfocusin={() => setFocusedPane('viewer')}>
-      <MessageContextMenu
-        messageIds={allMessageIds}
-        accountId={accountId || ''}
-        currentFolderId={folderId || ''}
-        folderType={folderType || 'inbox'}
-        isStarred={allStarred}
-        isRead={allRead}
-        onActionComplete={handleContextMenuActionComplete}
-        {onReply}
-      >
-        <div class="p-6">
-          <!-- Subject -->
-          <h1 class="text-xl font-semibold text-foreground mb-4">
-            {conversation.subject || '(No subject)'}
-          </h1>
+      <div class="p-6">
+        <!-- Subject -->
+        <h1 class="text-xl font-semibold text-foreground mb-4">
+          {conversation.subject || '(No subject)'}
+        </h1>
 
         <!-- Message Count Badge -->
         {#if conversation.messages && conversation.messages.length > 1}
@@ -849,8 +938,25 @@
             {#each conversation.messages as msg, index (msg.id)}
               {@const isExpanded = expandedMessages.has(msg.id)}
               {@const isLast = index === conversation.messages.length - 1}
-              
-              <div class="border border-border rounded-lg overflow-hidden">
+
+              <!-- Wrap each message in its own context menu -->
+              <MessageContextMenu
+                messageIds={[msg.id]}
+                accountId={accountId || ''}
+                currentFolderId={folderId || ''}
+                folderType={folderType || 'inbox'}
+                isStarred={msg.isStarred}
+                isRead={msg.isRead}
+                onActionComplete={handleContextMenuActionComplete}
+                {onReply}
+              >
+                <div
+                  class="border rounded-lg overflow-hidden transition-all {focusedMessageId === msg.id ? 'border-primary ring-2 ring-primary/20' : 'border-border'}"
+                  data-message-id={msg.id}
+                  tabindex="-1"
+                  onfocus={() => focusedMessageId = msg.id}
+                  onblur={() => { if (focusedMessageId === msg.id) focusedMessageId = null }}
+                >
                 <!-- Message Header (always visible, clickable to expand/collapse) -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div
@@ -858,7 +964,6 @@
                   onclick={() => toggleMessage(msg.id)}
                   onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleMessage(msg.id) }}
                   role="button"
-                  tabindex="0"
                 >
                   <!-- Avatar -->
                   <div
@@ -1028,12 +1133,12 @@
                     </div>
                   </div>
                 {/if}
-              </div>
+                </div>
+              </MessageContextMenu>
             {/each}
           </div>
         {/if}
-        </div>
-      </MessageContextMenu>
+      </div>
     </div>
   {/if}
 </div>
