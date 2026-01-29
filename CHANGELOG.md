@@ -1,5 +1,12 @@
 # CHANGELOG
 
+**v0.1.7 - 01-29-2026**
+---
+
+- Fixed AppImage regression for non-atomic distros
+- Sticking with 22.04 LTS to build since 20.04 doesn't have webkit2gtk-4.1 and 20.04 is only a few months away from EOS.
+
+
 **v0.1.6 - 01-28-2026**
 ---
 

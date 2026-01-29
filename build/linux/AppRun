@@ -17,7 +17,7 @@ case "$ARCH" in
 esac
 
 # WebKit has hardcoded path /usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/
-# Use bwrap to bind mount the entire arch-specific lib directory from AppImage
+# Use bwrap to bind mount the webkit helpers
 if [ -n "$LIB_ARCH" ] && [ -d "${HERE}/usr/lib/${LIB_ARCH}" ] && command -v bwrap >/dev/null 2>&1; then
     # Point GDK pixbuf to namespace paths (inside bwrap, files are at /usr/lib/...)
     export GDK_PIXBUF_MODULEDIR="/usr/lib/${LIB_ARCH}/gdk-pixbuf-2.0/2.10.0/loaders"
@@ -27,15 +27,26 @@ if [ -n "$LIB_ARCH" ] && [ -d "${HERE}/usr/lib/${LIB_ARCH}" ] && command -v bwra
     # (xdg-open, flatpak, etc.) to use wrong libraries. The webkit helper
     # wrappers will set it themselves when needed.
 
-    # Bind the entire arch-specific library directory
-    # Use --dev-bind for root so xdg-open can launch browser
-    exec bwrap \
-        --dev-bind / / \
-        --bind "$HOME" "$HOME" \
-        --bind /tmp /tmp \
-        --bind "${HERE}/usr/lib/${LIB_ARCH}" "/usr/lib/${LIB_ARCH}" \
-        --unsetenv LD_LIBRARY_PATH \
-        "${HERE}/usr/bin/aerion" "$@"
+    # Check if system has the webkit directory specifically
+    if [ -d "/usr/lib/${LIB_ARCH}/webkit2gtk-4.1" ]; then
+        # Webkit directory exists (Ubuntu/Debian) - only bind webkit to avoid library conflicts
+        exec bwrap \
+            --dev-bind / / \
+            --bind "$HOME" "$HOME" \
+            --bind /tmp /tmp \
+            --bind "${HERE}/usr/lib/${LIB_ARCH}/webkit2gtk-4.1" "/usr/lib/${LIB_ARCH}/webkit2gtk-4.1" \
+            --unsetenv LD_LIBRARY_PATH \
+            "${HERE}/usr/bin/aerion" "$@"
+    else
+        # Webkit directory doesn't exist (Void/Atomic Fedora) - bind entire arch lib directory
+        exec bwrap \
+            --dev-bind / / \
+            --bind "$HOME" "$HOME" \
+            --bind /tmp /tmp \
+            --bind "${HERE}/usr/lib/${LIB_ARCH}" "/usr/lib/${LIB_ARCH}" \
+            --unsetenv LD_LIBRARY_PATH \
+            "${HERE}/usr/bin/aerion" "$@"
+    fi
 else
     # No bwrap - fallback, use AppImage paths
     export WEBKIT_EXEC_PATH="${HERE}/usr/lib/${LIB_ARCH}/webkit2gtk-4.1"
