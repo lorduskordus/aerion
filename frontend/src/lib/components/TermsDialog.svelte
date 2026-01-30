@@ -2,6 +2,7 @@
   import { Dialog as DialogPrimitive } from 'bits-ui'
   import { cn } from '$lib/utils'
   import { Button } from '$lib/components/ui/button'
+  import Switch from '$lib/components/ui/switch/Switch.svelte'
   // @ts-ignore - wailsjs path
   import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
 
@@ -95,22 +96,15 @@
         </div>
 
         <!-- Toggle -->
-        <button
-          type="button"
-          onclick={() => agreed = !agreed}
-          class="flex items-center gap-3 cursor-pointer w-full text-left"
-        >
-          <div
-            class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 {agreed ? 'bg-primary' : 'bg-muted'}"
-          >
-            <span
-              class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform duration-200 {agreed ? 'translate-x-5' : 'translate-x-0.5'}"
-            ></span>
-          </div>
-          <span class="text-sm">
+        <div class="flex items-center gap-3">
+          <Switch
+            bind:checked={agreed}
+            id="agree-terms"
+          />
+          <label for="agree-terms" class="text-sm cursor-pointer">
             I have read and agree to the Terms of Use and Privacy Policy
-          </span>
-        </button>
+          </label>
+        </div>
       </div>
 
       <!-- Footer -->

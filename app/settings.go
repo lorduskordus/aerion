@@ -70,6 +70,16 @@ func (a *App) SetThemeMode(mode string) error {
 	return a.settingsStore.SetThemeMode(mode)
 }
 
+// GetShowTitleBar returns whether the title bar should be shown
+func (a *App) GetShowTitleBar() (bool, error) {
+	return a.settingsStore.GetShowTitleBar()
+}
+
+// SetShowTitleBar sets whether the title bar should be shown
+func (a *App) SetShowTitleBar(show bool) error {
+	return a.settingsStore.SetShowTitleBar(show)
+}
+
 // GetTermsAccepted returns whether the user has accepted the terms of service
 func (a *App) GetTermsAccepted() (bool, error) {
 	return a.settingsStore.GetTermsAccepted()

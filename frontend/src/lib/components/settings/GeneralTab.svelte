@@ -3,16 +3,19 @@
   import * as Select from '$lib/components/ui/select'
   import { Label } from '$lib/components/ui/label'
   import { Input } from '$lib/components/ui/input'
+  import Switch from '$lib/components/ui/switch/Switch.svelte'
 
   interface Props {
     readReceiptResponsePolicy: string
     markAsReadDelaySeconds: number
     messageListDensity: string
     themeMode: string
+    showTitleBar: boolean
     onPolicyChange: (value: string) => void
     onDelayChange: (value: number) => void
     onDensityChange: (value: string) => void
     onThemeChange: (value: string) => void
+    onShowTitleBarChange: (value: boolean) => void
   }
 
   let {
@@ -20,10 +23,12 @@
     markAsReadDelaySeconds = $bindable(),
     messageListDensity = $bindable(),
     themeMode = $bindable(),
+    showTitleBar = $bindable(),
     onPolicyChange,
     onDelayChange,
     onDensityChange,
     onThemeChange,
+    onShowTitleBarChange,
   }: Props = $props()
 
   // Read receipt response policy options
@@ -76,6 +81,11 @@
     onThemeChange?.(value)
   }
 
+  function handleShowTitleBarChange(value: boolean) {
+    showTitleBar = value
+    onShowTitleBarChange?.(value)
+  }
+
   function handleDelayInput(e: Event) {
     const target = e.target as HTMLInputElement
     const value = parseFloat(target.value)
@@ -91,6 +101,22 @@
       <Icon icon="mdi:format-size" class="w-4 h-4" />
       Display
     </h3>
+
+    <div class="space-y-2">
+      <div class="flex items-center justify-between">
+        <div class="space-y-0.5">
+          <Label for="show-title-bar">Show title bar</Label>
+          <p class="text-xs text-muted-foreground">
+            Disable for less UI clutter
+          </p>
+        </div>
+        <Switch
+          id="show-title-bar"
+          bind:checked={showTitleBar}
+          onCheckedChange={handleShowTitleBarChange}
+        />
+      </div>
+    </div>
 
     <div class="space-y-2">
       <Label>Theme</Label>

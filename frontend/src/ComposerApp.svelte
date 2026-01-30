@@ -8,6 +8,7 @@
   import ToastContainer from './lib/components/ui/toast/ToastContainer.svelte'
   import { addToast } from '$lib/stores/toast'
   import { createComposerWindowApi } from '$lib/composerApi'
+  import { getShowTitleBar } from '$lib/stores/settings.svelte'
   // @ts-ignore - wailsjs imports
   import { GetComposeMode, PrepareReply, GetDraft, CloseWindow } from '../wailsjs/go/app/ComposerApp.js'
   // @ts-ignore - wailsjs imports
@@ -160,58 +161,60 @@
 
 <div class="h-screen flex flex-col bg-background text-foreground">
   <!-- Custom Title Bar for frameless window -->
-  <header class="h-10 flex items-center justify-between bg-muted/50 border-b border-border select-none shrink-0">
-    <!-- Drag region - left side with title -->
-    <div class="flex-1 flex items-center gap-2 px-3 h-full" style="--wails-draggable: drag">
-      <Icon icon="mdi:email-edit-outline" class="w-5 h-5 text-primary" />
-      <span class="text-sm font-medium text-foreground">{windowTitle()}</span>
-    </div>
-    
-    <!-- Mac-style traffic light controls -->
-    <div 
-      class="flex items-center gap-2 px-3 h-full"
-      role="group"
-      aria-label="Window controls"
-      onmouseenter={() => isHovering = true}
-      onmouseleave={() => isHovering = false}
-    >
-      <!-- Minimize (yellow) -->
-      <button
-        class="w-3 h-3 rounded-full flex items-center justify-center transition-all bg-[#FEBC2E] hover:brightness-90 active:brightness-75"
-        onclick={minimize}
-        title="Minimize"
-        aria-label="Minimize window"
+  {#if getShowTitleBar()}
+    <header class="h-10 flex items-center justify-between bg-muted/50 border-b border-border select-none shrink-0">
+      <!-- Drag region - left side with title -->
+      <div class="flex-1 flex items-center gap-2 px-3 h-full" style="--wails-draggable: drag">
+        <Icon icon="mdi:email-edit-outline" class="w-5 h-5 text-primary" />
+        <span class="text-sm font-medium text-foreground">{windowTitle()}</span>
+      </div>
+
+      <!-- Mac-style traffic light controls -->
+      <div
+        class="flex items-center gap-2 px-3 h-full"
+        role="group"
+        aria-label="Window controls"
+        onmouseenter={() => isHovering = true}
+        onmouseleave={() => isHovering = false}
       >
-        {#if isHovering}
-          <span class="text-[10px] font-bold text-black/60 leading-none">−</span>
-        {/if}
-      </button>
-      
-      <!-- Maximize/Restore (green) -->
-      <button
-        class="w-3 h-3 rounded-full flex items-center justify-center transition-all bg-[#28C840] hover:brightness-90 active:brightness-75"
-        onclick={toggleMaximize}
-        title={isMaximized ? "Restore" : "Maximize"}
-        aria-label={isMaximized ? "Restore window" : "Maximize window"}
-      >
-        {#if isHovering}
-          <span class="text-[10px] font-bold text-black/60 leading-none">+</span>
-        {/if}
-      </button>
-      
-      <!-- Close (red) -->
-      <button
-        class="w-3 h-3 rounded-full flex items-center justify-center transition-all bg-[#FF5F57] hover:brightness-90 active:brightness-75"
-        onclick={requestClose}
-        title="Close"
-        aria-label="Close window"
-      >
-        {#if isHovering}
-          <span class="text-[10px] font-bold text-black/60 leading-none">×</span>
-        {/if}
-      </button>
-    </div>
-  </header>
+        <!-- Minimize (yellow) -->
+        <button
+          class="w-3 h-3 rounded-full flex items-center justify-center transition-all bg-[#FEBC2E] hover:brightness-90 active:brightness-75"
+          onclick={minimize}
+          title="Minimize"
+          aria-label="Minimize window"
+        >
+          {#if isHovering}
+            <span class="text-[10px] font-bold text-black/60 leading-none">−</span>
+          {/if}
+        </button>
+
+        <!-- Maximize/Restore (green) -->
+        <button
+          class="w-3 h-3 rounded-full flex items-center justify-center transition-all bg-[#28C840] hover:brightness-90 active:brightness-75"
+          onclick={toggleMaximize}
+          title={isMaximized ? "Restore" : "Maximize"}
+          aria-label={isMaximized ? "Restore window" : "Maximize window"}
+        >
+          {#if isHovering}
+            <span class="text-[10px] font-bold text-black/60 leading-none">+</span>
+          {/if}
+        </button>
+
+        <!-- Close (red) -->
+        <button
+          class="w-3 h-3 rounded-full flex items-center justify-center transition-all bg-[#FF5F57] hover:brightness-90 active:brightness-75"
+          onclick={requestClose}
+          title="Close"
+          aria-label="Close window"
+        >
+          {#if isHovering}
+            <span class="text-[10px] font-bold text-black/60 leading-none">×</span>
+          {/if}
+        </button>
+      </div>
+    </header>
+  {/if}
 
   <!-- Main content -->
   <main class="flex-1 min-h-0 overflow-hidden">

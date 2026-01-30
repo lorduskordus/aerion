@@ -15,6 +15,14 @@ jobs:
           - os: ubuntu-22.04-arm
             platform: linux
             arch: arm64
+          - os: ubuntu-24.04
+            platform: linux
+            arch: amd64
+            variant: atomic
+          - os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+            variant: atomic
           - os: macos-latest
             platform: darwin
             arch: amd64
@@ -66,8 +74,12 @@ jobs:
         run: |
           sudo apt-get install -y file
           make appimage
-          mv build/bin/aerion build/bin/aerion-linux-${{ matrix.arch }}
-          mv build/bin/Aerion-*.AppImage build/bin/Aerion-linux-${{ matrix.arch }}.AppImage
+          VARIANT_SUFFIX=""
+          if [ "${{ matrix.variant }}" = "atomic" ]; then
+            VARIANT_SUFFIX="-atomic"
+          fi
+          mv build/bin/aerion build/bin/aerion-linux-${{ matrix.arch }}${VARIANT_SUFFIX}
+          mv build/bin/Aerion-*.AppImage build/bin/Aerion-linux-${{ matrix.arch }}${VARIANT_SUFFIX}.AppImage
 
       - name: Build (macOS)
         if: matrix.platform == 'darwin'

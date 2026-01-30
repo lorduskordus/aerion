@@ -12,7 +12,7 @@
   import TermsDialog from './lib/components/TermsDialog.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { addToast } from '$lib/stores/toast'
-  import { loadSettings, getThemeMode, type ThemeMode } from '$lib/stores/settings.svelte'
+  import { loadSettings, getThemeMode, getShowTitleBar, type ThemeMode } from '$lib/stores/settings.svelte'
   import { loadUIState, saveUIState, paneConstraints } from '$lib/stores/uiState.svelte'
   import { 
     type FocusablePane,
@@ -917,7 +917,9 @@
 
 <div class="flex flex-col h-full w-full overflow-hidden bg-background">
   <!-- Custom Title Bar -->
-  <TitleBar onClose={handleShutdown} />
+  {#if getShowTitleBar()}
+    <TitleBar onClose={handleShutdown} />
+  {/if}
 
   <!-- Main Content -->
   <div class="flex flex-1 min-h-0 overflow-hidden">

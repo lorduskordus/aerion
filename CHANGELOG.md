@@ -1,5 +1,12 @@
 # CHANGELOG
 
+**v0.1.9 - 01-29-2026**
+---
+
+- Ability to disable window title bar in settings
+- Added an AppImage just for Immutable/Atomic distros [#1](https://github.com/hkdb/aerion/issues/1)
+
+
 **v0.1.8 - 01-29-2026**
 ---
 

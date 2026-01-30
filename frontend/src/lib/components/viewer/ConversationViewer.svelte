@@ -183,7 +183,7 @@
           if (currentIndex > 0) {
             focusedMessageId = messageIds[currentIndex - 1]
             // Focus the message element
-            document.querySelector(`[data-message-id="${focusedMessageId}"]`)?.focus()
+            ;(document.querySelector(`[data-message-id="${focusedMessageId}"]`) as HTMLElement)?.focus()
           } else {
             // At first message, clear focus to let Tab navigate out
             focusedMessageId = null
@@ -193,11 +193,11 @@
           if (currentIndex < messageIds.length - 1) {
             focusedMessageId = messageIds[currentIndex + 1]
             // Focus the message element
-            document.querySelector(`[data-message-id="${focusedMessageId}"]`)?.focus()
+            ;(document.querySelector(`[data-message-id="${focusedMessageId}"]`) as HTMLElement)?.focus()
           } else if (currentIndex === -1 && messageIds.length > 0) {
             // No message focused yet, focus first message
             focusedMessageId = messageIds[0]
-            document.querySelector(`[data-message-id="${focusedMessageId}"]`)?.focus()
+            ;(document.querySelector(`[data-message-id="${focusedMessageId}"]`) as HTMLElement)?.focus()
           }
         }
         return
@@ -964,6 +964,7 @@
                   onclick={() => toggleMessage(msg.id)}
                   onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleMessage(msg.id) }}
                   role="button"
+                  tabindex="0"
                 >
                   <!-- Avatar -->
                   <div

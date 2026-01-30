@@ -18,6 +18,7 @@ const (
 	KeyMessageListDensity        = "message_list_density"
 	KeyMessageListSortOrder      = "message_list_sort_order"
 	KeyThemeMode                 = "theme_mode"
+	KeyShowTitleBar              = "show_title_bar"
 	KeyTermsAccepted             = "terms_accepted"
 )
 
@@ -214,6 +215,27 @@ func (s *Store) SetThemeMode(mode string) error {
 		return fmt.Errorf("invalid theme mode: %s (must be 'system', 'light', or 'dark')", mode)
 	}
 	return s.Set(KeyThemeMode, mode)
+}
+
+// GetShowTitleBar returns whether the title bar should be shown
+func (s *Store) GetShowTitleBar() (bool, error) {
+	value, err := s.Get(KeyShowTitleBar)
+	if err != nil {
+		return true, err // Default to true (shown)
+	}
+	if value == "" {
+		return true, nil // Default to true (shown)
+	}
+	return value == "true", nil
+}
+
+// SetShowTitleBar sets whether the title bar should be shown
+func (s *Store) SetShowTitleBar(show bool) error {
+	value := "false"
+	if show {
+		value = "true"
+	}
+	return s.Set(KeyShowTitleBar, value)
 }
 
 // GetTermsAccepted returns whether the user has accepted the terms of service

@@ -5,9 +5,9 @@
   import * as Tabs from '$lib/components/ui/tabs'
   import { Button } from '$lib/components/ui/button'
   // @ts-ignore - wailsjs path
-  import { GetReadReceiptResponsePolicy, SetReadReceiptResponsePolicy, GetMarkAsReadDelay, SetMarkAsReadDelay, GetMessageListDensity, SetMessageListDensity, GetThemeMode, SetThemeMode } from '../../../../wailsjs/go/app/App.js'
+  import { GetReadReceiptResponsePolicy, SetReadReceiptResponsePolicy, GetMarkAsReadDelay, SetMarkAsReadDelay, GetMessageListDensity, SetMessageListDensity, GetThemeMode, SetThemeMode, GetShowTitleBar, SetShowTitleBar } from '../../../../wailsjs/go/app/App.js'
   import { addToast } from '$lib/stores/toast'
-  import { setMessageListDensity as updateDensityStore, setThemeMode as updateThemeStore, type MessageListDensity, type ThemeMode } from '$lib/stores/settings.svelte'
+  import { setMessageListDensity as updateDensityStore, setThemeMode as updateThemeStore, setShowTitleBar as updateShowTitleBarStore, type MessageListDensity, type ThemeMode } from '$lib/stores/settings.svelte'
   import GeneralTab from './GeneralTab.svelte'
   import AccountsTab from './AccountsTab.svelte'
   import ContactsTab from './ContactsTab.svelte'
@@ -30,6 +30,7 @@
   let markAsReadDelaySeconds = $state<number>(1) // Display in seconds, store in ms
   let messageListDensity = $state<string>('standard')
   let themeMode = $state<string>('system')
+  let showTitleBar = $state<boolean>(true)
   let loading = $state(true)
   let saving = $state(false)
   let activeTab = $state('general')
@@ -49,17 +50,19 @@
   async function loadSettings() {
     loading = true
     try {
-      const [policy, delayMs, density, theme] = await Promise.all([
+      const [policy, delayMs, density, theme, titleBar] = await Promise.all([
         GetReadReceiptResponsePolicy(),
         GetMarkAsReadDelay(),
         GetMessageListDensity(),
         GetThemeMode(),
+        GetShowTitleBar(),
       ])
       readReceiptResponsePolicy = policy
       // Convert ms to seconds for display
       markAsReadDelaySeconds = delayMs < 0 ? -1 : delayMs / 1000
       messageListDensity = density
       themeMode = theme
+      showTitleBar = titleBar
     } catch (err) {
       console.error('Failed to load settings:', err)
     } finally {
@@ -78,9 +81,11 @@
       await SetMarkAsReadDelay(delayMs)
       await SetMessageListDensity(messageListDensity)
       await SetThemeMode(themeMode)
+      await SetShowTitleBar(showTitleBar)
       // Update the reactive stores so UI updates immediately
       updateDensityStore(messageListDensity as MessageListDensity)
       updateThemeStore(themeMode as ThemeMode)
+      updateShowTitleBarStore(showTitleBar)
       addToast({
         type: 'success',
         message: 'Settings saved',
@@ -152,10 +157,12 @@
               bind:markAsReadDelaySeconds
               bind:messageListDensity
               bind:themeMode
+              bind:showTitleBar
               onPolicyChange={(v) => readReceiptResponsePolicy = v}
               onDelayChange={(v) => markAsReadDelaySeconds = v}
               onDensityChange={(v) => messageListDensity = v}
               onThemeChange={(v) => themeMode = v}
+              onShowTitleBarChange={(v) => showTitleBar = v}
             />
           </Tabs.Content>
 
