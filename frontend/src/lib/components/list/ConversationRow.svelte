@@ -245,7 +245,7 @@
 >
   <div
     data-conversation-row
-    class="group w-full flex items-start {densityClasses.row[density]} text-left border-b border-border transition-colors cursor-pointer outline-none {selected
+    class="group w-full flex items-start {densityClasses.row[density]} text-left border-b border-border transition-colors duration-300 cursor-pointer outline-none {selected
       ? 'bg-primary/20'
       : 'hover:bg-muted/50'}"
     onclick={(e) => onSelect(e)}
@@ -257,12 +257,12 @@
     <div
       class="{densityClasses.checkbox[density]} flex-shrink-0 flex items-center justify-center self-center {checked
         ? 'opacity-100'
-        : 'opacity-0 group-hover:opacity-100'} transition-opacity"
+        : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-200"
     >
       <button
         class="{densityClasses.checkboxInner[density]} rounded border {checked
           ? 'bg-primary border-primary'
-          : 'border-muted-foreground hover:border-primary'} flex items-center justify-center transition-colors"
+          : 'border-muted-foreground hover:border-primary'} flex items-center justify-center transition-colors duration-200"
         onclick={handleCheckboxClick}
       >
         {#if checked}
@@ -365,7 +365,7 @@
 
     <!-- Star -->
     <button
-      class="flex-shrink-0 p-1 -mr-1 rounded hover:bg-muted transition-colors"
+      class="flex-shrink-0 p-1 -mr-1 rounded hover:bg-muted transition-colors duration-200"
       onclick={handleStarClick}
     >
       <Icon

@@ -158,10 +158,14 @@
 
     cleanupFunctions.push(
       EventsOn('folder:synced', (data: { accountId: string; folderId: string }) => {
-        // Reload conversation if it's from the same account
-        // (conversations can span multiple folders: Inbox, Sent, Drafts, etc.)
+        // Only reload if the conversation isn't currently loaded successfully
+        // Other event listeners handle specific changes (flags, deletions, moves)
+        // This prevents unnecessary reloads when viewing a message during sync
         if (threadId && folderId && accountId && data.accountId === accountId) {
-          loadConversation(threadId, folderId)
+          // Skip reload if conversation is already loaded (not loading, not error)
+          if (!conversation || loading || error) {
+            loadConversation(threadId, folderId)
+          }
         }
       })
     )
@@ -823,6 +827,7 @@
       </button>
     </div>
   {:else if conversation}
+    <div class="conversation-viewer-content flex flex-col h-full">
     <!-- Header with Actions -->
     <div class="flex items-center justify-between px-4 py-3 border-b border-border">
       <div class="flex items-center gap-2">
@@ -1140,6 +1145,7 @@
           </div>
         {/if}
       </div>
+    </div>
     </div>
   {/if}
 </div>

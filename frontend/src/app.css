@@ -208,6 +208,22 @@ mark {
   animation: pane-focus-flash 0.3s ease-out;
 }
 
+/* Smooth slide-down for conversation viewer content */
+@keyframes conversation-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.conversation-viewer-content {
+  animation: conversation-slide-down 0.2s ease-out;
+}
+
 /* Composer editor styles - optimized for email composition */
 /* Replaces prose/prose-sm for better performance and cursor behavior */
 .composer-editor {

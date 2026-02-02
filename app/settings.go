@@ -59,15 +59,22 @@ func (a *App) SetMessageListSortOrder(sortOrder string) error {
 }
 
 // GetThemeMode returns the current theme mode setting
-// Values: "system", "light", "dark"
+// Values: "system", "light", "light-blue", "light-orange", "dark", "dark-gray"
 func (a *App) GetThemeMode() (string, error) {
 	return a.settingsStore.GetThemeMode()
 }
 
 // SetThemeMode sets the theme mode
-// Valid values: "system", "light", "dark"
+// Valid values: "system", "light", "light-blue", "light-orange", "dark", "dark-gray"
 func (a *App) SetThemeMode(mode string) error {
-	return a.settingsStore.SetThemeMode(mode)
+	if err := a.settingsStore.SetThemeMode(mode); err != nil {
+		return err
+	}
+
+	// Broadcast theme change to all detached composer windows
+	a.BroadcastThemeChange(mode)
+
+	return nil
 }
 
 // GetShowTitleBar returns whether the title bar should be shown

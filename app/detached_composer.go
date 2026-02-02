@@ -23,6 +23,7 @@ import (
 	"github.com/hkdb/aerion/internal/message"
 	"github.com/hkdb/aerion/internal/oauth2"
 	"github.com/hkdb/aerion/internal/platform"
+	"github.com/hkdb/aerion/internal/settings"
 	"github.com/hkdb/aerion/internal/smtp"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -58,13 +59,14 @@ type ComposerApp struct {
 	ipcToken  string
 
 	// Database (shared with main window, read-only for most operations)
-	db           *database.DB
-	accountStore *account.Store
-	folderStore  *folder.Store
-	messageStore *message.Store
-	contactStore *contact.Store
-	draftStore   *draft.Store
-	credStore    *credentials.Store
+	db            *database.DB
+	accountStore  *account.Store
+	folderStore   *folder.Store
+	messageStore  *message.Store
+	contactStore  *contact.Store
+	draftStore    *draft.Store
+	credStore     *credentials.Store
+	settingsStore *settings.Store
 
 	// IMAP pool for sending/draft operations
 	imapPool *imap.Pool
@@ -130,6 +132,7 @@ func (c *ComposerApp) Startup(ctx context.Context) {
 	c.messageStore = message.NewStore(db)
 	c.contactStore = contact.NewStore(db.DB)
 	c.draftStore = draft.NewStore(db)
+	c.settingsStore = settings.NewStore(db)
 
 	// Initialize credential store
 	credStore, err := credentials.NewStore(db.DB, paths.Data)
@@ -506,6 +509,11 @@ func (c *ComposerApp) GetComposeMode() *ComposeMode {
 		MessageID: c.config.MessageID,
 		DraftID:   c.config.DraftID,
 	}
+}
+
+// GetThemeMode returns the current theme mode setting.
+func (c *ComposerApp) GetThemeMode() (string, error) {
+	return c.settingsStore.GetThemeMode()
 }
 
 // GetOriginalMessage returns the original message for reply/forward.

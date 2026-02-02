@@ -1,5 +1,13 @@
 # CHANGELOG
 
+**v0.1.11 - 02-02-2026**
+---
+
+- Fixed detached composer theme
+- Fixed message focus on refresh
+- Improved transitions for smoother UX
+
+
 **v0.1.10 - 02-02-2026**
 ---
 

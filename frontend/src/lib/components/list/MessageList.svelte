@@ -41,6 +41,7 @@
   let loading = $state(false)
   let error = $state<string | null>(null)
   let selectedThreadId = $state<string | null>(null)
+  let lastLoadedFolderId = $state<string | null>(null) // Track folder changes
 
   // Derived: check if this folder is currently syncing (from account store's progress tracking)
   const syncing = $derived(
@@ -279,9 +280,18 @@
 
       if (currentOffset === 0) {
         conversations = convList || []
-        // Auto-select first message on fresh load for keyboard navigation
+
+        // Check if we switched to a different folder
+        const folderChanged = lastLoadedFolderId !== folderId
+        lastLoadedFolderId = folderId
+
+        // Auto-select first message on folder navigation or initial load
         if (conversations.length > 0) {
-          selectedThreadId = conversations[0].threadId
+          // If folder changed, always auto-select first message
+          // If same folder (refresh), keep existing selection
+          if (folderChanged || !selectedThreadId) {
+            selectedThreadId = conversations[0].threadId
+          }
         } else {
           selectedThreadId = null
         }
