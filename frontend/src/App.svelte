@@ -39,7 +39,7 @@
   let messageListContainerRef: HTMLElement | null = null
 
   // Theme state - follows stored preference or system
-  let theme = $state<'light' | 'dark'>('light')
+  let theme = $state<ThemeMode>('light')
 
   // React to theme mode changes from settings store
   $effect(() => {
@@ -229,8 +229,11 @@
     }
   })
 
-  function applyTheme(t: 'light' | 'dark') {
-    if (t === 'dark') {
+  function applyTheme(themeName: ThemeMode) {
+    document.documentElement.setAttribute('data-theme', themeName)
+
+    // Legacy: Also set .dark class for backwards compat
+    if (themeName.startsWith('dark')) {
       document.documentElement.classList.add('dark')
     } else {
       document.documentElement.classList.remove('dark')
@@ -241,9 +244,9 @@
   function applyThemeFromMode(mode: ThemeMode) {
     if (mode === 'system') {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-      theme = mediaQuery.matches ? 'dark' : 'light'
+      theme = mediaQuery.matches ? 'dark' : 'light'  // Default purple themes
     } else {
-      theme = mode as 'light' | 'dark'
+      theme = mode
     }
     applyTheme(theme)
   }

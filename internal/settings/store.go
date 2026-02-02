@@ -44,9 +44,12 @@ const DefaultMessageListSortOrder = SortOrderNewest
 
 // Theme mode values
 const (
-	ThemeModeSystem = "system"
-	ThemeModeLight  = "light"
-	ThemeModeDark   = "dark"
+	ThemeModeSystem      = "system"
+	ThemeModeLight       = "light"        // Default light purple
+	ThemeModeLightBlue   = "light-blue"   // New
+	ThemeModeLightOrange = "light-orange" // New
+	ThemeModeDark        = "dark"         // Default dark purple
+	ThemeModeDarkGray    = "dark-gray"    // New
 )
 
 // DefaultThemeMode is the default theme mode
@@ -211,8 +214,9 @@ func (s *Store) GetThemeMode() (string, error) {
 
 // SetThemeMode sets the theme mode
 func (s *Store) SetThemeMode(mode string) error {
-	if mode != ThemeModeSystem && mode != ThemeModeLight && mode != ThemeModeDark {
-		return fmt.Errorf("invalid theme mode: %s (must be 'system', 'light', or 'dark')", mode)
+	if mode != ThemeModeSystem && mode != ThemeModeLight && mode != ThemeModeLightBlue &&
+		mode != ThemeModeLightOrange && mode != ThemeModeDark && mode != ThemeModeDarkGray {
+		return fmt.Errorf("invalid theme mode: %s (must be 'system', 'light', 'light-blue', 'light-orange', 'dark', or 'dark-gray')", mode)
 	}
 	return s.Set(KeyThemeMode, mode)
 }

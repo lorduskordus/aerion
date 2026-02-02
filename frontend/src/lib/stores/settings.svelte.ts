@@ -6,7 +6,10 @@ import { GetMessageListDensity, GetMessageListSortOrder, GetThemeMode, GetShowTi
 
 export type MessageListDensity = 'micro' | 'compact' | 'standard' | 'large'
 export type MessageListSortOrder = 'newest' | 'oldest'
-export type ThemeMode = 'system' | 'light' | 'dark'
+export type ThemeMode =
+  | 'system'
+  | 'light' | 'light-blue' | 'light-orange'
+  | 'dark' | 'dark-gray'
 
 // Module-level reactive state
 let messageListDensity = $state<MessageListDensity>('standard')

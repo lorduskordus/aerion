@@ -1,5 +1,14 @@
 # CHANGELOG
 
+**v0.1.10 - 02-02-2026**
+---
+
+- Added other themes:
+    - Dark (Gray)
+    - Light (Blue)
+    - Light (Orange)
+
+
 **v0.1.9 - 01-29-2026**
 ---
 

@@ -70,6 +70,7 @@ Some of the system level features (clickable notifications & auto-sync on wake) 
 - Basic Search
 - Notification that brings focus to the e-mail when clicked (Linux Only)
 - Auto-Sync when system wakes from suspend (Linux Only)
+- Multiple color themes (More to come...)
 - [Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md)
 
 ### 🚀 Installation
@@ -103,7 +104,6 @@ Potential features in the future:
 - PGP Support
 - In-App Keyboard Shortcut Cheat Sheet
 - Integrated Calendar?
-- Theme (Color) Customization
 - AI Assisted Composition
 - Advance Search
 

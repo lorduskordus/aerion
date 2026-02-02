@@ -50,7 +50,10 @@
   const themeModeOptions = [
     { value: 'system', label: 'System' },
     { value: 'light', label: 'Light' },
+    { value: 'light-blue', label: 'Light (Blue)' },
+    { value: 'light-orange', label: 'Light (Orange)' },
     { value: 'dark', label: 'Dark' },
+    { value: 'dark-gray', label: 'Dark (Gray)' },
   ]
 
   // Get the label for the current value
