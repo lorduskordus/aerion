@@ -206,8 +206,9 @@ jobs:
 
           # Upload all artifacts
           gh release upload $TAG_NAME \
-            aerion-*/* \
-            aerion-flatpak/* \
+            aerion-*/build/bin/* \
+            aerion-*/*.tar.gz \
+            aerion-flatpak/*.flatpak \
             build/linux/aerion.desktop \
             flathub-submission.tar.gz \
             --clobber
