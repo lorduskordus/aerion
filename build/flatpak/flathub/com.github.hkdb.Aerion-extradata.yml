@@ -1,0 +1,89 @@
+app-id: com.github.hkdb.Aerion
+runtime: org.gnome.Platform
+runtime-version: '47'
+sdk: org.gnome.Sdk
+command: aerion
+
+finish-args:
+  # Network access for email sync
+  - --share=network
+  # IPC is required for X11 and Wayland
+  - --share=ipc
+  # Display access
+  - --socket=wayland
+  - --socket=fallback-x11
+  # GPU access for hardware acceleration
+  - --device=dri
+  # Notifications
+  - --talk-name=org.freedesktop.Notifications
+  # Secret Service for secure credential storage
+  - --talk-name=org.freedesktop.secrets
+  # Access to user's home directory for attachments
+  - --filesystem=home
+  # Access to Downloads for saving attachments
+  - --filesystem=xdg-download
+  # Access to Documents for opening attachments
+  - --filesystem=xdg-documents
+  # For opening links in default browser
+  - --talk-name=org.freedesktop.portal.Desktop
+  - --talk-name=org.freedesktop.portal.OpenURI
+
+modules:
+  - name: aerion
+    buildsystem: simple
+    build-commands:
+      # Extract pre-built binary from tarball
+      - tar xzf aerion.tar.gz
+      - install -Dm755 aerion /app/bin/aerion
+
+      # Install desktop file
+      - install -Dm644 aerion.desktop /app/share/applications/com.github.hkdb.Aerion.desktop
+      - desktop-file-edit --set-key=Icon --set-value=com.github.hkdb.Aerion /app/share/applications/com.github.hkdb.Aerion.desktop
+      - desktop-file-edit --set-key=Exec --set-value=aerion /app/share/applications/com.github.hkdb.Aerion.desktop
+
+      # Install icon
+      - install -Dm644 appicon.png /app/share/icons/hicolor/256x256/apps/com.github.hkdb.Aerion.png
+
+      # Install metainfo
+      - install -Dm644 com.github.hkdb.Aerion.metainfo.xml /app/share/metainfo/com.github.hkdb.Aerion.metainfo.xml
+
+    sources:
+      # Pre-built binary tarball with OAuth credentials (x86_64)
+      # UPDATE: version, URL, sha256, and size for each release
+      - type: extra-data
+        filename: aerion.tar.gz
+        only-arches:
+          - x86_64
+        url: https://github.com/hkdb/aerion/releases/download/v0.1.12/aerion-v0.1.12-linux-x86_64.tar.gz
+        sha256: REPLACE_WITH_X86_64_SHA256
+        size: REPLACE_WITH_X86_64_SIZE
+
+      # Pre-built binary tarball with OAuth credentials (aarch64)
+      - type: extra-data
+        filename: aerion.tar.gz
+        only-arches:
+          - aarch64
+        url: https://github.com/hkdb/aerion/releases/download/v0.1.12/aerion-v0.1.12-linux-aarch64.tar.gz
+        sha256: REPLACE_WITH_AARCH64_SHA256
+        size: REPLACE_WITH_AARCH64_SIZE
+
+      # Desktop file from repo
+      - type: file
+        url: https://raw.githubusercontent.com/hkdb/aerion/v0.1.12/build/linux/aerion.desktop
+        sha256: REPLACE_WITH_SHA256_OF_DESKTOP_FILE
+
+      # Icon from repo
+      - type: file
+        url: https://raw.githubusercontent.com/hkdb/aerion/v0.1.12/build/appicon.png
+        sha256: REPLACE_WITH_SHA256_OF_ICON
+
+      # Metainfo from repo
+      - type: file
+        url: https://raw.githubusercontent.com/hkdb/aerion/v0.1.12/build/flatpak/com.github.hkdb.Aerion.metainfo.xml
+        sha256: REPLACE_WITH_SHA256_OF_METAINFO
+
+# NOTE: To update for new releases:
+# 1. Update version in url (v0.1.12 -> v0.1.13)
+# 2. Download tarball and get sha256: sha256sum aerion-v0.1.13-linux-x86_64.tar.gz
+# 3. Get size: stat -c%s aerion-v0.1.13-linux-x86_64.tar.gz
+# 4. Update sha256 hashes for desktop file, icon, and metainfo

@@ -15,14 +15,6 @@ jobs:
           - os: ubuntu-22.04-arm
             platform: linux
             arch: arm64
-          - os: ubuntu-24.04
-            platform: linux
-            arch: amd64
-            variant: atomic
-          - os: ubuntu-24.04-arm
-            platform: linux
-            arch: arm64
-            variant: atomic
           - os: macos-latest
             platform: darwin
             arch: amd64
@@ -72,17 +64,20 @@ jobs:
       - name: Build (Linux)
         if: matrix.platform == 'linux'
         run: |
-          sudo apt-get install -y file
-          make appimage
-          if [ "${{ matrix.variant }}" = "atomic" ]; then
-            # Atomic builds: only keep AppImage with -atomic suffix
-            mv build/bin/Aerion-*.AppImage build/bin/Aerion-linux-${{ matrix.arch }}-atomic.AppImage
-            rm -f build/bin/aerion
-          else
-            # Regular builds: keep both binary and AppImage
-            mv build/bin/aerion build/bin/aerion-linux-${{ matrix.arch }}
-            mv build/bin/Aerion-*.AppImage build/bin/Aerion-linux-${{ matrix.arch }}.AppImage
+          make build-linux
+          mv build/bin/aerion build/bin/aerion-linux-${{ matrix.arch }}
+
+          # Create tarball for Flatpak extra-data
+          mkdir -p flatpak-binary
+          cp build/bin/aerion-linux-${{ matrix.arch }} flatpak-binary/aerion
+
+          if [ "${{ matrix.arch }}" = "amd64" ]; then
+            tar czf aerion-${{ github.ref_name }}-linux-x86_64.tar.gz -C flatpak-binary aerion
+          elif [ "${{ matrix.arch }}" = "arm64" ]; then
+            tar czf aerion-${{ github.ref_name }}-linux-aarch64.tar.gz -C flatpak-binary aerion
           fi
+
+          rm -rf flatpak-binary
 
       - name: Build (macOS)
         if: matrix.platform == 'darwin'
@@ -109,11 +104,79 @@ jobs:
           path: |
             build/bin/aerion-*
             build/bin/Aerion-*
+            aerion-*.tar.gz
+          retention-days: 1
+
+  build-flatpak:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:noble-20260113
+    env:
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y \
+            flatpak flatpak-builder git \
+            libgtk-3-dev libwebkit2gtk-4.1-dev \
+            build-essential wget
+
+      - name: Set up Go
+        run: |
+          wget -q https://go.dev/dl/go1.23.0.linux-amd64.tar.gz
+          tar -C /usr/local -xzf go1.23.0.linux-amd64.tar.gz
+          echo "/usr/local/go/bin" >> $GITHUB_PATH
+
+      - name: Set up Node.js
+        run: |
+          wget -qO- https://nodejs.org/dist/v20.11.0/node-v20.11.0-linux-x64.tar.xz | tar -xJ -C /usr/local
+          echo "/usr/local/node-v20.11.0-linux-x64/bin" >> $GITHUB_PATH
+
+      - name: Install Wails CLI
+        run: /usr/local/go/bin/go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          /usr/local/node-v20.11.0-linux-x64/bin/npm install
+
+      - name: Build binary on host
+        run: |
+          export PATH=$PATH:/usr/local/go/bin:/root/go/bin
+          make build-linux
+
+      - name: Add Flathub repository
+        run: flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+
+      - name: Install Flatpak runtimes
+        run: |
+          flatpak install -y flathub \
+            org.gnome.Platform//47 \
+            org.gnome.Sdk//47
+
+      - name: Package into Flatpak
+        run: |
+          flatpak-builder --force-clean --repo=repo build-dir build/flatpak/com.github.hkdb.Aerion-prebuilt.yml
+          mkdir -p build/bin
+          flatpak build-bundle repo build/bin/Aerion-${{ github.ref_name }}.flatpak com.github.hkdb.Aerion
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aerion-flatpak
+          path: build/bin/Aerion-*.flatpak
           retention-days: 1
 
   publish:
     needs:
       - build
+      - build-flatpak
     runs-on: ubuntu-latest
     env:
       GH_REPO: ${{ github.repository }}
@@ -128,4 +191,22 @@ jobs:
       - name: Publish release
         run: |
           TAG_NAME=${{ github.ref_name }}
-          gh release upload $TAG_NAME aerion-*/* build/linux/aerion.desktop --clobber
+
+          # Update Flathub manifest with current tag and commit
+          sed -i "s/tag: .*/tag: ${TAG_NAME}/" build/flatpak/flathub/com.github.hkdb.Aerion.yml
+          sed -i "s/# commit: .*/commit: ${GITHUB_SHA}/" build/flatpak/flathub/com.github.hkdb.Aerion.yml
+
+          # Create Flathub submission package
+          mkdir -p flathub-submission
+          cp build/flatpak/flathub/com.github.hkdb.Aerion.yml flathub-submission/
+          cp build/flatpak/com.github.hkdb.Aerion.metainfo.xml flathub-submission/
+          cp build/flatpak/flathub/README.md flathub-submission/
+          tar -czf flathub-submission.tar.gz flathub-submission/
+
+          # Upload all artifacts
+          gh release upload $TAG_NAME \
+            aerion-*/* \
+            aerion-flatpak/* \
+            build/linux/aerion.desktop \
+            flathub-submission.tar.gz \
+            --clobber

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+**v0.1.12 - 02-03-2026**
+---
+
+- Removed AppImage build
+- Implemented Flatpak build
+
+
 **v0.1.11 - 02-02-2026**
 ---
 

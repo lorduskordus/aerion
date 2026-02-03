@@ -8,9 +8,9 @@
 # OAuth credentials are loaded from .env or .env.local files
 # See .env.example for required variables
 
-.PHONY: all build build-linux appimage dev generate clean tools-clean test lint help \
+.PHONY: all build build-linux dev generate clean test lint help \
         install uninstall install-linux uninstall-linux \
-        install-darwin uninstall-darwin build-windows-installer
+        install-darwin uninstall-darwin build-windows-installer flatpak
 
 # Load environment variables from .env files
 # .env.local takes precedence over .env
@@ -29,25 +29,9 @@ LDFLAGS := -X '$(MODULE)/internal/oauth2.GoogleClientID=$(GOOGLE_CLIENT_ID)' \
 # Wails build tags
 BUILD_TAGS := webkit2_41
 
-# AppImage tools directory and architecture detection
-TOOLS_DIR := $(CURDIR)/.tools
-HOST_ARCH := $(shell uname -m)
-ifeq ($(HOST_ARCH),aarch64)
-    ARCH := aarch64
-    LINUXDEPLOY := $(TOOLS_DIR)/linuxdeploy-aarch64.AppImage
-    APPIMAGE_RUNTIME := $(TOOLS_DIR)/runtime-aarch64
-else
-    ARCH := x86_64
-    LINUXDEPLOY := $(TOOLS_DIR)/linuxdeploy-x86_64.AppImage
-    APPIMAGE_RUNTIME := $(TOOLS_DIR)/runtime-x86_64
-endif
-
-# Detect webkit helper directory (architecture-specific)
-ifeq ($(ARCH),aarch64)
-    WEBKIT_HELPERS_DIR := /usr/lib/aarch64-linux-gnu/webkit2gtk-4.1
-else
-    WEBKIT_HELPERS_DIR := /usr/lib/x86_64-linux-gnu/webkit2gtk-4.1
-endif
+# NOTE: AppImage build target has been removed due to webkit bundling incompatibility.
+# See archive/AppImage/README.md for details on what was tried and why it didn't work.
+# Use Flatpak packaging instead for cross-distro distribution.
 
 # Installation directories (can be overridden)
 PREFIX ?= /usr/local
@@ -75,78 +59,10 @@ build-linux:
 	@echo "Building Aerion for Linux..."
 	wails build -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS),linux,production
 
-# Download linuxdeploy tool (architecture-specific)
-$(LINUXDEPLOY):
-	@mkdir -p $(TOOLS_DIR)
-	@echo "Downloading linuxdeploy for $(ARCH)..."
-	curl -L --retry 3 --retry-delay 5 --connect-timeout 30 -o $(LINUXDEPLOY) \
-		https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-$(ARCH).AppImage
-	chmod +x $(LINUXDEPLOY)
-
-# Download AppImage runtime (architecture-specific)
-$(APPIMAGE_RUNTIME):
-	@mkdir -p $(TOOLS_DIR)
-	@echo "Downloading AppImage runtime for $(ARCH)..."
-	curl -L --retry 3 --retry-delay 5 --connect-timeout 30 -o $(APPIMAGE_RUNTIME) \
-		https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-$(ARCH)
-
-# No longer needed - we manually bundle webkit helpers
-
-# Build Linux AppImage
-appimage: build-linux $(LINUXDEPLOY) $(APPIMAGE_RUNTIME)
-	@echo "Creating AppImage..."
-	@rm -rf build/linux/AppDir
-	@mkdir -p build/linux/AppDir/usr/bin
-	@mkdir -p build/linux/AppDir/usr/share/applications
-	@mkdir -p build/linux/AppDir/usr/share/icons/hicolor/256x256/apps
-	@mkdir -p build/linux/AppDir/usr/lib/$(ARCH)-linux-gnu/webkit2gtk-4.1
-	cp build/bin/aerion build/linux/AppDir/usr/bin/
-	cp build/linux/aerion.desktop build/linux/AppDir/usr/share/applications/
-	cp build/appicon.png build/linux/AppDir/usr/share/icons/hicolor/256x256/apps/aerion.png
-	@echo "Creating /lib symlink for webkit compatibility..."
-	ln -sf usr/lib build/linux/AppDir/lib
-	@echo "Bundling webkit2gtk helper processes..."
-	@if [ -d "$(WEBKIT_HELPERS_DIR)" ]; then \
-		cp -r $(WEBKIT_HELPERS_DIR)/* build/linux/AppDir/usr/lib/$(ARCH)-linux-gnu/webkit2gtk-4.1/; \
-		echo "Webkit helpers bundled from $(WEBKIT_HELPERS_DIR) to usr/lib/$(ARCH)-linux-gnu/webkit2gtk-4.1/"; \
-		echo "Creating wrapper scripts for webkit helpers..."; \
-		for helper in WebKitNetworkProcess WebKitWebProcess WebKitGPUProcess; do \
-			if [ -f "build/linux/AppDir/usr/lib/$(ARCH)-linux-gnu/webkit2gtk-4.1/$$helper" ]; then \
-				mv "build/linux/AppDir/usr/lib/$(ARCH)-linux-gnu/webkit2gtk-4.1/$$helper" \
-				   "build/linux/AppDir/usr/lib/$(ARCH)-linux-gnu/webkit2gtk-4.1/$$helper.bin"; \
-				cp build/linux/webkit-wrapper.sh "build/linux/AppDir/usr/lib/$(ARCH)-linux-gnu/webkit2gtk-4.1/$$helper"; \
-				chmod +x "build/linux/AppDir/usr/lib/$(ARCH)-linux-gnu/webkit2gtk-4.1/$$helper"; \
-			fi; \
-		done; \
-	else \
-		echo "Warning: webkit2gtk helpers not found at $(WEBKIT_HELPERS_DIR)"; \
-		echo "AppImage may not work on systems without webkit2gtk installed"; \
-	fi
-	@echo "Bundling GDK pixbuf loaders..."
-	@mkdir -p build/linux/AppDir/usr/lib/$(ARCH)-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders
-	@if [ -d "/usr/lib/$(ARCH)-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders" ]; then \
-		cp -r /usr/lib/$(ARCH)-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders/* \
-		      build/linux/AppDir/usr/lib/$(ARCH)-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders/; \
-		echo "Pixbuf loaders bundled"; \
-	fi
-	@echo "Generating pixbuf loaders cache..."
-	@GDK_PIXBUF_MODULEDIR=$(CURDIR)/build/linux/AppDir/usr/lib/$(ARCH)-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders \
-		gdk-pixbuf-query-loaders 2>/dev/null | \
-		sed 's|$(CURDIR)/build/linux/AppDir||g' > build/linux/AppDir/usr/lib/$(ARCH)-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders.cache || \
-		echo "# loaders.cache" > build/linux/AppDir/usr/lib/$(ARCH)-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders.cache
-	@echo "Preparing custom AppRun script..."
-	chmod +x build/linux/AppRun
-	cd $(CURDIR) && ARCH=$(ARCH) \
-		LDAI_RUNTIME_FILE=$(APPIMAGE_RUNTIME) \
-		$(LINUXDEPLOY) \
-		--appdir build/linux/AppDir \
-		--custom-apprun build/linux/AppRun \
-		--desktop-file build/linux/AppDir/usr/share/applications/aerion.desktop \
-		--icon-file build/linux/AppDir/usr/share/icons/hicolor/256x256/apps/aerion.png \
-		--output appimage
-	@mv Aerion-*.AppImage build/bin/ 2>/dev/null || mv aerion-*.AppImage build/bin/
-	@rm -rf build/linux/AppDir
-	@echo "AppImage created at build/bin/"
+# Build Flatpak (recommended for Linux distribution)
+flatpak:
+	@echo "Building Flatpak..."
+	./build/flatpak/build-local.sh
 
 # Run in development mode with hot reload
 dev:
@@ -185,10 +101,10 @@ clean:
 	rm -rf AppDir
 	rm -f aerion
 
-# Clean downloaded tools
+# Clean downloaded tools (deprecated - AppImage removed)
 tools-clean:
-	@echo "Cleaning downloaded tools..."
-	rm -rf $(TOOLS_DIR)
+	@echo "Note: AppImage support has been removed. See archive/AppImage/ for details."
+	@echo "Use 'make clean' to clean build artifacts."
 
 # Install frontend dependencies
 frontend-deps:
@@ -287,7 +203,7 @@ help:
 	@echo "Build Targets:"
 	@echo "  make build        - Build production binary"
 	@echo "  make build-linux  - Build for Linux with production tags"
-	@echo "  make appimage     - Build Linux AppImage (includes binary)"
+	@echo "  make flatpak      - Build Flatpak package (recommended for Linux)"
 	@echo "  make dev          - Run in development mode with hot reload"
 	@echo "  make generate     - Generate Wails TypeScript bindings"
 	@echo ""
@@ -309,7 +225,6 @@ help:
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make clean        - Clean build artifacts"
-	@echo "  make tools-clean  - Clean downloaded tools (linuxdeploy)"
 	@echo "  make frontend-deps   - Install frontend dependencies"
 	@echo "  make frontend-update - Update frontend dependencies"
 	@echo ""

@@ -77,12 +77,34 @@ Some of the system level features (clickable notifications & auto-sync on wake) 
 ---
 
 Download from the release page:
-- Linux: AppImage (Or the binary + .desktop file if you prefer)
+- Linux: Binary + .desktop file (Flatpak coming soon)
 - MacOS: .app
 - Windows: .exe
 
+For Linux ~
+
+**Install dependency:**
+
+Debian/Ubuntu:
+
+```bash
+
+sudo apt install libwebkit2gtk-4.1-0
+```
+Fedora:
+
+```bash
+sudo dnf install webkit2gtk4.1
+```
+Arch Linux:
+
+```bash
+sudo pacman -S webkit2gtk-4.1
+```
+
 For more information, check the [Installation Section](https://aerion.3df.io/docs/getting-started/installation/) of the official documentation.
 
+**Note:** AppImage support has been removed due to webkit bundling incompatibilities. See `archive/AppImage/README.md` for technical details.
 
 ### 📖 Documentation
 ---

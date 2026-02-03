@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.github.hkdb.Aerion</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Aerion</name>
+  <summary>Lightweight open-source email client for Linux</summary>
+  <description>
+    <p>
+      Aerion is a modern, lightweight email client inspired by Geary, focused on
+      resource efficiency and a clean user experience.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Multiple email accounts with unified inbox</li>
+      <li>Support for Gmail, Outlook, and generic IMAP/SMTP</li>
+      <li>OAuth2 authentication for Gmail and Microsoft accounts</li>
+      <li>Conversation threading</li>
+      <li>Rich text WYSIWYG composer with TipTap editor</li>
+      <li>Contact sync (CardDAV, Google, Microsoft)</li>
+      <li>Dark mode and multiple color themes</li>
+      <li>Keyboard-friendly navigation with vim-style shortcuts</li>
+      <li>Detachable composer window</li>
+      <li>Basic tracking element removal from emails</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">com.github.hkdb.Aerion.desktop</launchable>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/hkdb/aerion/main/docs/ss.png</image>
+      <caption>Aerion main window showing inbox</caption>
+    </screenshot>
+  </screenshots>
+
+  <url type="homepage">https://aerion.3df.io</url>
+  <url type="bugtracker">https://github.com/hkdb/aerion/issues</url>
+  <url type="help">https://aerion.3df.io/docs/intro</url>
+  <url type="vcs-browser">https://github.com/hkdb/aerion</url>
+
+  <developer id="io.3df">
+    <name>3DF</name>
+  </developer>
+
+  <categories>
+    <category>Network</category>
+    <category>Email</category>
+    <category>Office</category>
+  </categories>
+
+  <keywords>
+    <keyword>email</keyword>
+    <keyword>mail</keyword>
+    <keyword>imap</keyword>
+    <keyword>smtp</keyword>
+    <keyword>gmail</keyword>
+    <keyword>outlook</keyword>
+  </keywords>
+
+  <provides>
+    <binary>aerion</binary>
+  </provides>
+
+  <releases>
+    <release version="0.1.12" date="2026-02-03">
+      <description>
+        <ul>
+          <li>Removed AppImage build</li>
+          <li>Implemented Flatpak build</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.1.11" date="2026-02-02">
+      <description>
+        <ul>
+          <li>Fixed detached composer theme</li>
+          <li>Fixed message focus on refresh</li>
+          <li>Improved transitions for smoother UX</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.1.10" date="2026-02-02">
+      <description>
+        <ul>
+          <li>Added multiple color themes</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.1.9" date="2026-01-29">
+      <description>
+        <ul>
+          <li>Added ability to disable window title bar in settings</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+
+  <content_rating type="oars-1.1">
+    <content_attribute id="violence-cartoon">none</content_attribute>
+    <content_attribute id="violence-fantasy">none</content_attribute>
+    <content_attribute id="violence-realistic">none</content_attribute>
+    <content_attribute id="violence-bloodshed">none</content_attribute>
+    <content_attribute id="violence-sexual">none</content_attribute>
+    <content_attribute id="violence-desecration">none</content_attribute>
+    <content_attribute id="violence-slavery">none</content_attribute>
+    <content_attribute id="violence-worship">none</content_attribute>
+    <content_attribute id="drugs-alcohol">none</content_attribute>
+    <content_attribute id="drugs-narcotics">none</content_attribute>
+    <content_attribute id="drugs-tobacco">none</content_attribute>
+    <content_attribute id="sex-nudity">none</content_attribute>
+    <content_attribute id="sex-themes">none</content_attribute>
+    <content_attribute id="sex-homosexuality">none</content_attribute>
+    <content_attribute id="sex-prostitution">none</content_attribute>
+    <content_attribute id="sex-adultery">none</content_attribute>
+    <content_attribute id="sex-appearance">none</content_attribute>
+    <content_attribute id="language-profanity">none</content_attribute>
+    <content_attribute id="language-humor">none</content_attribute>
+    <content_attribute id="language-discrimination">none</content_attribute>
+    <content_attribute id="social-chat">intense</content_attribute>
+    <content_attribute id="social-info">none</content_attribute>
+    <content_attribute id="social-audio">none</content_attribute>
+    <content_attribute id="social-location">none</content_attribute>
+    <content_attribute id="social-contacts">intense</content_attribute>
+    <content_attribute id="money-purchasing">none</content_attribute>
+    <content_attribute id="money-gambling">none</content_attribute>
+  </content_rating>
+
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+
+  <requires>
+    <internet>always</internet>
+  </requires>
+</component>

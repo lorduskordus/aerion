@@ -1,0 +1,106 @@
+app-id: com.github.hkdb.Aerion
+runtime: org.gnome.Platform
+runtime-version: '47'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.golang
+  - org.freedesktop.Sdk.Extension.node20
+command: aerion
+
+finish-args:
+  # Network access for email sync
+  - --share=network
+  # IPC is required for X11 and Wayland
+  - --share=ipc
+  # Display access
+  - --socket=wayland
+  - --socket=fallback-x11
+  # GPU access for hardware acceleration
+  - --device=dri
+  # Notifications
+  - --talk-name=org.freedesktop.Notifications
+  # Secret Service for secure credential storage
+  - --talk-name=org.freedesktop.secrets
+  # Access to user's home directory for attachments
+  - --filesystem=home
+  # Access to Downloads for saving attachments
+  - --filesystem=xdg-download
+  # Access to Documents for opening attachments
+  - --filesystem=xdg-documents
+  # System tray icon support
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --own-name=org.kde.StatusNotifierItem-*
+  # For opening links in default browser
+  - --talk-name=org.freedesktop.portal.Desktop
+  - --talk-name=org.freedesktop.portal.OpenURI
+
+modules:
+  - name: aerion
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/golang/bin:/usr/lib/sdk/node20/bin
+      env:
+        GOROOT: /usr/lib/sdk/golang
+        GOPATH: /run/build/aerion/go
+        GOCACHE: /run/build/aerion/go-cache
+        GO111MODULE: 'on'
+        CGO_ENABLED: '1'
+        GOPROXY: 'direct'
+        GOSUMDB: 'off'
+        NODE_ENV: production
+        # Allow network access for Go and npm downloads during build
+        # This is a hybrid approach - not "pure" Flatpak but practical for dev tools
+        npm_config_cache: /run/build/aerion/npm-cache
+
+    build-commands:
+      # Install Wails CLI
+      - |
+        export PATH=$PATH:/run/build/aerion/go/bin
+        export GOPATH=/run/build/aerion/go
+        go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      # Install frontend dependencies
+      - |
+        cd frontend
+        npm install --legacy-peer-deps
+        cd ..
+
+      # Build the application
+      # OAuth credentials are injected via environment variables if available
+      - |
+        export PATH=$PATH:/run/build/aerion/go/bin
+        LDFLAGS=""
+        if [ -n "$GOOGLE_CLIENT_ID" ]; then
+          LDFLAGS="$LDFLAGS -X 'github.com/hkdb/aerion/internal/oauth2.GoogleClientID=${GOOGLE_CLIENT_ID}'"
+        fi
+        if [ -n "$GOOGLE_CLIENT_SECRET" ]; then
+          LDFLAGS="$LDFLAGS -X 'github.com/hkdb/aerion/internal/oauth2.GoogleClientSecret=${GOOGLE_CLIENT_SECRET}'"
+        fi
+        if [ -n "$MICROSOFT_CLIENT_ID" ]; then
+          LDFLAGS="$LDFLAGS -X 'github.com/hkdb/aerion/internal/oauth2.MicrosoftClientID=${MICROSOFT_CLIENT_ID}'"
+        fi
+        if [ -n "$LDFLAGS" ]; then
+          /run/build/aerion/go/bin/wails build -ldflags "$LDFLAGS" -tags webkit2_41,linux,production -o aerion
+        else
+          /run/build/aerion/go/bin/wails build -tags webkit2_41,linux,production -o aerion
+        fi
+
+      # Install the binary
+      - install -Dm755 build/bin/aerion /app/bin/aerion
+
+      # Install desktop file
+      - install -Dm644 build/linux/aerion.desktop /app/share/applications/com.github.hkdb.Aerion.desktop
+
+      # Update desktop file to use correct app ID
+      - desktop-file-edit --set-key=Icon --set-value=com.github.hkdb.Aerion /app/share/applications/com.github.hkdb.Aerion.desktop
+      - desktop-file-edit --set-key=Exec --set-value=aerion /app/share/applications/com.github.hkdb.Aerion.desktop
+
+      # Install icon
+      - install -Dm644 build/appicon.png /app/share/icons/hicolor/256x256/apps/com.github.hkdb.Aerion.png
+
+      # Install metainfo (AppStream metadata)
+      - install -Dm644 build/flatpak/com.github.hkdb.Aerion.metainfo.xml /app/share/metainfo/com.github.hkdb.Aerion.metainfo.xml
+
+    sources:
+      - type: dir
+        path: .

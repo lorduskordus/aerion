@@ -40,4 +40,4 @@ WORKDIR /build
 ENV APPIMAGE_EXTRACT_AND_RUN=1
 
 # Build script
-CMD ["bash", "-c", "make appimage && cp Aerion-*.AppImage /output/"]
+CMD ["bash", "-c", "make appimage && cp build/bin/Aerion-*.AppImage /output/"]
