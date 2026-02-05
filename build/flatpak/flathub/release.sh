@@ -60,12 +60,7 @@ if [ ! -f "${FLATHUB_DIR}/flathub.json" ]; then
     echo "📄 Creating flathub.json..."
     cat > "${FLATHUB_DIR}/flathub.json" << 'EOF'
 {
-  "only-arches": ["x86_64", "aarch64"],
-  "skip-appstream-check": false,
-  "linter-exceptions": [
-    "appid-uses-code-hosting-domain",
-    "finish-args-login1-system-talk-name"
-  ]
+  "only-arches": ["x86_64", "aarch64"]
 }
 EOF
     echo "   ✅ flathub.json (created)"
