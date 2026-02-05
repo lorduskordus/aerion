@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id>com.github.hkdb.Aerion</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>MIT</project_license>
+  <project_license>Apache-2.0</project_license>
   <name>Aerion</name>
   <summary>Lightweight open-source email client for Linux</summary>
   <description>
@@ -63,6 +63,13 @@
   </provides>
 
   <releases>
+    <release version="0.1.14" date="2026-02-05">
+      <description>
+        <ul>
+          <li>Finalized flatpak submission</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.13" date="2026-02-04">
       <description>
         <ul>

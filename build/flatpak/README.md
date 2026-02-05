@@ -2,11 +2,18 @@
 
 This directory contains files for building and distributing Aerion as a Flatpak.
 
+## Quick Links
+
+- **For Flathub submission**: See [`flathub/README.md`](flathub/README.md) for complete submission guide
+- **For local development**: Continue reading this file
+
 ## Files
 
-- `com.github.hkdb.Aerion.yml` - Flatpak manifest
+- `com.github.hkdb.Aerion.yml` - Flatpak manifest for local building (builds from source)
+- `com.github.hkdb.Aerion-prebuilt.yml` - Flatpak manifest using pre-built binary
 - `com.github.hkdb.Aerion.metainfo.xml` - AppStream metadata (required for Flathub)
 - `build-flatpak.sh` - Automated build script
+- `flathub/` - Flathub submission files (pre-built binary approach)
 - `README.md` - This file
 
 ## Prerequisites
@@ -142,74 +149,12 @@ desktop-file-validate build/linux/aerion.desktop
 
 ## Submitting to Flathub
 
-### 1. Fork the Flathub Repository
+**See [`flathub/README.md`](flathub/README.md)** for complete Flathub submission instructions.
 
-```bash
-# Fork https://github.com/flathub/flathub on GitHub
-git clone git@github.com:YOUR-USERNAME/flathub.git
-cd flathub
-```
-
-### 2. Create Application Repository
-
-Create a new repository on GitHub: `com.github.hkdb.Aerion`
-
-### 3. Prepare Submission
-
-```bash
-cd com.github.hkdb.Aerion
-git init
-git remote add origin git@github.com:YOUR-USERNAME/com.github.hkdb.Aerion.git
-
-# Copy Flatpak files from aerion repo
-cp /path/to/aerion/build/flatpak/com.github.hkdb.Aerion.yml .
-cp /path/to/aerion/build/flatpak/com.github.hkdb.Aerion.metainfo.xml .
-
-# Test build
-flatpak-builder --force-clean --repo=repo build-dir com.github.hkdb.Aerion.yml
-
-git add .
-git commit -m "Initial Flathub submission"
-git push -u origin main
-```
-
-### 4. Submit Pull Request
-
-Go to https://github.com/flathub/flathub and create a new issue with:
-- Title: "New app: Aerion"
-- Link to your repo: `https://github.com/YOUR-USERNAME/com.github.hkdb.Aerion`
-
-The Flathub team will review and provide feedback.
-
-## Requirements for Flathub
-
-Your submission must meet these requirements:
-
-1. ✅ Valid AppStream metadata (metainfo.xml)
-2. ✅ Valid desktop file
-3. ✅ Icon in PNG format (256x256 or higher)
-4. ✅ FOSS license (MIT ✅)
-5. ✅ No proprietary dependencies
-6. ✅ Stable release tag (not git HEAD)
-7. ⚠️ OAuth credentials handled properly
-
-## Using Git Sources (Recommended for Flathub)
-
-For Flathub submission, replace the `type: dir` source with a git tag:
-
-```yaml
-sources:
-  - type: git
-    url: https://github.com/hkdb/aerion.git
-    tag: v0.1.11
-    commit: YOUR_COMMIT_SHA
-```
-
-Get the commit SHA:
-
-```bash
-git rev-parse v0.1.11
-```
+Aerion uses the **pre-built binary approach** (extra-data) for Flathub distribution, which allows OAuth credentials to be embedded in the binaries. The flathub directory contains:
+- Updated manifest for pre-built binaries
+- Submission guide
+- Helper script to calculate hashes for new releases
 
 ## Troubleshooting
 
@@ -252,9 +197,14 @@ The manifest grants `--filesystem=home` access. For production, consider restric
 
 ## Maintenance
 
-When releasing a new version:
+### For Local Builds
+
+When testing a new version locally:
 
 1. Update `build/flatpak/com.github.hkdb.Aerion.metainfo.xml` with new release info
-2. Update the git tag in manifest (if using git source)
+2. Update OAuth credentials in environment if needed
 3. Build and test locally: `./build/flatpak/build-flatpak.sh`
-4. Submit PR to Flathub repository with version bump
+
+### For Flathub Updates
+
+See [`flathub/README.md`](flathub/README.md) for instructions on updating your Flathub release.

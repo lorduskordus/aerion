@@ -1,5 +1,11 @@
 # CHANGELOG
 
+**v0.1.14 - 02-05-2026**
+---
+
+- Finalized flatpak submission
+
+
 **v0.1.13 - 02-04-2026**
 ---
 
