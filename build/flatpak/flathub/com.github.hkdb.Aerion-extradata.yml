@@ -54,33 +54,33 @@ modules:
         filename: aerion.tar.gz
         only-arches:
           - x86_64
-        url: https://github.com/hkdb/aerion/releases/download/v0.1.13/aerion-v0.1.13-linux-x86_64.tar.gz
-        sha256: 44edd5ba7b2d81cd0ee65c832aaabd036ed3fc627657a4405fc86d822ef7c02a
-        size: 13330633
+        url: https://github.com/hkdb/aerion/releases/download/v0.1.14/aerion-v0.1.14-linux-x86_64.tar.gz
+        sha256: 522042b0a70c3f3ac37844fc383a386db54767ff45a586e6628821d84d934782
+        size: 13330634
 
       # Pre-built binary tarball with OAuth credentials (aarch64)
       - type: extra-data
         filename: aerion.tar.gz
         only-arches:
           - aarch64
-        url: https://github.com/hkdb/aerion/releases/download/v0.1.13/aerion-v0.1.13-linux-aarch64.tar.gz
-        sha256: c9e213bfc019c48afd641838c5b94778442f6be5442970e19d4b3cddc61c9270
-        size: 12783072
+        url: https://github.com/hkdb/aerion/releases/download/v0.1.14/aerion-v0.1.14-linux-aarch64.tar.gz
+        sha256: 86b08e5dac17481af153fc38e45a653faf29656e7cd0eae4d96a89a9850e1c4a
+        size: 12783074
 
       # Desktop file from repo
       - type: file
-        url: https://raw.githubusercontent.com/hkdb/aerion/v0.1.13/build/linux/aerion.desktop
+        url: https://raw.githubusercontent.com/hkdb/aerion/v0.1.14/build/linux/aerion.desktop
         sha256: 7b12d8d5caecf743ad18584bf959b8c998e3365cfc0e205e51cfe88961333ce2
 
       # Icon from repo
       - type: file
-        url: https://raw.githubusercontent.com/hkdb/aerion/v0.1.13/build/appicon.png
+        url: https://raw.githubusercontent.com/hkdb/aerion/v0.1.14/build/appicon.png
         sha256: 793b5caa6cbd90d36f39a0b98cdd2f1a405ca7c6306c59abff893f08a49a8bb5
 
       # Metainfo from repo
       - type: file
-        url: https://raw.githubusercontent.com/hkdb/aerion/v0.1.13/build/flatpak/com.github.hkdb.Aerion.metainfo.xml
-        sha256: 58783828047584db0731fbbea0dcb188961783d83b1a38ff86ef8c6034d7fe87
+        url: https://raw.githubusercontent.com/hkdb/aerion/v0.1.14/build/flatpak/com.github.hkdb.Aerion.metainfo.xml
+        sha256: e4d7181c0ffdbbd031a6782272bba00be312e61008688dc948f244032d636ce0
 
 # NOTE: To update for new releases:
 # 1. Run: ./calculate-hashes.sh v0.1.14 (or your version)

@@ -10,12 +10,10 @@ Aerion uses the extra-data approach (similar to Discord, Spotify) because OAuth 
 
 Before submitting to Flathub:
 
-1. **Create a GitHub release** with version tag (e.g., `v0.1.13`)
+1. **Create a GitHub release** with version tag (e.g., `v0.1.14`)
 2. **Ensure release includes**:
    - `aerion-v0.1.13-linux-x86_64.tar.gz` (x86_64 binary with OAuth credentials)
    - `aerion-v0.1.13-linux-aarch64.tar.gz` (aarch64 binary with OAuth credentials)
-3. **Update metainfo.xml** with new version and changelog
-4. **Test the manifest** works with the release
 
 ## Updating the Manifest for New Releases
 
