@@ -1,6 +1,6 @@
 app-id: com.github.hkdb.Aerion
 runtime: org.gnome.Platform
-runtime-version: '47'
+runtime-version: '48'
 sdk: org.gnome.Sdk
 command: aerion
 
@@ -18,15 +18,12 @@ finish-args:
   - --talk-name=org.freedesktop.Notifications
   # Secret Service for secure credential storage
   - --talk-name=org.freedesktop.secrets
-  # Access to user's home directory for attachments
-  - --filesystem=home
+  # Sleep/wake detection for sync management
+  - --system-talk-name=org.freedesktop.login1
   # Access to Downloads for saving attachments
   - --filesystem=xdg-download
   # Access to Documents for opening attachments
   - --filesystem=xdg-documents
-  # For opening links in default browser
-  - --talk-name=org.freedesktop.portal.Desktop
-  - --talk-name=org.freedesktop.portal.OpenURI
 
 modules:
   - name: aerion
