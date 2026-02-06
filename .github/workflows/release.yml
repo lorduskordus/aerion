@@ -137,9 +137,10 @@ jobs:
         run: |
           TAG_NAME=${{ github.ref_name }}
 
-          # Rename desktop file and icon for portal notification support
+          # Rename desktop file, icon, and metainfo for Flathub extra-data
           cp build/linux/aerion.desktop io.github.hkdb.Aerion.desktop
           cp build/linux/aerion.png io.github.hkdb.Aerion.png
+          cp build/flatpak/io.github.hkdb.Aerion.metainfo.xml io.github.hkdb.Aerion.metainfo.xml
 
           # Upload all artifacts
           gh release upload $TAG_NAME \
@@ -147,6 +148,7 @@ jobs:
             aerion-*/*.tar.gz \
             io.github.hkdb.Aerion.desktop \
             io.github.hkdb.Aerion.png \
+            io.github.hkdb.Aerion.metainfo.xml \
             build/linux/install.sh \
             build/linux/uninstall.sh \
             --clobber
