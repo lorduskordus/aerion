@@ -187,6 +187,9 @@ sed -i "s/PLACEHOLDER_ICON_SHA256/${ICON_SHA256}/" "$MANIFEST"
 sed -i "s|url: https://github.com/hkdb/aerion/releases/download/v[0-9.]\+[-a-zA-Z0-9]*/io.github.hkdb.Aerion.metainfo.xml|url: ${REPO}/releases/download/${VERSION}/io.github.hkdb.Aerion.metainfo.xml|" "$MANIFEST"
 sed -i "s/PLACEHOLDER_METAINFO_SHA256/${METAINFO_SHA256}/" "$MANIFEST"
 
+# Update git tag
+sed -i "s|tag: v.*|tag: ${VERSION}|" "$MANIFEST"
+
 echo ""
 echo "✅ Manifest updated successfully!"
 echo "   Backup saved: ${MANIFEST}.backup"
