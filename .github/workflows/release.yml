@@ -176,16 +176,15 @@ jobs:
             org.gnome.Platform//49 \
             org.gnome.Sdk//49
 
-      - name: Wait for release assets to be available
-        run: |
-          echo "Waiting 30 seconds for release assets to be fully available..."
-          sleep 30
-
       - name: Calculate hashes and update manifest
         run: |
           cd build/flatpak/flathub
           chmod +x calculate-hashes.sh
           ./calculate-hashes.sh ${{ github.ref_name }}
+
+      - name: Clean flatpak-builder cache
+        run: |
+          rm -rf .flatpak-builder
 
       - name: Build Flatpak with extra-data (like Flathub would)
         run: |

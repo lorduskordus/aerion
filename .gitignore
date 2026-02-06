@@ -13,6 +13,7 @@ build/linux/AppDir
 .flatpak-builder/
 build-dir/
 repo/
+build/flatpak/flathub/io.github.hkdb.Aerion.yml.backup
 
 # Frontend
 frontend/node_modules/

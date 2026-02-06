@@ -133,19 +133,6 @@ found_x86 && /sha256:/ {
 { print }
 ' "$MANIFEST" > "${MANIFEST}.tmp" && mv "${MANIFEST}.tmp" "$MANIFEST"
 
-# Update x86_64 size
-awk -v size="$X86_64_SIZE" '
-/url:.*x86_64$/ { found_x86=1; print; next }
-found_x86 && /size:/ {
-    match($0, /^[ \t]*/);
-    spaces=substr($0, 1, RLENGTH);
-    print spaces "size: " size;
-    found_x86=0;
-    next
-}
-{ print }
-' "$MANIFEST" > "${MANIFEST}.tmp" && mv "${MANIFEST}.tmp" "$MANIFEST"
-
 # Update aarch64 URL
 sed -i "s|url: https://github.com/hkdb/aerion/releases/download/v[0-9.]\+[-a-zA-Z0-9]*/aerion-v[0-9.]\+[-a-zA-Z0-9]*-linux-aarch64|url: ${REPO}/releases/download/${VERSION}/aerion-${VERSION}-linux-aarch64|" "$MANIFEST"
 
@@ -156,19 +143,6 @@ found_arm && /sha256:/ {
     match($0, /^[ \t]*/);
     spaces=substr($0, 1, RLENGTH);
     print spaces "sha256: " sha;
-    found_arm=0;
-    next
-}
-{ print }
-' "$MANIFEST" > "${MANIFEST}.tmp" && mv "${MANIFEST}.tmp" "$MANIFEST"
-
-# Update aarch64 size
-awk -v size="$AARCH64_SIZE" '
-/url:.*aarch64$/ { found_arm=1; print; next }
-found_arm && /size:/ {
-    match($0, /^[ \t]*/);
-    spaces=substr($0, 1, RLENGTH);
-    print spaces "size: " size;
     found_arm=0;
     next
 }
@@ -201,12 +175,10 @@ echo ""
 echo "x86_64 binary:"
 echo "  url: ${REPO}/releases/download/${VERSION}/aerion-${VERSION}-linux-x86_64"
 echo "  sha256: $X86_64_SHA256"
-echo "  size: $X86_64_SIZE"
 echo ""
 echo "aarch64 binary:"
 echo "  url: ${REPO}/releases/download/${VERSION}/aerion-${VERSION}-linux-aarch64"
 echo "  sha256: $AARCH64_SHA256"
-echo "  size: $AARCH64_SIZE"
 echo ""
 echo "Desktop file:"
 echo "  url: ${REPO}/releases/download/${VERSION}/io.github.hkdb.Aerion.desktop"

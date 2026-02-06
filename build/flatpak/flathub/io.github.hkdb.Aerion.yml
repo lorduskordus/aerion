@@ -2,9 +2,6 @@ app-id: io.github.hkdb.Aerion
 runtime: org.gnome.Platform
 runtime-version: '49'
 sdk: org.gnome.Sdk
-sdk-extensions:
-  - org.freedesktop.Sdk.Extension.golang
-  - org.freedesktop.Sdk.Extension.node20
 command: aerion
 
 finish-args:
@@ -19,67 +16,49 @@ finish-args:
   - --device=dri
   # Portal access for notifications, file chooser, secrets, and opening URIs
   - --talk-name=org.freedesktop.portal.Desktop
+  # Sleep/wake detection for sync management
+  - --system-talk-name=org.freedesktop.login1
 
 modules:
   - name: aerion
     buildsystem: simple
-    build-options:
-      append-path: /usr/lib/sdk/golang/bin:/usr/lib/sdk/node20/bin
-      env:
-        GOROOT: /usr/lib/sdk/golang
-        GOPATH: /run/build/aerion/go
-        GOCACHE: /run/build/aerion/go-cache
-        GO111MODULE: 'on'
-        CGO_ENABLED: '1'
-        # Use direct mode for reliability
-        GOPROXY: 'direct'
-        GOSUMDB: 'off'
-        NODE_ENV: production
-        npm_config_cache: /run/build/aerion/npm-cache
-
     build-commands:
-      # Install Wails CLI
-      - |
-        export PATH=$PATH:/run/build/aerion/go/bin
-        export GOPATH=/run/build/aerion/go
-        go install github.com/wailsapp/wails/v2/cmd/wails@latest
-
-      # Install frontend dependencies
-      - |
-        cd frontend
-        npm install --legacy-peer-deps
-        cd ..
-
-      # Build the application
-      # Note: OAuth credentials should be configured via Flathub secrets if needed
-      - |
-        export PATH=$PATH:/run/build/aerion/go/bin
-        /run/build/aerion/go/bin/wails build -tags webkit2_41,linux,production -o aerion
-
-      # Install the binary
-      - install -Dm755 build/bin/aerion /app/bin/aerion
-
-      # Install desktop file with correct app ID
-      - install -Dm644 build/linux/aerion.desktop /app/share/applications/io.github.hkdb.Aerion.desktop
-
-      # Update desktop file Icon and Exec fields
+      # Install pre-built binary
+      - install -Dm755 aerion-binary /app/bin/aerion
+      - install -Dm644 io.github.hkdb.Aerion.desktop /app/share/applications/io.github.hkdb.Aerion.desktop
       - desktop-file-edit --set-key=Icon --set-value=io.github.hkdb.Aerion /app/share/applications/io.github.hkdb.Aerion.desktop
       - desktop-file-edit --set-key=Exec --set-value=aerion /app/share/applications/io.github.hkdb.Aerion.desktop
-
-      # Install icon with correct app ID
-      - install -Dm644 build/appicon.png /app/share/icons/hicolor/256x256/apps/io.github.hkdb.Aerion.png
-
-      # Install metainfo (AppStream metadata)
-      - install -Dm644 build/flatpak/io.github.hkdb.Aerion.metainfo.xml /app/share/metainfo/io.github.hkdb.Aerion.metainfo.xml
+      - install -Dm644 io.github.hkdb.Aerion.png /app/share/icons/hicolor/256x256/apps/io.github.hkdb.Aerion.png
+      - install -Dm644 io.github.hkdb.Aerion.metainfo.xml /app/share/metainfo/io.github.hkdb.Aerion.metainfo.xml
 
     sources:
-      # Update this to point to your release tag when submitting to Flathub
-      # Example: For v0.1.15 release, change to:
-      # - type: git
-      #   url: https://github.com/hkdb/aerion.git
-      #   tag: v0.1.15
-      #   commit: <full-commit-hash-for-v0.1.15>
-      - type: git
-        url: https://github.com/hkdb/aerion.git
-        tag: v0.1.15
-        # commit: UPDATE_THIS_WITH_FULL_COMMIT_HASH
+      # Pre-built binary with OAuth credentials (x86_64)
+      - type: file
+        dest-filename: aerion-binary
+        only-arches:
+          - x86_64
+        url: https://github.com/hkdb/aerion/releases/download/v0.1.15-test3/aerion-v0.1.15-test3-linux-x86_64
+        sha256: 118b274f5c17dc473078748ec389f53e5069dcea55d8de6000f13a5cc387cbe2
+
+      # Pre-built binary with OAuth credentials (aarch64)
+      - type: file
+        dest-filename: aerion-binary
+        only-arches:
+          - aarch64
+        url: https://github.com/hkdb/aerion/releases/download/v0.1.15-test3/aerion-v0.1.15-test3-linux-aarch64
+        sha256: 76c1f62e9433a5b79dfcba2f8a99185cdb62595904371290794175eb95af65fc
+
+      # Desktop file from GitHub release
+      - type: file
+        url: https://github.com/hkdb/aerion/releases/download/v0.1.15-test3/io.github.hkdb.Aerion.desktop
+        sha256: 4830c36f130f3023894f82a38f7dfb8ccfd302ac343c9d68aa8300d2736095bc
+
+      # Icon from GitHub release
+      - type: file
+        url: https://github.com/hkdb/aerion/releases/download/v0.1.15-test3/io.github.hkdb.Aerion.png
+        sha256: 793b5caa6cbd90d36f39a0b98cdd2f1a405ca7c6306c59abff893f08a49a8bb5
+
+      # Metainfo from GitHub release
+      - type: file
+        url: https://github.com/hkdb/aerion/releases/download/v0.1.15-test3/io.github.hkdb.Aerion.metainfo.xml
+        sha256: a38c5e3200b0242999b7a6b9a8eb5f92471761678b828a7a112f802290e7af5e
