@@ -151,15 +151,45 @@ found_arm && /sha256:/ {
 
 # Update desktop file URL and SHA256
 sed -i "s|url: https://github.com/hkdb/aerion/releases/download/v[0-9.]\+[-a-zA-Z0-9]*/io.github.hkdb.Aerion.desktop|url: ${REPO}/releases/download/${VERSION}/io.github.hkdb.Aerion.desktop|" "$MANIFEST"
-sed -i "s/PLACEHOLDER_DESKTOP_SHA256/${DESKTOP_SHA256}/" "$MANIFEST"
+awk -v sha="$DESKTOP_SHA256" '
+/url:.*Aerion\.desktop$/ { found=1; print; next }
+found && /sha256:/ {
+    match($0, /^[ \t]*/);
+    spaces=substr($0, 1, RLENGTH);
+    print spaces "sha256: " sha;
+    found=0;
+    next
+}
+{ print }
+' "$MANIFEST" > "${MANIFEST}.tmp" && mv "${MANIFEST}.tmp" "$MANIFEST"
 
 # Update icon URL and SHA256
 sed -i "s|url: https://github.com/hkdb/aerion/releases/download/v[0-9.]\+[-a-zA-Z0-9]*/io.github.hkdb.Aerion.png|url: ${REPO}/releases/download/${VERSION}/io.github.hkdb.Aerion.png|" "$MANIFEST"
-sed -i "s/PLACEHOLDER_ICON_SHA256/${ICON_SHA256}/" "$MANIFEST"
+awk -v sha="$ICON_SHA256" '
+/url:.*Aerion\.png$/ { found=1; print; next }
+found && /sha256:/ {
+    match($0, /^[ \t]*/);
+    spaces=substr($0, 1, RLENGTH);
+    print spaces "sha256: " sha;
+    found=0;
+    next
+}
+{ print }
+' "$MANIFEST" > "${MANIFEST}.tmp" && mv "${MANIFEST}.tmp" "$MANIFEST"
 
 # Update metainfo URL and SHA256
 sed -i "s|url: https://github.com/hkdb/aerion/releases/download/v[0-9.]\+[-a-zA-Z0-9]*/io.github.hkdb.Aerion.metainfo.xml|url: ${REPO}/releases/download/${VERSION}/io.github.hkdb.Aerion.metainfo.xml|" "$MANIFEST"
-sed -i "s/PLACEHOLDER_METAINFO_SHA256/${METAINFO_SHA256}/" "$MANIFEST"
+awk -v sha="$METAINFO_SHA256" '
+/url:.*Aerion\.metainfo\.xml$/ { found=1; print; next }
+found && /sha256:/ {
+    match($0, /^[ \t]*/);
+    spaces=substr($0, 1, RLENGTH);
+    print spaces "sha256: " sha;
+    found=0;
+    next
+}
+{ print }
+' "$MANIFEST" > "${MANIFEST}.tmp" && mv "${MANIFEST}.tmp" "$MANIFEST"
 
 # Update git tag
 sed -i "s|tag: v.*|tag: ${VERSION}|" "$MANIFEST"
