@@ -21,8 +21,8 @@ modules:
   - name: aerion
     buildsystem: simple
     build-commands:
-      # Install pre-built binary
-      - install -Dm755 aerion-binary /app/bin/aerion
+      # Install pre-built binary (select correct arch)
+      - install -Dm755 aerion-*-linux-$FLATPAK_ARCH /app/bin/aerion
       - install -Dm644 io.github.hkdb.Aerion.desktop /app/share/applications/io.github.hkdb.Aerion.desktop
       - desktop-file-edit --set-key=Icon --set-value=io.github.hkdb.Aerion /app/share/applications/io.github.hkdb.Aerion.desktop
       - desktop-file-edit --set-key=Exec --set-value=aerion /app/share/applications/io.github.hkdb.Aerion.desktop
@@ -30,33 +30,7 @@ modules:
       - install -Dm644 io.github.hkdb.Aerion.metainfo.xml /app/share/metainfo/io.github.hkdb.Aerion.metainfo.xml
 
     sources:
-      # Pre-built binary with OAuth credentials (x86_64)
-      - type: file
-        dest-filename: aerion-binary
-        only-arches:
-          - x86_64
-        url: https://github.com/hkdb/aerion/releases/download/v0.1.16/aerion-v0.1.16-linux-x86_64
-        sha256: bfe0e2b31da64142c4131062a74818d79fe44e81fdf79eecc9c5a66eed47071e
-
-      # Pre-built binary with OAuth credentials (aarch64)
-      - type: file
-        dest-filename: aerion-binary
-        only-arches:
-          - aarch64
-        url: https://github.com/hkdb/aerion/releases/download/v0.1.16/aerion-v0.1.16-linux-aarch64
-        sha256: 375140f578f4fdd3e88008402dc3bc385d5dd59f1afc72c118f3aeedbff29463
-
-      # Desktop file from GitHub release
-      - type: file
-        url: https://github.com/hkdb/aerion/releases/download/v0.1.16/io.github.hkdb.Aerion.desktop
-        sha256: 4830c36f130f3023894f82a38f7dfb8ccfd302ac343c9d68aa8300d2736095bc
-
-      # Icon from GitHub release
-      - type: file
-        url: https://github.com/hkdb/aerion/releases/download/v0.1.16/io.github.hkdb.Aerion.png
-        sha256: 793b5caa6cbd90d36f39a0b98cdd2f1a405ca7c6306c59abff893f08a49a8bb5
-
-      # Metainfo from GitHub release
-      - type: file
-        url: https://github.com/hkdb/aerion/releases/download/v0.1.16/io.github.hkdb.Aerion.metainfo.xml
-        sha256: 204ca080a0bbfd2d96c63724ae2879a0643c80f53a234c7bd357cdca5364b3ad
+      # Pre-built binaries and metadata from GitHub release
+      - type: archive
+        url: https://github.com/hkdb/aerion/releases/download/v0.1.15/aerion-v0.1.15-linux-flathub.tar.gz
+        sha256: PLACEHOLDER

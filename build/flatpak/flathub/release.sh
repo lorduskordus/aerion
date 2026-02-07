@@ -30,8 +30,9 @@ echo "Target: $FLATHUB_DIR"
 echo ""
 echo "Copying files..."
 echo ""
-echo "NOTE: Desktop file, icon, and metainfo are downloaded from GitHub releases"
-echo "      Only the manifest and flathub.json are stored in the Flathub repo"
+echo "NOTE: Binaries, desktop file, icon, and metainfo are bundled in a single"
+echo "      archive on GitHub releases. Only the manifest and flathub.json are"
+echo "      stored in the Flathub repo"
 echo ""
 
 # Copy manifest (rename to standard name)

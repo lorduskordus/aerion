@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte'
+  import { onMount, onDestroy, tick } from 'svelte'
   import Icon from '@iconify/svelte'
   // @ts-ignore - wailsjs bindings
   import { GetConversation, GetReadReceiptResponsePolicy, SendReadReceipt, IgnoreReadReceipt, GetMarkAsReadDelay, GetMessageSource } from '../../../../wailsjs/go/app/App'
@@ -157,6 +157,21 @@
     )
 
     cleanupFunctions.push(
+      EventsOn('messages:updated', (data: { accountId: string; folderId: string }) => {
+        if (threadId && folderId && accountId && data.accountId === accountId && data.folderId === folderId) {
+          // Save scroll position before reload
+          const scrollTop = contentContainerRef?.scrollTop ?? 0
+          loadConversation(threadId, folderId).then(() => {
+            // Restore scroll position after reload
+            if (contentContainerRef) {
+              contentContainerRef.scrollTop = scrollTop
+            }
+          })
+        }
+      })
+    )
+
+    cleanupFunctions.push(
       EventsOn('folder:synced', (data: { accountId: string; folderId: string }) => {
         // Only reload if the conversation isn't currently loaded successfully
         // Other event listeners handle specific changes (flags, deletions, moves)
@@ -278,6 +293,11 @@
       console.error('Failed to load conversation:', err)
     } finally {
       loading = false
+      // Scroll to bottom to show the latest message
+      await tick()
+      if (contentContainerRef) {
+        contentContainerRef.scrollTop = contentContainerRef.scrollHeight
+      }
     }
   }
 

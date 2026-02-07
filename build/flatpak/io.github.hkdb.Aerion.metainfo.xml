@@ -63,6 +63,15 @@
   </provides>
 
   <releases>
+    <release version="0.1.17" date="2026-02-07">
+      <description>
+        <ul>
+          <li>Added refresh conversation viewer if new mail arrives in the thread</li>
+          <li>Added auto scroll to the bottom (newest mail) in conversation viewer on long threads</li>
+          <li>GA/Flathub submission fix</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.16" date="2026-02-07">
       <description>
         <ul>

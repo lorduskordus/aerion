@@ -137,23 +137,58 @@ jobs:
         run: |
           TAG_NAME=${{ github.ref_name }}
 
-          # Rename desktop file, icon, and metainfo for Flathub extra-data
-          cp build/linux/aerion.desktop io.github.hkdb.Aerion.desktop
-          cp build/linux/aerion.png io.github.hkdb.Aerion.png
-          cp build/flatpak/io.github.hkdb.Aerion.metainfo.xml io.github.hkdb.Aerion.metainfo.xml
+          # Create Flathub archive (both arch binaries + metadata in one archive)
+          mkdir -p flathub-package
+          cp aerion-linux-amd64/build/bin/aerion-${TAG_NAME}-linux-x86_64 flathub-package/
+          cp aerion-linux-arm64/build/bin/aerion-${TAG_NAME}-linux-aarch64 flathub-package/
+          cp build/linux/aerion.desktop flathub-package/io.github.hkdb.Aerion.desktop
+          cp build/linux/aerion.png flathub-package/io.github.hkdb.Aerion.png
+          cp build/flatpak/io.github.hkdb.Aerion.metainfo.xml flathub-package/io.github.hkdb.Aerion.metainfo.xml
+          tar czf aerion-${TAG_NAME}-linux-flathub.tar.gz -C flathub-package .
+          rm -rf flathub-package
 
           # Upload all artifacts
           gh release upload $TAG_NAME \
             aerion-*/build/bin/* \
             aerion-*/*.tar.gz \
-            io.github.hkdb.Aerion.desktop \
-            io.github.hkdb.Aerion.png \
-            io.github.hkdb.Aerion.metainfo.xml \
+            aerion-${TAG_NAME}-linux-flathub.tar.gz \
             --clobber
 
-  build-flatpak:
+  update-manifest:
     needs: publish
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget
+
+      - name: Calculate hashes and update manifest
+        run: |
+          cd build/flatpak/flathub
+          chmod +x calculate-hashes.sh
+          ./calculate-hashes.sh ${{ github.ref_name }}
+
+      - name: Upload updated manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: flathub-manifest
+          path: build/flatpak/flathub/io.github.hkdb.Aerion.yml
+          retention-days: 1
+
+  build-flatpak:
+    needs: update-manifest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: write
     env:
@@ -162,10 +197,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: flathub-manifest
+          path: build/flatpak/flathub
+
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder wget
+          sudo apt-get install -y flatpak flatpak-builder
 
       - name: Add Flathub repository
         run: flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
@@ -176,31 +216,37 @@ jobs:
             org.gnome.Platform//49 \
             org.gnome.Sdk//49
 
-      - name: Calculate hashes and update manifest
-        run: |
-          cd build/flatpak/flathub
-          chmod +x calculate-hashes.sh
-          ./calculate-hashes.sh ${{ github.ref_name }}
-
       - name: Clean flatpak-builder cache
         run: |
           rm -rf .flatpak-builder
 
-      - name: Build Flatpak with extra-data (like Flathub would)
+      - name: Build Flatpak (like Flathub would)
         run: |
           flatpak-builder --user --force-clean --repo=repo \
             build-dir build/flatpak/flathub/io.github.hkdb.Aerion.yml
 
           mkdir -p build/bin
-          flatpak build-bundle repo build/bin/Aerion-${{ github.ref_name }}.flatpak io.github.hkdb.Aerion
+          flatpak build-bundle repo build/bin/Aerion-${{ github.ref_name }}-${{ matrix.arch }}.flatpak io.github.hkdb.Aerion
 
       - name: Upload Flatpak to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload ${{ github.ref_name }} \
-            build/bin/Aerion-${{ github.ref_name }}.flatpak \
+            build/bin/Aerion-${{ github.ref_name }}-${{ matrix.arch }}.flatpak \
             --clobber
+
+  commit-manifest:
+    needs: build-flatpak
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: flathub-manifest
+          path: build/flatpak/flathub
 
       - name: Commit updated manifest
         if: success()

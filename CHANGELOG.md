@@ -1,5 +1,13 @@
 # CHANGELOG
 
+**v0.1.17 - 02-07-2026**
+---
+
+- Added refresh conversation viewer if new mail arrives in the thread
+- Added auto scroll to the bottom (newest mail) in conversation viewer on long threads
+- GA/Flathub submission fix
+
+
 **v0.1.16 - 02-07-2026**
 ---
 

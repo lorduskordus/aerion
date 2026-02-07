@@ -624,8 +624,11 @@ ${processedHtml}
 
 <!-- Click outside to close context menu -->
 {#if linkContextMenuVisible}
-  <div
-    class="fixed inset-0 z-40"
+  <button
+    type="button"
+    class="fixed inset-0 z-40 cursor-default"
+    aria-label="Close context menu"
     onclick={() => linkContextMenuVisible = false}
-  ></div>
+    onkeydown={(e) => { if (e.key === 'Escape') linkContextMenuVisible = false }}
+  ></button>
 {/if}
