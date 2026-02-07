@@ -32,5 +32,5 @@ modules:
     sources:
       # Pre-built binaries and metadata from GitHub release
       - type: archive
-        url: https://github.com/hkdb/aerion/releases/download/v0.1.17-test1/aerion-v0.1.17-test1-linux-flathub.tar.gz
-        sha256: 2f0fa831e6df206451ac53ce3e35f0eb6dcdad2523867501bc7d77365f96533c
+        url: https://github.com/hkdb/aerion/releases/download/v0.1.17/aerion-v0.1.17-linux-flathub.tar.gz
+        sha256: 64cfe5282d52ff4e9b040a9ac613b408108efeb26490797fd8351b597bf4ddc3
