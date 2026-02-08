@@ -50,7 +50,7 @@ npm-debug.log*
 .env.*.local
 
 # Generated bindings
-frontend/wailsjs/
+# frontend/wailsjs/
 
 # Cache
 .cache/
