@@ -1,12 +1,15 @@
 #!/bin/bash
-# Test Flatpak build in a container matching GitHub Actions environment
-# Usage: ./test-flatpak-build.sh v0.1.15-test3
+# Test Flatpak from-source build in a container matching GitHub Actions environment
+# Usage: ./test-build.sh v0.1.18
+#
+# This simulates the GA workflow: runs calculate-hashes.sh to resolve the git tag/commit
+# and shim binary hashes, then builds the Flatpak from source with vendored dependencies.
 
 set -e
 
 if [ -z "$1" ]; then
     echo "Usage: $0 <version-tag>"
-    echo "Example: $0 v0.1.15-test3"
+    echo "Example: $0 v0.1.18"
     exit 1
 fi
 
@@ -15,7 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 echo "=========================================="
-echo "Flatpak Build Test (GitHub Actions Match)"
+echo "Flatpak From-Source Build Test"
 echo "=========================================="
 echo "Version: $VERSION"
 echo "Repo: $REPO_DIR"
@@ -37,11 +40,12 @@ echo "Adding Flathub repository..."
 flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
 
 echo ""
-echo "Installing Flatpak runtimes..."
-echo "(SDK extensions not needed for extra-data builds)"
+echo "Installing Flatpak runtimes and SDK extensions..."
 flatpak install -y --user flathub \
   org.gnome.Platform//49 \
-  org.gnome.Sdk//49
+  org.gnome.Sdk//49 \
+  org.freedesktop.Sdk.Extension.golang//24.08 \
+  org.freedesktop.Sdk.Extension.node20//24.08
 
 echo ""
 echo "=========================================="
@@ -54,11 +58,10 @@ cd /workspace
 echo "Cleaning flatpak-builder cache..."
 rm -rf .flatpak-builder
 
-echo "Waiting for release assets (simulating GitHub Actions delay)..."
-echo "Checking if release assets are available..."
-if ! wget -q --spider "https://github.com/hkdb/aerion/releases/download/${VERSION}/aerion-${VERSION}-linux-x86_64"; then
+echo "Checking if shim binary release assets are available..."
+if ! wget -q --spider "https://github.com/hkdb/aerion/releases/download/${VERSION}/aerion-creds-${VERSION}-linux-x86_64"; then
     echo ""
-    echo "❌ ERROR: Release assets not found for ${VERSION}"
+    echo "ERROR: Shim binary not found for ${VERSION}"
     echo "   Make sure the release exists at:"
     echo "   https://github.com/hkdb/aerion/releases/tag/${VERSION}"
     echo ""
@@ -73,11 +76,12 @@ chmod +x calculate-hashes.sh
 
 echo ""
 echo "=========================================="
-echo "Building Flatpak..."
+echo "Building Flatpak from source..."
 echo "=========================================="
 cd /workspace
 
 flatpak-builder --user --force-clean --repo=repo \
+  --install-deps-from=flathub \
   build-dir build/flatpak/flathub/io.github.hkdb.Aerion.yml
 
 echo ""
@@ -87,7 +91,7 @@ flatpak build-bundle repo build/bin/Aerion-${VERSION}.flatpak io.github.hkdb.Aer
 
 echo ""
 echo "=========================================="
-echo "✅ Build successful!"
+echo "Build successful!"
 echo "=========================================="
 echo "Output: build/bin/Aerion-${VERSION}.flatpak"
 ls -lh build/bin/Aerion-${VERSION}.flatpak

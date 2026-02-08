@@ -1,5 +1,11 @@
 # CHANGELOG
 
+**v0.1.18 - 02-08-2026**
+---
+
+- Converted to Flathub build from source
+
+
 **v0.1.17 - 02-07-2026**
 ---
 

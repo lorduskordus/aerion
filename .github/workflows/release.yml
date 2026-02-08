@@ -66,11 +66,24 @@ jobs:
         run: |
           make build-linux
 
-          # Rename binary for Flatpak extra-data (with version tag)
+          # Rename binary with version tag
           if [ "${{ matrix.arch }}" = "amd64" ]; then
             mv build/bin/aerion build/bin/aerion-${{ github.ref_name }}-linux-x86_64
           elif [ "${{ matrix.arch }}" = "arm64" ]; then
             mv build/bin/aerion build/bin/aerion-${{ github.ref_name }}-linux-aarch64
+          fi
+
+          # Build OAuth credentials shim binary
+          if [ "${{ matrix.arch }}" = "amd64" ]; then
+            CGO_ENABLED=0 GOARCH=amd64 go build \
+              -ldflags "-X 'main.GoogleClientID=$GOOGLE_CLIENT_ID' -X 'main.GoogleClientSecret=$GOOGLE_CLIENT_SECRET' -X 'main.MicrosoftClientID=$MICROSOFT_CLIENT_ID'" \
+              -o build/bin/aerion-creds-${{ github.ref_name }}-linux-x86_64 \
+              cmd/aerion-creds/main.go
+          elif [ "${{ matrix.arch }}" = "arm64" ]; then
+            CGO_ENABLED=0 GOARCH=arm64 go build \
+              -ldflags "-X 'main.GoogleClientID=$GOOGLE_CLIENT_ID' -X 'main.GoogleClientSecret=$GOOGLE_CLIENT_SECRET' -X 'main.MicrosoftClientID=$MICROSOFT_CLIENT_ID'" \
+              -o build/bin/aerion-creds-${{ github.ref_name }}-linux-aarch64 \
+              cmd/aerion-creds/main.go
           fi
 
           # Create distribution tarball (complete package for manual installation)
@@ -137,21 +150,10 @@ jobs:
         run: |
           TAG_NAME=${{ github.ref_name }}
 
-          # Create Flathub archive (both arch binaries + metadata in one archive)
-          mkdir -p flathub-package
-          cp aerion-linux-amd64/build/bin/aerion-${TAG_NAME}-linux-x86_64 flathub-package/
-          cp aerion-linux-arm64/build/bin/aerion-${TAG_NAME}-linux-aarch64 flathub-package/
-          cp build/linux/aerion.desktop flathub-package/io.github.hkdb.Aerion.desktop
-          cp build/linux/aerion.png flathub-package/io.github.hkdb.Aerion.png
-          cp build/flatpak/io.github.hkdb.Aerion.metainfo.xml flathub-package/io.github.hkdb.Aerion.metainfo.xml
-          tar czf aerion-${TAG_NAME}-linux-flathub.tar.gz -C flathub-package .
-          rm -rf flathub-package
-
-          # Upload all artifacts
+          # Upload all artifacts (binaries, shim binaries, tarballs)
           gh release upload $TAG_NAME \
             aerion-*/build/bin/* \
             aerion-*/*.tar.gz \
-            aerion-${TAG_NAME}-linux-flathub.tar.gz \
             --clobber
 
   update-manifest:
@@ -210,11 +212,13 @@ jobs:
       - name: Add Flathub repository
         run: flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
 
-      - name: Install Flatpak runtimes
+      - name: Install Flatpak runtimes and SDK extensions
         run: |
           flatpak install -y --user flathub \
             org.gnome.Platform//49 \
-            org.gnome.Sdk//49
+            org.gnome.Sdk//49 \
+            org.freedesktop.Sdk.Extension.golang//24.08 \
+            org.freedesktop.Sdk.Extension.node20//24.08
 
       - name: Clean flatpak-builder cache
         run: |
@@ -223,6 +227,7 @@ jobs:
       - name: Build Flatpak (like Flathub would)
         run: |
           flatpak-builder --user --force-clean --repo=repo \
+            --install-deps-from=flathub \
             build-dir build/flatpak/flathub/io.github.hkdb.Aerion.yml
 
           mkdir -p build/bin

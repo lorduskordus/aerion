@@ -63,6 +63,13 @@
   </provides>
 
   <releases>
+    <release version="0.1.18" date="2026-02-08">
+      <description>
+        <ul>
+          <li>Converted to Flathub build from source</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.17" date="2026-02-07">
       <description>
         <ul>

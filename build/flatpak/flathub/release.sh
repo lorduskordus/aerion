@@ -13,14 +13,12 @@ fi
 FLATHUB_DIR="$1"
 
 if [ ! -d "$FLATHUB_DIR" ]; then
-    echo "❌ ERROR: Directory not found: $FLATHUB_DIR"
+    echo "ERROR: Directory not found: $FLATHUB_DIR"
     exit 1
 fi
 
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-BUILD_DIR="$( cd "${SCRIPT_DIR}/.." && pwd )"
-LINUX_DIR="$( cd "${BUILD_DIR}/.." && pwd )/linux"
 
 echo "=========================================="
 echo "Aerion Flathub Release Helper"
@@ -28,35 +26,48 @@ echo "=========================================="
 echo "Source: $SCRIPT_DIR"
 echo "Target: $FLATHUB_DIR"
 echo ""
+echo "NOTE: This is a from-source build. The Flathub repo contains the manifest"
+echo "      plus vendored dependency files. The app is built from source during"
+echo "      the Flathub build process. Only the OAuth credentials shim binary"
+echo "      is downloaded as a pre-built binary."
+echo ""
 echo "Copying files..."
 echo ""
-echo "NOTE: Binaries, desktop file, icon, and metainfo are bundled in a single"
-echo "      archive on GitHub releases. Only the manifest and flathub.json are"
-echo "      stored in the Flathub repo"
-echo ""
 
-# Copy manifest (rename to standard name)
-echo "📄 Copying manifest..."
+# Copy manifest
+echo "Copying manifest..."
 cp "${SCRIPT_DIR}/io.github.hkdb.Aerion.yml" \
    "${FLATHUB_DIR}/io.github.hkdb.Aerion.yml"
-echo "   ✅ io.github.hkdb.Aerion.yml"
+echo "   io.github.hkdb.Aerion.yml"
+
+# Copy Go module vendoring sources
+echo "Copying Go module sources..."
+cp "${SCRIPT_DIR}/go.mod.yml" "${FLATHUB_DIR}/go.mod.yml"
+cp "${SCRIPT_DIR}/modules.txt" "${FLATHUB_DIR}/modules.txt"
+echo "   go.mod.yml"
+echo "   modules.txt"
+
+# Copy npm package vendoring sources
+echo "Copying npm package sources..."
+cp "${SCRIPT_DIR}/node-sources.json" "${FLATHUB_DIR}/node-sources.json"
+echo "   node-sources.json"
 
 # Create flathub.json if it doesn't exist (only needed for initial submission)
 if [ ! -f "${FLATHUB_DIR}/flathub.json" ]; then
-    echo "📄 Creating flathub.json..."
+    echo "Creating flathub.json..."
     cat > "${FLATHUB_DIR}/flathub.json" << 'EOF'
 {
   "only-arches": ["x86_64", "aarch64"]
 }
 EOF
-    echo "   ✅ flathub.json (created)"
+    echo "   flathub.json (created)"
 else
-    echo "📄 flathub.json already exists (skipped)"
+    echo "flathub.json already exists (skipped)"
 fi
 
 echo ""
 echo "=========================================="
-echo "✅ All files copied successfully!"
+echo "All files copied successfully!"
 echo "=========================================="
 echo ""
 echo "Next steps:"
