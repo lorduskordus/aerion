@@ -77,7 +77,7 @@
           <li>Auto-focus to the To: field on launch of new composer and on forwards</li>
           <li>Fixed reliability issues with attach file and insert image</li>
           <li>Fixed deletion while syncing</li>
-          <li>Improved dead connections handling which makes wake from sleep more reliable & should fix #9</li>
+          <li>Improved dead connections handling which makes wake from sleep more reliable &amp; should fix #9</li>
           <li>Fixed delete mail from trash #9</li>
           <li>Added reply, reply-all, and forward of a specific message</li>
           <li>Fixed move mail from trash back to inbox</li>
