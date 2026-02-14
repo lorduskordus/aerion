@@ -5,7 +5,7 @@
 
 - Added PGP support - needs more testing
 - Added S/MIME support - needs more testing
-- Fixed composer rapid enter lag issue with 0 margin <p> instead of <br>
+- Fixed composer rapid enter lag issue with 0 margin `<p>` instead of `<br>`
 - Added auto refresh of draft folder on discard
 - Added logic to prevent uneccessary reloads of loaded conversations if there's no change
 - Fixed draft synced to server indication regression
