@@ -14,7 +14,6 @@
     <ul>
       <li>Multiple email accounts with unified inbox</li>
       <li>Support for Gmail, Outlook, and generic IMAP/SMTP</li>
-      <li>OAuth2 authentication for Gmail and Microsoft accounts</li>
       <li>Conversation threading</li>
       <li>Rich text WYSIWYG composer with TipTap editor</li>
       <li>Contact sync (CardDAV, Google, Microsoft) for auto-completion</li>
@@ -22,6 +21,7 @@
       <li>Keyboard-friendly navigation with vim-style shortcuts</li>
       <li>Detachable composer window</li>
       <li>Basic tracking element removal from emails</li>
+      <li>PGP and S/MIME experimental support</li>
     </ul>
   </description>
 
@@ -63,6 +63,30 @@
   </provides>
 
   <releases>
+    <release version="0.1.21" date="2026-02-14">
+      <description>
+        <ul>
+          <li>Added PGP support - needs more testing</li>
+          <li>Added S/MIME support - needs more testing</li>
+          <li>Fixed composer rapid enter lag issue with 0 margin <p> instead of <br></li>
+          <li>Added auto refresh of draft folder on discard</li>
+          <li>Added logic to prevent uneccessary reloads of loaded conversations if there's no change</li>
+          <li>Fixed draft synced to server indication regression</li>
+          <li>Fixed inserted images and attachments saved in draft folder</li>
+          <li>Max window size fix #4</li>
+          <li>Auto-focus to the To: field on launch of new composer and on forwards</li>
+          <li>Fixed reliability issues with attach file and insert image</li>
+          <li>Fixed deletion while syncing</li>
+          <li>Improved dead connections handling which makes wake from sleep more reliable & should fix #9</li>
+          <li>Fixed delete mail from trash #9</li>
+          <li>Added reply, reply-all, and forward of a specific message</li>
+          <li>Fixed move mail from trash back to inbox</li>
+          <li>Improved Sent Folder detection (Wrong sent folder mapping will break threading)</li>
+          <li>Ctrl+A when focused on message list will select all messages #14</li>
+          <li>Ctrl+A when focused on conversation viewer will select all text of the expanded email in viewport</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.20" date="2026-02-11">
       <description>
         <ul>

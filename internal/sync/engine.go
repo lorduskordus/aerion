@@ -26,6 +26,8 @@ import (
 	imapPkg "github.com/hkdb/aerion/internal/imap"
 	"github.com/hkdb/aerion/internal/logging"
 	"github.com/hkdb/aerion/internal/message"
+	"github.com/hkdb/aerion/internal/pgp"
+	"github.com/hkdb/aerion/internal/smime"
 	"github.com/rs/zerolog"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/encoding/htmlindex"
@@ -65,7 +67,12 @@ type ParsedBody struct {
 	BodyText       string
 	BodyHTML       string
 	HasAttachments bool
-	Attachments    []*message.Attachment // Extracted attachment metadata (content only for inline)
+	Attachments    []*message.Attachment  // Extracted attachment metadata (content only for inline)
+	SMIMEResult    *smime.SignatureResult // S/MIME verification result (nil if not S/MIME)
+	SMIMERawBody   []byte                // Raw S/MIME body for on-view processing
+	SMIMEEncrypted bool                  // Whether the message is encrypted
+	PGPRawBody     []byte                // Raw PGP body for on-view processing
+	PGPEncrypted   bool                  // Whether the message is PGP encrypted
 }
 
 // Retry limits for error recovery
@@ -73,31 +80,6 @@ const (
 	maxMessageRetries    = 3 // Max retries per message before giving up
 	maxConnectionRetries = 3 // Max connection recovery attempts before aborting
 )
-
-// isConnectionError checks if an error indicates a dead/broken connection.
-// These errors warrant getting a new connection from the pool.
-func isConnectionError(err error) bool {
-	if err == nil {
-		return false
-	}
-	errStr := err.Error()
-	connectionErrors := []string{
-		"use of closed network connection",
-		"connection reset",
-		"broken pipe",
-		"EOF",
-		"i/o timeout",
-		"connection refused",
-		"no such host",
-		"network is unreachable",
-	}
-	for _, connErr := range connectionErrors {
-		if strings.Contains(errStr, connErr) {
-			return true
-		}
-	}
-	return false
-}
 
 // SyncProgress holds progress information for sync operations
 type SyncProgress struct {
@@ -121,6 +103,8 @@ type Engine struct {
 	sanitizer        *email.Sanitizer
 	log              zerolog.Logger
 	progressCallback ProgressCallback
+	smimeVerifier    *smime.Verifier
+	pgpVerifier      *pgp.Verifier
 }
 
 // NewEngine creates a new sync engine
@@ -139,6 +123,36 @@ func NewEngine(pool *imapPkg.Pool, folderStore *folder.Store, messageStore *mess
 // SetProgressCallback sets the callback function for progress updates
 func (e *Engine) SetProgressCallback(callback ProgressCallback) {
 	e.progressCallback = callback
+}
+
+// SetSMIMEVerifier sets the S/MIME verifier for signature verification during body parsing
+func (e *Engine) SetSMIMEVerifier(verifier *smime.Verifier) {
+	e.smimeVerifier = verifier
+}
+
+// SetPGPVerifier sets the PGP verifier for signature verification during body parsing
+func (e *Engine) SetPGPVerifier(verifier *pgp.Verifier) {
+	e.pgpVerifier = verifier
+}
+
+// ParseRawBody parses raw message bytes into body text/HTML.
+// This is a convenience wrapper around ParseDecryptedBody for callers that only need text.
+func (e *Engine) ParseRawBody(raw []byte) (bodyHTML, bodyText string) {
+	parsed := e.ParseDecryptedBody(raw, "")
+	return parsed.BodyHTML, parsed.BodyText
+}
+
+// ParseDecryptedBody parses raw message bytes (e.g. from a decrypted S/MIME or PGP envelope)
+// and returns the full ParsedBody including attachments.
+// This is used by the app layer for on-view processing of encrypted messages.
+func (e *Engine) ParseDecryptedBody(raw []byte, messageID string) *ParsedBody {
+	parsed := e.parseMessageBodyInternal(raw, messageID)
+
+	if parsed.BodyHTML != "" && e.sanitizer != nil {
+		parsed.BodyHTML = e.sanitizer.Sanitize(parsed.BodyHTML)
+	}
+
+	return parsed
 }
 
 // emitProgress sends progress updates if a callback is set
@@ -570,7 +584,7 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 				}
 
 				// Check if this is a connection error
-				if isConnectionError(err) {
+				if imapPkg.IsConnectionError(err) {
 					headerConnectionFailures++
 					batchRetries++
 
@@ -1229,8 +1243,13 @@ type ProcessedBody struct {
 	BodyText       string
 	Snippet        string
 	HasAttachments bool
-	Attachments    []*message.Attachment // Extracted during parsing (no re-parse needed)
-	RawBytes       []byte                // For on-demand attachment content fetch
+	Attachments    []*message.Attachment  // Extracted during parsing (no re-parse needed)
+	RawBytes       []byte                 // For on-demand attachment content fetch
+	SMIMEResult    *smime.SignatureResult  // S/MIME verification result
+	SMIMERawBody   []byte                 // Raw S/MIME body for on-view processing
+	SMIMEEncrypted bool                   // Whether the message is encrypted
+	PGPRawBody     []byte                 // Raw PGP body for on-view processing
+	PGPEncrypted   bool                   // Whether the message is PGP encrypted
 }
 
 // fetchMessageBodiesBatch fetches bodies for multiple messages in a single IMAP command
@@ -1390,6 +1409,11 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 			HasAttachments: parsed.HasAttachments,
 			Attachments:    parsed.Attachments,
 			RawBytes:       rawBytes,
+			SMIMEResult:    parsed.SMIMEResult,
+			SMIMERawBody:   parsed.SMIMERawBody,
+			SMIMEEncrypted: parsed.SMIMEEncrypted,
+			PGPRawBody:     parsed.PGPRawBody,
+			PGPEncrypted:   parsed.PGPEncrypted,
 		}
 	}
 
@@ -1711,7 +1735,7 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 		bodies, fetchErr := e.fetchMessageBodiesBatch(ctx, conn.Client().RawClient(), uidToMessageID)
 		if fetchErr != nil {
 			// Check if this is a connection error
-			if isConnectionError(fetchErr) {
+			if imapPkg.IsConnectionError(fetchErr) {
 				connectionFailures++
 
 				// Check if we've exhausted connection recovery attempts
@@ -1786,12 +1810,18 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 
 			for _, pb := range currentBodies {
 				// Build body update
-				bodyUpdates = append(bodyUpdates, message.BodyUpdate{
-					MessageID: pb.MessageID,
-					BodyHTML:  pb.BodyHTML,
-					BodyText:  pb.BodyText,
-					Snippet:   pb.Snippet,
-				})
+				bu := message.BodyUpdate{
+					MessageID:      pb.MessageID,
+					BodyHTML:       pb.BodyHTML,
+					BodyText:       pb.BodyText,
+					Snippet:        pb.Snippet,
+					SMIMERawBody:   pb.SMIMERawBody,
+					SMIMEEncrypted: pb.SMIMEEncrypted,
+					PGPRawBody:     pb.PGPRawBody,
+					PGPEncrypted:   pb.PGPEncrypted,
+				}
+				// Don't cache S/MIME or PGP verification status — computed fresh on each view
+				bodyUpdates = append(bodyUpdates, bu)
 
 				// Use pre-extracted attachments (no re-parsing!)
 				if len(pb.Attachments) > 0 {
@@ -2549,6 +2579,71 @@ func (e *Engine) parseMessageBodyInternal(raw []byte, messageID string) *ParsedB
 		Str("topLevelContentType", topLevelCT).
 		Int("rawLen", len(raw)).
 		Msg("Parsing message body")
+
+	// Check for S/MIME content (signed or encrypted)
+	isSigned := smime.IsSMIMESigned(topLevelCT)
+	isEncrypted := smime.IsSMIMEEncrypted(topLevelCT)
+
+	if isSigned || isEncrypted {
+		// Store raw body for on-view processing (verification/decryption happens fresh on each view)
+		result.SMIMERawBody = raw
+		result.SMIMEEncrypted = isEncrypted
+
+		if isEncrypted {
+			// Encrypted: don't store body text/html (decrypted only on view)
+			return result
+		}
+
+		// Signed-only: still parse body for FTS, but don't cache verification status
+		if e.smimeVerifier != nil {
+			_, innerBody := e.smimeVerifier.VerifyAndUnwrap(raw)
+			// Use the unwrapped inner body for parsing (not the S/MIME wrapper)
+			if innerBody != nil {
+				raw = innerBody
+				reader = bytes.NewReader(raw)
+				newEntity, parseErr := gomessage.Read(reader)
+				if parseErr != nil {
+					e.log.Debug().Err(parseErr).Msg("Failed to re-parse unwrapped S/MIME body")
+					result.BodyText = string(raw)
+					return result
+				}
+				entity = newEntity
+				topLevelCT = entity.Header.Get("Content-Type")
+			}
+		}
+	}
+
+	// Check for PGP/MIME content (signed or encrypted)
+	isPGPSigned := pgp.IsPGPSigned(topLevelCT)
+	isPGPEncrypted := pgp.IsPGPEncrypted(topLevelCT)
+
+	if isPGPSigned || isPGPEncrypted {
+		// Store raw body for on-view processing (verification/decryption happens fresh on each view)
+		result.PGPRawBody = raw
+		result.PGPEncrypted = isPGPEncrypted
+
+		if isPGPEncrypted {
+			// Encrypted: don't store body text/html (decrypted only on view)
+			return result
+		}
+
+		// Signed-only: still parse body for FTS, but don't cache verification status
+		if e.pgpVerifier != nil {
+			_, innerBody := e.pgpVerifier.VerifyAndUnwrap(raw)
+			// Use the unwrapped inner body for parsing (not the PGP wrapper)
+			if innerBody != nil {
+				raw = innerBody
+				reader = bytes.NewReader(raw)
+				newEntity, parseErr := gomessage.Read(reader)
+				if parseErr != nil {
+					e.log.Debug().Err(parseErr).Msg("Failed to re-parse unwrapped PGP body")
+					result.BodyText = string(raw)
+					return result
+				}
+				entity = newEntity
+			}
+		}
+	}
 
 	mr := entity.MultipartReader()
 	e.log.Debug().Bool("isMultipart", mr != nil).Msg("Multipart detection result")

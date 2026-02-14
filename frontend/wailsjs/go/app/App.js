@@ -22,6 +22,10 @@ export function AddImageAllowlist(arg1, arg2) {
   return window['go']['app']['App']['AddImageAllowlist'](arg1, arg2);
 }
 
+export function AddPGPKeyServer(arg1) {
+  return window['go']['app']['App']['AddPGPKeyServer'](arg1);
+}
+
 export function Archive(arg1) {
   return window['go']['app']['App']['Archive'](arg1);
 }
@@ -60,6 +64,14 @@ export function CancelFolderSync(arg1, arg2) {
 
 export function CancelOAuthFlow() {
   return window['go']['app']['App']['CancelOAuthFlow']();
+}
+
+export function CheckRecipientCerts(arg1) {
+  return window['go']['app']['App']['CheckRecipientCerts'](arg1);
+}
+
+export function CheckRecipientPGPKeys(arg1) {
+  return window['go']['app']['App']['CheckRecipientPGPKeys'](arg1);
 }
 
 export function ClearContactSourceError(arg1) {
@@ -102,8 +114,24 @@ export function DeleteLocalMessages(arg1) {
   return window['go']['app']['App']['DeleteLocalMessages'](arg1);
 }
 
+export function DeletePGPKey(arg1) {
+  return window['go']['app']['App']['DeletePGPKey'](arg1);
+}
+
+export function DeletePGPSenderKey(arg1) {
+  return window['go']['app']['App']['DeletePGPSenderKey'](arg1);
+}
+
 export function DeletePermanently(arg1) {
   return window['go']['app']['App']['DeletePermanently'](arg1);
+}
+
+export function DeleteSMIMECertificate(arg1) {
+  return window['go']['app']['App']['DeleteSMIMECertificate'](arg1);
+}
+
+export function DeleteSenderCert(arg1) {
+  return window['go']['app']['App']['DeleteSenderCert'](arg1);
 }
 
 export function DiscoverCardDAVAddressbooks(arg1, arg2, arg3) {
@@ -112,6 +140,10 @@ export function DiscoverCardDAVAddressbooks(arg1, arg2, arg3) {
 
 export function DownloadAttachment(arg1, arg2) {
   return window['go']['app']['App']['DownloadAttachment'](arg1, arg2);
+}
+
+export function DownloadEncryptedAttachment(arg1, arg2, arg3) {
+  return window['go']['app']['App']['DownloadEncryptedAttachment'](arg1, arg2, arg3);
 }
 
 export function FetchMessageBody(arg1) {
@@ -274,12 +306,32 @@ export function GetOAuthStatus(arg1) {
   return window['go']['app']['App']['GetOAuthStatus'](arg1);
 }
 
+export function GetPGPEncryptPolicy(arg1) {
+  return window['go']['app']['App']['GetPGPEncryptPolicy'](arg1);
+}
+
+export function GetPGPKeyServers() {
+  return window['go']['app']['App']['GetPGPKeyServers']();
+}
+
+export function GetPGPSignPolicy(arg1) {
+  return window['go']['app']['App']['GetPGPSignPolicy'](arg1);
+}
+
 export function GetPendingMailto() {
   return window['go']['app']['App']['GetPendingMailto']();
 }
 
 export function GetReadReceiptResponsePolicy() {
   return window['go']['app']['App']['GetReadReceiptResponsePolicy']();
+}
+
+export function GetSMIMEEncryptPolicy(arg1) {
+  return window['go']['app']['App']['GetSMIMEEncryptPolicy'](arg1);
+}
+
+export function GetSMIMESignPolicy(arg1) {
+  return window['go']['app']['App']['GetSMIMESignPolicy'](arg1);
 }
 
 export function GetSearchCount(arg1, arg2, arg3) {
@@ -338,8 +390,32 @@ export function GetUnifiedInboxUnreadCount() {
   return window['go']['app']['App']['GetUnifiedInboxUnreadCount']();
 }
 
+export function HasPGPKey(arg1) {
+  return window['go']['app']['App']['HasPGPKey'](arg1);
+}
+
+export function HasSMIMECertificate(arg1) {
+  return window['go']['app']['App']['HasSMIMECertificate'](arg1);
+}
+
 export function IgnoreReadReceipt(arg1, arg2) {
   return window['go']['app']['App']['IgnoreReadReceipt'](arg1, arg2);
+}
+
+export function ImportPGPKeyFromPath(arg1, arg2, arg3) {
+  return window['go']['app']['App']['ImportPGPKeyFromPath'](arg1, arg2, arg3);
+}
+
+export function ImportRecipientCert(arg1, arg2) {
+  return window['go']['app']['App']['ImportRecipientCert'](arg1, arg2);
+}
+
+export function ImportRecipientPGPKey(arg1, arg2) {
+  return window['go']['app']['App']['ImportRecipientPGPKey'](arg1, arg2);
+}
+
+export function ImportSMIMECertificateFromPath(arg1, arg2, arg3) {
+  return window['go']['app']['App']['ImportSMIMECertificateFromPath'](arg1, arg2, arg3);
 }
 
 export function InitiateShutdown() {
@@ -374,6 +450,34 @@ export function ListDrafts(arg1) {
   return window['go']['app']['App']['ListDrafts'](arg1);
 }
 
+export function ListPGPKeys(arg1) {
+  return window['go']['app']['App']['ListPGPKeys'](arg1);
+}
+
+export function ListPGPSenderKeys() {
+  return window['go']['app']['App']['ListPGPSenderKeys']();
+}
+
+export function ListSMIMECertificates(arg1) {
+  return window['go']['app']['App']['ListSMIMECertificates'](arg1);
+}
+
+export function ListSenderCerts() {
+  return window['go']['app']['App']['ListSenderCerts']();
+}
+
+export function LookupHKP(arg1) {
+  return window['go']['app']['App']['LookupHKP'](arg1);
+}
+
+export function LookupPGPKey(arg1) {
+  return window['go']['app']['App']['LookupPGPKey'](arg1);
+}
+
+export function LookupWKD(arg1) {
+  return window['go']['app']['App']['LookupWKD'](arg1);
+}
+
 export function MarkAsNotSpam(arg1) {
   return window['go']['app']['App']['MarkAsNotSpam'](arg1);
 }
@@ -406,6 +510,10 @@ export function OpenComposerWindow(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['OpenComposerWindow'](arg1, arg2, arg3, arg4);
 }
 
+export function OpenEncryptedAttachment(arg1, arg2) {
+  return window['go']['app']['App']['OpenEncryptedAttachment'](arg1, arg2);
+}
+
 export function OpenFile(arg1) {
   return window['go']['app']['App']['OpenFile'](arg1);
 }
@@ -422,8 +530,32 @@ export function PickAttachmentFiles() {
   return window['go']['app']['App']['PickAttachmentFiles']();
 }
 
+export function PickPGPKeyFile() {
+  return window['go']['app']['App']['PickPGPKeyFile']();
+}
+
+export function PickRecipientCertFile() {
+  return window['go']['app']['App']['PickRecipientCertFile']();
+}
+
+export function PickRecipientPGPKeyFile() {
+  return window['go']['app']['App']['PickRecipientPGPKeyFile']();
+}
+
+export function PickSMIMECertificateFile() {
+  return window['go']['app']['App']['PickSMIMECertificateFile']();
+}
+
 export function PrepareReply(arg1, arg2) {
   return window['go']['app']['App']['PrepareReply'](arg1, arg2);
+}
+
+export function ProcessPGPMessage(arg1) {
+  return window['go']['app']['App']['ProcessPGPMessage'](arg1);
+}
+
+export function ProcessSMIMEMessage(arg1) {
+  return window['go']['app']['App']['ProcessSMIMEMessage'](arg1);
 }
 
 export function ReadFileAsAttachment(arg1) {
@@ -450,6 +582,10 @@ export function RemoveImageAllowlist(arg1) {
   return window['go']['app']['App']['RemoveImageAllowlist'](arg1);
 }
 
+export function RemovePGPKeyServer(arg1) {
+  return window['go']['app']['App']['RemovePGPKeyServer'](arg1);
+}
+
 export function RemoveTrustedCertificate(arg1) {
   return window['go']['app']['App']['RemoveTrustedCertificate'](arg1);
 }
@@ -462,12 +598,20 @@ export function SaveAllAttachments(arg1) {
   return window['go']['app']['App']['SaveAllAttachments'](arg1);
 }
 
+export function SaveAllEncryptedAttachments(arg1) {
+  return window['go']['app']['App']['SaveAllEncryptedAttachments'](arg1);
+}
+
 export function SaveAttachmentAs(arg1) {
   return window['go']['app']['App']['SaveAttachmentAs'](arg1);
 }
 
 export function SaveDraft(arg1, arg2, arg3) {
   return window['go']['app']['App']['SaveDraft'](arg1, arg2, arg3);
+}
+
+export function SaveEncryptedAttachmentAs(arg1, arg2) {
+  return window['go']['app']['App']['SaveEncryptedAttachmentAs'](arg1, arg2);
 }
 
 export function SaveOAuthTokens(arg1, arg2, arg3, arg4, arg5) {
@@ -514,6 +658,14 @@ export function SetDefaultIdentity(arg1, arg2) {
   return window['go']['app']['App']['SetDefaultIdentity'](arg1, arg2);
 }
 
+export function SetDefaultPGPKey(arg1, arg2) {
+  return window['go']['app']['App']['SetDefaultPGPKey'](arg1, arg2);
+}
+
+export function SetDefaultSMIMECertificate(arg1, arg2) {
+  return window['go']['app']['App']['SetDefaultSMIMECertificate'](arg1, arg2);
+}
+
 export function SetMarkAsReadDelay(arg1) {
   return window['go']['app']['App']['SetMarkAsReadDelay'](arg1);
 }
@@ -526,8 +678,24 @@ export function SetMessageListSortOrder(arg1) {
   return window['go']['app']['App']['SetMessageListSortOrder'](arg1);
 }
 
+export function SetPGPEncryptPolicy(arg1, arg2) {
+  return window['go']['app']['App']['SetPGPEncryptPolicy'](arg1, arg2);
+}
+
+export function SetPGPSignPolicy(arg1, arg2) {
+  return window['go']['app']['App']['SetPGPSignPolicy'](arg1, arg2);
+}
+
 export function SetReadReceiptResponsePolicy(arg1) {
   return window['go']['app']['App']['SetReadReceiptResponsePolicy'](arg1);
+}
+
+export function SetSMIMEEncryptPolicy(arg1, arg2) {
+  return window['go']['app']['App']['SetSMIMEEncryptPolicy'](arg1, arg2);
+}
+
+export function SetSMIMESignPolicy(arg1, arg2) {
+  return window['go']['app']['App']['SetSMIMESignPolicy'](arg1, arg2);
 }
 
 export function SetShowTitleBar(arg1) {

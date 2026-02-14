@@ -117,6 +117,22 @@ export function readFileAsDataUrl(file: File): Promise<string> {
 }
 
 /**
+ * Add inline margin:0 to <p> tags so recipients see single-spaced paragraphs.
+ * The composer uses paragraph-based Enter (splitBlock) for performance, and CSS
+ * handles zero margins during editing. This function ensures the sent HTML also
+ * renders single-spaced in all email clients.
+ */
+export function addParagraphStyles(html: string): string {
+  return html
+    // Normalize empty paragraphs so they all have <br> for consistent height
+    .replace(/<p><\/p>/g, '<p><br></p>')
+    // Insert style="margin:0" after every <p that is followed by space or >
+    // This avoids matching <pre>, <param>, etc.
+    .replace(/<p([ >])/g, (_, after) => `<p style="margin:0"${after}`)
+    .replace(/style="margin:0" style="/g, 'style="margin:0;')
+}
+
+/**
  * Keywords that suggest attachments should be present
  */
 export const ATTACHMENT_KEYWORDS = [

@@ -25,14 +25,13 @@
     isInputElement 
   } from '$lib/stores/keyboard.svelte'
   // @ts-ignore - wailsjs path
-  import { PrepareReply, GetPendingMailto, GetDraft, Trash, DeletePermanently, MarkAsRead, MarkAsUnread, Star, Unstar, Archive, MarkAsSpam, MarkAsNotSpam, Undo, GetTermsAccepted, SetTermsAccepted, GetSystemTheme, RefreshWindowConstraints, AcceptCertificate } from '../wailsjs/go/app/App.js'
+  import { PrepareReply, GetPendingMailto, GetDraft, MarkAsRead, MarkAsUnread, Star, Unstar, Archive, MarkAsSpam, MarkAsNotSpam, Undo, GetTermsAccepted, SetTermsAccepted, GetSystemTheme, RefreshWindowConstraints, AcceptCertificate } from '../wailsjs/go/app/App.js'
   // @ts-ignore - wailsjs path
   import { smtp, folder, certificate } from '../wailsjs/go/models'
   // @ts-ignore - wailsjs runtime
   import { WindowShow, EventsOn } from '../wailsjs/runtime/runtime'
   // @ts-ignore - wailsjs path
   import { InitiateShutdown } from '../wailsjs/go/app/App.js'
-  import { monitorScreenChanges } from '$lib/utils/window'
 
   // Component refs for keyboard navigation
   let sidebarRef: Sidebar | null = null
@@ -297,8 +296,8 @@
     // Show window after UI is ready (prevents white flash on startup)
     WindowShow()
 
-    // Re-evaluate window max size constraints when display configuration changes
-    monitorScreenChanges(() => RefreshWindowConstraints())
+    // Remove GTK max size constraints that Wails v2 sets at startup
+    RefreshWindowConstraints()
 
     // Check for pending mailto: URL from command line
     try {
@@ -626,25 +625,33 @@
           e.preventDefault()
           handleCompose()
           return
-        case 'r':
+        case 'r': {
           if (!hasConversation) return
           e.preventDefault()
-          if (e.shiftKey) {
-            // Reply All - need last message ID
-            const lastMsgId = getLastMessageId()
-            if (lastMsgId) handleReply('reply-all', lastMsgId)
-          } else {
-            // Reply
-            const lastMsgId = getLastMessageId()
-            if (lastMsgId) handleReply('reply', lastMsgId)
+          if (focusedPane === 'viewer' && viewerRef?.hasFocusedMessage()) {
+            if (e.shiftKey) {
+              viewerRef.replyAll()
+              return
+            }
+            viewerRef.reply()
+            return
           }
+          const msgId = getLastMessageId()
+          if (!msgId) return
+          handleReply(e.shiftKey ? 'reply-all' : 'reply', msgId)
           return
-        case 'f':
+        }
+        case 'f': {
           if (!hasConversation) return
           e.preventDefault()
-          const lastMsgId = getLastMessageId()
-          if (lastMsgId) handleReply('forward', lastMsgId)
+          if (focusedPane === 'viewer' && viewerRef?.hasFocusedMessage()) {
+            viewerRef.forward()
+            return
+          }
+          const msgId = getLastMessageId()
+          if (msgId) handleReply('forward', msgId)
           return
+        }
         case 's':
           e.preventDefault()
           if (e.shiftKey) {
@@ -663,7 +670,14 @@
             sidebarRef?.toggleSync()
             return
           }
-          break
+          // Ctrl-A: Select all text in viewer, or select all messages in list
+          e.preventDefault()
+          if (focusedPane === 'viewer') {
+            viewerRef?.selectAllText()
+            return
+          }
+          messageListRef?.selectAll()
+          return
         case 'l':
           e.preventDefault()
           if (e.shiftKey) {
@@ -866,27 +880,25 @@
         }
         return
       case 'Backspace':
-      case 'Delete':
-        if (messageListRef?.hasCheckedMessages()) {
-          // Delete checked messages
-          const messageIds = messageListRef.getCheckedMessageIds()
+      case 'Delete': {
+        if (focusedPane === 'viewer' && viewerRef?.hasFocusedMessage()) {
           if (e.shiftKey) {
-            handleBulkDeletePermanently(messageIds)
-          } else {
-            handleBulkTrash(messageIds)
+            viewerRef.deletePermanently()
+            return
           }
-        } else {
-          // Delete the keyboard-focused message (not the viewed one)
-          const focusedMessageIds = messageListRef?.getSelectedMessageIds() ?? []
-          if (focusedMessageIds.length > 0) {
-            if (e.shiftKey) {
-              handleBulkDeletePermanently(focusedMessageIds)
-            } else {
-              handleBulkTrash(focusedMessageIds)
-            }
-          }
+          viewerRef.trash()
+          return
+        }
+        if (messageListRef?.hasCheckedMessages()) {
+          messageListRef.requestDelete(messageListRef.getCheckedMessageIds(), e.shiftKey)
+          return
+        }
+        const focusedMessageIds = messageListRef?.getSelectedMessageIds() ?? []
+        if (focusedMessageIds.length > 0) {
+          messageListRef?.requestDelete(focusedMessageIds, e.shiftKey)
         }
         return
+      }
     }
   }
 
@@ -901,28 +913,6 @@
   }
 
   // Bulk action handlers
-  async function handleBulkTrash(messageIds: string[]) {
-    try {
-      await Trash(messageIds)
-      addToast({ type: 'success', message: 'Moved to trash', actions: [{ label: 'Undo', onClick: handleUndo }] })
-      messageListRef?.clearChecked()
-      messageListRef?.handleActionComplete(true)
-    } catch (err) {
-      addToast({ type: 'error', message: `Failed to delete: ${err}` })
-    }
-  }
-
-  async function handleBulkDeletePermanently(messageIds: string[]) {
-    try {
-      await DeletePermanently(messageIds)
-      addToast({ type: 'success', message: 'Permanently deleted' })
-      messageListRef?.clearChecked()
-      messageListRef?.handleActionComplete(true)
-    } catch (err) {
-      addToast({ type: 'error', message: `Failed to delete: ${err}` })
-    }
-  }
-
   async function handleBulkArchive(messageIds: string[]) {
     try {
       await Archive(messageIds)

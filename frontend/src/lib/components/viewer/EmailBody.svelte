@@ -13,9 +13,10 @@
     bodyText?: string
     fromEmail?: string
     onCompose?: (to: string) => void
+    encryptedInlineAttachments?: Record<string, string>
   }
 
-  let { messageId, accountId, bodyHtml = '', bodyText = '', fromEmail = '', onCompose }: Props = $props()
+  let { messageId, accountId, bodyHtml = '', bodyText = '', fromEmail = '', onCompose, encryptedInlineAttachments }: Props = $props()
 
   // State for remote image handling
   let imagesBlocked = $state(true)
@@ -115,6 +116,16 @@
       }
       
       window.addEventListener('message', function(e) {
+        if (e.data?.type === 'select-all') {
+          var range = document.createRange();
+          range.selectNodeContents(document.body);
+          var selection = window.getSelection();
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+          return;
+        }
         if (e.data?.type === 'inline-images' && e.data.images) {
           var images = e.data.images;
           var replaced = 0;
@@ -257,6 +268,9 @@
     html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; /* Chrome/Safari/WebKit */ }
     body { padding: 16px; }
     img { max-width: 100%; height: auto; }
+    /* Ensure empty paragraphs (blank lines) render with visible height */
+    p:empty { min-height: 1em; }
+    p:has(> br:only-child) { min-height: 1em; }
     img[data-cid] { min-width: 100px; min-height: 60px; }
     a { color: #2563eb; }
     /* Only apply defaults to elements without inline styles */
@@ -446,8 +460,15 @@ ${processedHtml}
     const id = messageId
     const html = bodyHtml
     const hasCid = html ? /src=["']cid:([^"']+)["']/i.test(html) : false
+    const encInline = encryptedInlineAttachments
 
     if (!id || !hasCid) {
+      return
+    }
+
+    // For encrypted messages, use the in-memory inline attachments from decryption
+    if (encInline && Object.keys(encInline).length > 0) {
+      inlineAttachments = encInline
       return
     }
 

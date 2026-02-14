@@ -3,12 +3,38 @@ package imap
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/hkdb/aerion/internal/logging"
 	"github.com/rs/zerolog"
 )
+
+// IsConnectionError checks if an error indicates a dead/broken connection.
+// These errors warrant discarding the connection and getting a new one from the pool.
+func IsConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	connectionErrors := []string{
+		"use of closed network connection",
+		"connection reset",
+		"broken pipe",
+		"EOF",
+		"i/o timeout",
+		"connection refused",
+		"no such host",
+		"network is unreachable",
+	}
+	for _, connErr := range connectionErrors {
+		if strings.Contains(errStr, connErr) {
+			return true
+		}
+	}
+	return false
+}
 
 // PoolConfig configures the connection pool
 type PoolConfig struct {

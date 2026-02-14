@@ -38,6 +38,23 @@ type Draft struct {
 	// Identity
 	IdentityID string `json:"identityId,omitempty"`
 
+	// S/MIME preferences (preserved across draft save/load)
+	SignMessage bool `json:"signMessage,omitempty"`
+
+	// Encryption state (encrypt-to-self for S/MIME drafts)
+	Encrypted     bool   `json:"encrypted,omitempty"`
+	EncryptedBody []byte `json:"-"` // PKCS#7 DER blob, not sent to frontend
+
+	// PGP preferences (preserved across draft save/load)
+	PGPSignMessage bool `json:"pgpSignMessage,omitempty"`
+
+	// PGP encryption state (encrypt-to-self for PGP drafts)
+	PGPEncrypted     bool   `json:"pgpEncrypted,omitempty"`
+	PGPEncryptedBody []byte `json:"-"` // PGP armored blob, not sent to frontend
+
+	// Attachment data (JSON-serialized for non-encrypted drafts)
+	AttachmentsData []byte `json:"-"` // Not sent to frontend directly
+
 	// IMAP sync state
 	SyncStatus      SyncStatus `json:"syncStatus"`
 	IMAPUID         uint32     `json:"imapUid,omitempty"`

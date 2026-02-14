@@ -7,6 +7,16 @@
   strip-components: 3
   type: archive
   url: https://proxy.golang.org/github.com/!microsoft/go-winio/@v/v0.6.2.zip
+- dest: vendor/github.com/ProtonMail/go-crypto
+  sha256: a7b989d1685dfb29d396d479f9922f30a2dcea9ba28f98535232493d631b3744
+  strip-components: 3
+  type: archive
+  url: https://proxy.golang.org/github.com/!proton!mail/go-crypto/@v/v1.1.5.zip
+- dest: vendor/github.com/cloudflare/circl
+  sha256: 4497093cb7544d30e9d5d741a5e62c14fb8989c4271ca0a9a0a03a73570b3b83
+  strip-components: 3
+  type: archive
+  url: https://proxy.golang.org/github.com/cloudflare/circl/@v/v1.3.7.zip
 - dest: vendor/github.com/emersion/go-imap/v2
   sha256: bc383389d2072cc9ffa14ab3cd85a9e9d52857f84f06a4b0d6cd855d1ebf635b
   strip-components: 4
@@ -82,6 +92,16 @@
   strip-components: 3
   type: archive
   url: https://proxy.golang.org/golang.org/x/text/@v/v0.32.0.zip
+- dest: vendor/go.mozilla.org/pkcs7
+  sha256: 11b30a1d5df3f7eff5d5a096294c7957110742f00964959dcb14486171d246ff
+  strip-components: 2
+  type: archive
+  url: https://proxy.golang.org/go.mozilla.org/pkcs7/@v/v0.9.0.zip
+- dest: vendor/software.sslmate.com/src/go-pkcs12
+  sha256: 9665bc3461beb6f36f2d1b8ce3e1d597c165c9d829d4217621b1c6a8a12bc647
+  strip-components: 3
+  type: archive
+  url: https://proxy.golang.org/software.sslmate.com/src/go-pkcs12/@v/v0.7.0.zip
 - dest: vendor/modernc.org/sqlite
   sha256: eca92adf703ca9be15a14df79f9a739331b8fc9fa8eaa8d016a78d963e5863c6
   strip-components: 2

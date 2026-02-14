@@ -171,6 +171,196 @@ func (s *Store) IsKeyringEnabled() bool {
 	return s.keyringEnabled
 }
 
+// SetSMIMEPrivateKey stores an S/MIME private key for a certificate
+func (s *Store) SetSMIMEPrivateKey(certID string, privateKeyPEM []byte) error {
+	if len(privateKeyPEM) == 0 {
+		return nil
+	}
+
+	keyringKey := "smime:" + certID + ":private_key"
+
+	// Try OS keyring first if available
+	if s.keyringEnabled {
+		err := gokeyring.Set(serviceName, keyringKey, string(privateKeyPEM))
+		if err == nil {
+			s.log.Debug().Str("cert_id", certID).Msg("S/MIME private key stored in OS keyring")
+			s.clearSMIMEDBPrivateKey(certID)
+			return nil
+		}
+		s.log.Warn().Err(err).Msg("Failed to store S/MIME key in OS keyring, using fallback")
+	}
+
+	// Fallback to encrypted database storage
+	encrypted, err := s.encryptor.Encrypt(string(privateKeyPEM))
+	if err != nil {
+		return fmt.Errorf("failed to encrypt S/MIME private key: %w", err)
+	}
+
+	_, err = s.db.Exec(
+		"UPDATE smime_certificates SET encrypted_private_key = ? WHERE id = ?",
+		encrypted, certID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to store encrypted S/MIME private key: %w", err)
+	}
+
+	s.log.Debug().Str("cert_id", certID).Msg("S/MIME private key stored in encrypted database")
+	return nil
+}
+
+// GetSMIMEPrivateKey retrieves an S/MIME private key for a certificate
+func (s *Store) GetSMIMEPrivateKey(certID string) ([]byte, error) {
+	keyringKey := "smime:" + certID + ":private_key"
+
+	// Try OS keyring first if available
+	if s.keyringEnabled {
+		key, err := gokeyring.Get(serviceName, keyringKey)
+		if err == nil {
+			return []byte(key), nil
+		}
+		if err != gokeyring.ErrNotFound {
+			s.log.Warn().Err(err).Msg("Error reading S/MIME key from OS keyring, trying fallback")
+		}
+	}
+
+	// Try fallback encrypted database storage
+	var encrypted sql.NullString
+	err := s.db.QueryRow(
+		"SELECT encrypted_private_key FROM smime_certificates WHERE id = ?",
+		certID,
+	).Scan(&encrypted)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrCredentialNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query S/MIME private key: %w", err)
+	}
+
+	if !encrypted.Valid || encrypted.String == "" {
+		return nil, ErrCredentialNotFound
+	}
+
+	key, err := s.encryptor.Decrypt(encrypted.String)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt S/MIME private key: %w", err)
+	}
+
+	return []byte(key), nil
+}
+
+// DeleteSMIMEPrivateKey removes an S/MIME private key for a certificate
+func (s *Store) DeleteSMIMEPrivateKey(certID string) error {
+	keyringKey := "smime:" + certID + ":private_key"
+
+	if s.keyringEnabled {
+		gokeyring.Delete(serviceName, keyringKey)
+	}
+
+	s.clearSMIMEDBPrivateKey(certID)
+	return nil
+}
+
+// clearSMIMEDBPrivateKey clears the encrypted private key from the database
+func (s *Store) clearSMIMEDBPrivateKey(certID string) {
+	s.db.Exec("UPDATE smime_certificates SET encrypted_private_key = NULL WHERE id = ?", certID)
+}
+
+// SetPGPPrivateKey stores a PGP private key for a keypair
+func (s *Store) SetPGPPrivateKey(keyID string, armoredKey []byte) error {
+	if len(armoredKey) == 0 {
+		return nil
+	}
+
+	keyringKey := "pgp:" + keyID + ":private_key"
+
+	// Try OS keyring first if available
+	if s.keyringEnabled {
+		err := gokeyring.Set(serviceName, keyringKey, string(armoredKey))
+		if err == nil {
+			s.log.Debug().Str("key_id", keyID).Msg("PGP private key stored in OS keyring")
+			s.clearPGPDBPrivateKey(keyID)
+			return nil
+		}
+		s.log.Warn().Err(err).Msg("Failed to store PGP key in OS keyring, using fallback")
+	}
+
+	// Fallback to encrypted database storage
+	encrypted, err := s.encryptor.Encrypt(string(armoredKey))
+	if err != nil {
+		return fmt.Errorf("failed to encrypt PGP private key: %w", err)
+	}
+
+	_, err = s.db.Exec(
+		"UPDATE pgp_keys SET encrypted_private_key = ? WHERE id = ?",
+		encrypted, keyID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to store encrypted PGP private key: %w", err)
+	}
+
+	s.log.Debug().Str("key_id", keyID).Msg("PGP private key stored in encrypted database")
+	return nil
+}
+
+// GetPGPPrivateKey retrieves a PGP private key for a keypair
+func (s *Store) GetPGPPrivateKey(keyID string) ([]byte, error) {
+	keyringKey := "pgp:" + keyID + ":private_key"
+
+	// Try OS keyring first if available
+	if s.keyringEnabled {
+		key, err := gokeyring.Get(serviceName, keyringKey)
+		if err == nil {
+			return []byte(key), nil
+		}
+		if err != gokeyring.ErrNotFound {
+			s.log.Warn().Err(err).Msg("Error reading PGP key from OS keyring, trying fallback")
+		}
+	}
+
+	// Try fallback encrypted database storage
+	var encrypted sql.NullString
+	err := s.db.QueryRow(
+		"SELECT encrypted_private_key FROM pgp_keys WHERE id = ?",
+		keyID,
+	).Scan(&encrypted)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrCredentialNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query PGP private key: %w", err)
+	}
+
+	if !encrypted.Valid || encrypted.String == "" {
+		return nil, ErrCredentialNotFound
+	}
+
+	key, err := s.encryptor.Decrypt(encrypted.String)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt PGP private key: %w", err)
+	}
+
+	return []byte(key), nil
+}
+
+// DeletePGPPrivateKey removes a PGP private key for a keypair
+func (s *Store) DeletePGPPrivateKey(keyID string) error {
+	keyringKey := "pgp:" + keyID + ":private_key"
+
+	if s.keyringEnabled {
+		gokeyring.Delete(serviceName, keyringKey)
+	}
+
+	s.clearPGPDBPrivateKey(keyID)
+	return nil
+}
+
+// clearPGPDBPrivateKey clears the encrypted private key from the database
+func (s *Store) clearPGPDBPrivateKey(keyID string) {
+	s.db.Exec("UPDATE pgp_keys SET encrypted_private_key = NULL WHERE id = ?", keyID)
+}
+
 // SetCardDAVPassword stores a password for a CardDAV contact source
 func (s *Store) SetCardDAVPassword(sourceID, password string) error {
 	if password == "" {

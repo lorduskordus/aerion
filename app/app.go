@@ -25,6 +25,8 @@ import (
 	"github.com/hkdb/aerion/internal/oauth2"
 	"github.com/hkdb/aerion/internal/platform"
 	"github.com/hkdb/aerion/internal/settings"
+	"github.com/hkdb/aerion/internal/pgp"
+	"github.com/hkdb/aerion/internal/smime"
 	"github.com/hkdb/aerion/internal/sync"
 	"github.com/hkdb/aerion/internal/undo"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -78,6 +80,20 @@ type App struct {
 	carddavStore     *carddav.Store
 	carddavSyncer    *carddav.Syncer
 	carddavScheduler *carddav.Scheduler
+
+	// S/MIME
+	smimeStore     *smime.Store
+	smimeSigner    *smime.Signer
+	smimeVerifier  *smime.Verifier
+	smimeEncryptor *smime.Encryptor
+	smimeDecryptor *smime.Decryptor
+
+	// PGP
+	pgpStore     *pgp.Store
+	pgpSigner    *pgp.Signer
+	pgpVerifier  *pgp.Verifier
+	pgpEncryptor *pgp.Encryptor
+	pgpDecryptor *pgp.Decryptor
 
 	// Undo system
 	undoStack *undo.Stack
@@ -219,12 +235,30 @@ func (a *App) Startup(ctx context.Context) {
 	// Initialize certificate trust store (TOFU)
 	a.certStore = certificate.NewStore(db.DB)
 
+	// Initialize S/MIME support
+	a.smimeStore = smime.NewStore(db.DB, log)
+	a.smimeSigner = smime.NewSigner(a.smimeStore, a.credStore, log)
+	a.smimeVerifier = smime.NewVerifier(a.smimeStore, log)
+	a.smimeEncryptor = smime.NewEncryptor(a.smimeStore, a.credStore, log)
+	a.smimeDecryptor = smime.NewDecryptor(a.smimeStore, a.credStore, log)
+
+	// Initialize PGP support
+	a.pgpStore = pgp.NewStore(db.DB, log)
+	a.pgpSigner = pgp.NewSigner(a.pgpStore, a.credStore, log)
+	a.pgpVerifier = pgp.NewVerifier(a.pgpStore, log)
+	a.pgpEncryptor = pgp.NewEncryptor(a.pgpStore, a.credStore, log)
+	a.pgpDecryptor = pgp.NewDecryptor(a.pgpStore, a.credStore, log)
+
 	// Initialize IMAP connection pool
 	poolConfig := imap.DefaultPoolConfig()
 	a.imapPool = imap.NewPool(poolConfig, a.getIMAPCredentials)
 
 	// Initialize sync engine
 	a.syncEngine = sync.NewEngine(a.imapPool, a.folderStore, a.messageStore, a.attachmentStore)
+
+	// Wire S/MIME and PGP verifiers into sync engine for signature verification during body parsing
+	a.syncEngine.SetSMIMEVerifier(a.smimeVerifier)
+	a.syncEngine.SetPGPVerifier(a.pgpVerifier)
 
 	// Set up sync progress callback to emit events to frontend
 	a.syncEngine.SetProgressCallback(func(progress sync.SyncProgress) {

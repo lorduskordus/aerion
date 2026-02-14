@@ -522,4 +522,172 @@ var migrations = []Migration{
 			);
 		`,
 	},
+	{
+		Version: 19,
+		SQL: `
+			-- S/MIME user certificates (imported PKCS#12 with private key in keyring/encrypted fallback)
+			CREATE TABLE IF NOT EXISTS smime_certificates (
+				id TEXT PRIMARY KEY,
+				account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+				email TEXT NOT NULL,
+				subject TEXT NOT NULL,
+				issuer TEXT NOT NULL,
+				serial_number TEXT NOT NULL,
+				fingerprint TEXT NOT NULL UNIQUE,
+				not_before DATETIME NOT NULL,
+				not_after DATETIME NOT NULL,
+				cert_chain_pem TEXT NOT NULL,
+				encrypted_private_key TEXT,
+				is_default INTEGER NOT NULL DEFAULT 0,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			);
+
+			CREATE INDEX IF NOT EXISTS idx_smime_certificates_account ON smime_certificates(account_id);
+			CREATE INDEX IF NOT EXISTS idx_smime_certificates_email ON smime_certificates(email);
+
+			-- Auto-collected sender public certificates (from incoming signed messages)
+			CREATE TABLE IF NOT EXISTS smime_sender_certs (
+				id TEXT PRIMARY KEY,
+				email TEXT NOT NULL,
+				subject TEXT NOT NULL,
+				issuer TEXT NOT NULL,
+				serial_number TEXT NOT NULL,
+				fingerprint TEXT NOT NULL UNIQUE,
+				not_before DATETIME NOT NULL,
+				not_after DATETIME NOT NULL,
+				cert_pem TEXT NOT NULL,
+				collected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			);
+
+			CREATE INDEX IF NOT EXISTS idx_smime_sender_certs_email ON smime_sender_certs(email);
+			CREATE INDEX IF NOT EXISTS idx_smime_sender_certs_fingerprint ON smime_sender_certs(fingerprint);
+
+			-- Cached verification results on messages
+			ALTER TABLE messages ADD COLUMN smime_status TEXT;
+			ALTER TABLE messages ADD COLUMN smime_signer_email TEXT;
+			ALTER TABLE messages ADD COLUMN smime_signer_subject TEXT;
+
+			-- Per-account signing policy
+			ALTER TABLE accounts ADD COLUMN smime_sign_policy TEXT NOT NULL DEFAULT 'never';
+			ALTER TABLE accounts ADD COLUMN smime_default_cert_id TEXT;
+		`,
+	},
+	{
+		Version: 20,
+		SQL: `
+			-- Raw S/MIME body for on-view verification/decryption
+			ALTER TABLE messages ADD COLUMN smime_raw_body BLOB;
+
+			-- Whether the message is encrypted (so viewer knows to decrypt)
+			ALTER TABLE messages ADD COLUMN smime_encrypted INTEGER NOT NULL DEFAULT 0;
+
+			-- Per-account encryption policy
+			ALTER TABLE accounts ADD COLUMN smime_encrypt_policy TEXT NOT NULL DEFAULT 'never';
+		`,
+	},
+	{
+		Version: 21,
+		SQL: `
+			-- Whether the draft body is encrypted (encrypt-to-self)
+			ALTER TABLE drafts ADD COLUMN encrypted INTEGER NOT NULL DEFAULT 0;
+
+			-- Encrypted draft body (PKCS#7 DER blob)
+			ALTER TABLE drafts ADD COLUMN encrypted_body BLOB;
+		`,
+	},
+	{
+		Version: 22,
+		SQL: `
+			-- Per-message S/MIME sign preference (preserved across draft save/load)
+			ALTER TABLE drafts ADD COLUMN sign_message INTEGER NOT NULL DEFAULT 0;
+		`,
+	},
+	{
+		Version: 23,
+		SQL: `
+			-- Store attachment data alongside draft body (inline images + regular attachments)
+			-- JSON-serialized []smtp.Attachment for non-encrypted drafts
+			-- For encrypted drafts, attachments are included in the encrypted_body payload
+			ALTER TABLE drafts ADD COLUMN attachments_data BLOB;
+		`,
+	},
+	{
+		Version: 24,
+		SQL: `
+			-- PGP user keypairs
+			CREATE TABLE IF NOT EXISTS pgp_keys (
+				id TEXT PRIMARY KEY,
+				account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+				email TEXT NOT NULL,
+				key_id TEXT NOT NULL,
+				fingerprint TEXT NOT NULL UNIQUE,
+				user_id TEXT NOT NULL,
+				algorithm TEXT NOT NULL,
+				key_size INTEGER,
+				created_at_key DATETIME,
+				expires_at_key DATETIME,
+				public_key_armored TEXT NOT NULL,
+				encrypted_private_key TEXT,
+				is_default INTEGER NOT NULL DEFAULT 0,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			);
+			CREATE INDEX IF NOT EXISTS idx_pgp_keys_account ON pgp_keys(account_id);
+			CREATE INDEX IF NOT EXISTS idx_pgp_keys_email ON pgp_keys(email);
+			CREATE INDEX IF NOT EXISTS idx_pgp_keys_fingerprint ON pgp_keys(fingerprint);
+
+			-- Collected sender public keys
+			CREATE TABLE IF NOT EXISTS pgp_sender_keys (
+				id TEXT PRIMARY KEY,
+				email TEXT NOT NULL,
+				key_id TEXT NOT NULL,
+				fingerprint TEXT NOT NULL UNIQUE,
+				user_id TEXT NOT NULL,
+				algorithm TEXT NOT NULL,
+				key_size INTEGER,
+				created_at_key DATETIME,
+				expires_at_key DATETIME,
+				public_key_armored TEXT NOT NULL,
+				source TEXT NOT NULL DEFAULT 'message',
+				collected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			);
+			CREATE INDEX IF NOT EXISTS idx_pgp_sender_keys_email ON pgp_sender_keys(email);
+			CREATE INDEX IF NOT EXISTS idx_pgp_sender_keys_fingerprint ON pgp_sender_keys(fingerprint);
+
+			-- Message PGP columns (parallel to smime_* columns)
+			ALTER TABLE messages ADD COLUMN pgp_status TEXT;
+			ALTER TABLE messages ADD COLUMN pgp_signer_email TEXT;
+			ALTER TABLE messages ADD COLUMN pgp_signer_key_id TEXT;
+			ALTER TABLE messages ADD COLUMN pgp_raw_body BLOB;
+			ALTER TABLE messages ADD COLUMN pgp_encrypted INTEGER NOT NULL DEFAULT 0;
+
+			-- Account PGP policies
+			ALTER TABLE accounts ADD COLUMN pgp_sign_policy TEXT NOT NULL DEFAULT 'never';
+			ALTER TABLE accounts ADD COLUMN pgp_encrypt_policy TEXT NOT NULL DEFAULT 'never';
+			ALTER TABLE accounts ADD COLUMN pgp_default_key_id TEXT;
+
+			-- Draft PGP fields
+			ALTER TABLE drafts ADD COLUMN pgp_sign_message INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE drafts ADD COLUMN pgp_encrypted INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE drafts ADD COLUMN pgp_encrypted_body BLOB;
+		`,
+	},
+	{
+		Version: 25,
+		SQL: `
+			-- PGP key servers table (user-manageable, including defaults)
+			CREATE TABLE IF NOT EXISTS pgp_keyservers (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				url TEXT NOT NULL UNIQUE,
+				order_index INTEGER NOT NULL DEFAULT 0,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			);
+
+			INSERT OR IGNORE INTO pgp_keyservers (url, order_index) VALUES
+				('https://keys.openpgp.org', 0),
+				('https://keyserver.ubuntu.com', 1),
+				('https://pgp.mit.edu', 2);
+		`,
+	},
 }

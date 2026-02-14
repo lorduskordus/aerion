@@ -15,7 +15,6 @@
   import { smtp, app } from '../wailsjs/go/models'
   // @ts-ignore - wailsjs runtime
   import { WindowMinimise, WindowToggleMaximise, WindowShow, Quit, EventsOn, EventsOff } from '../wailsjs/runtime/runtime'
-  import { monitorScreenChanges } from '$lib/utils/window'
 
   // Theme state - follows system preference or main window theme
   let theme = $state<ThemeMode>('light')
@@ -79,8 +78,8 @@
     // Show window after theme is applied (prevents white flash on startup)
     WindowShow()
 
-    // Re-evaluate window max size constraints when display configuration changes
-    monitorScreenChanges(() => RefreshWindowConstraints())
+    // Remove GTK max size constraints that Wails v2 sets at startup
+    RefreshWindowConstraints()
 
     // Listen for system theme changes (only applies when mode is 'system')
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')

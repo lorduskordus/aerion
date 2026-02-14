@@ -71,6 +71,7 @@ Some of the system level features (clickable notifications & auto-sync on wake) 
 - Notification that brings focus to the e-mail when clicked (Linux Only)
 - Auto-Sync when system wakes from suspend (Linux Only)
 - Multiple color themes (More to come...)
+- PGP & S/MIME support
 - [Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md)
 
 ### 🚀 Installation
@@ -130,7 +131,7 @@ For more information, check the [Installation Section](https://aerion.3df.io/doc
 ### ⚗️ Tech Stack
 ---
 
-This application was built with [Wails](https://wails.io) + [Svelte](https://svelte.dev/) and mostly implemented by Claude Opus 4.5.
+This application was built with [Wails](https://wails.io) + [Svelte](https://svelte.dev/) and largely implemented by various versions of Claude Opus & Sonnet models with lots of prompted refactors and manual edits. No yolo-ing.
 
 
 ### 🧑🏻‍💻 Roadmap
@@ -138,11 +139,12 @@ This application was built with [Wails](https://wails.io) + [Svelte](https://sve
 
 Potential features in the future:
 
-- PGP Support
-- In-App Keyboard Shortcut Cheat Sheet
+- Responsive layout (For tiled windows, Linux Phones, and Tablets)
+- Customizable shortcut keys?
+- Advance Search
+- Explore the possibility of supporting [Age](https://github.com/FiloSottile/age) as an encryption method
 - Integrated Calendar?
 - AI Assisted Composition
-- Advance Search
 
 
 ### 💰 Sponsorship

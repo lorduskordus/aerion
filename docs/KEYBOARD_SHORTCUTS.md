@@ -67,6 +67,7 @@ These shortcuts depend on which pane is focused. They are disabled when typing i
 | `Shift+Down` / `Shift+J` | Select next + toggle checkbox |
 | `Space` | Toggle checkbox on current conversation |
 | `Enter` | Open selected conversation in viewer |
+| `CTRL+A` | Select all messages in folder |
 
 ### Conversation Viewer
 
@@ -74,6 +75,7 @@ These shortcuts depend on which pane is focused. They are disabled when typing i
 |----------|--------|
 | `Up` / `K` | Scroll up |
 | `Down` / `J` | Scroll down |
+| `Ctrl + A` | Select all text of message in viewport |
 
 ---
 
@@ -99,6 +101,8 @@ These only work when the composer is open.
 | `Ctrl+Enter` | Send message |
 | `Alt+T` | Activate/Deactivate toolbar mode |
 | `Alt+A` | Attach a file |
+| `Alt+P` | Toggle PGP security mode (S = sign, E = encrypt) |
+| `Alt+S` | Toggle S/MIME security mode (S = sign, E = encrypt) |
 | `Ctrl+D` | Pop out/detach composer to separate window |
 | `Escape` | Close composer (prompts to save draft if unsaved) |
 
@@ -122,6 +126,11 @@ COMPOSE & REPLY
   Ctrl + F            Forward
   Ctrl + Enter        Send (in composer)
   Ctrl + D            Detach composer
+  Alt + P             PGP mode (S/E to toggle sign/encrypt)
+  Alt + S             S/MIME mode (S/E to toggle sign/encrypt)
+
+SELECTION
+  Ctrl + A            Select all messages (list) / text (viewer)
 
 MESSAGE ACTIONS
   S                   Star/Unstar

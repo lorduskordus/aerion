@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -12,6 +13,13 @@ import (
 	"github.com/hkdb/aerion/internal/smtp"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
+
+// draftBodyPayload is used to serialize body fields for encrypted draft storage
+type draftBodyPayload struct {
+	BodyHTML     string            `json:"bodyHtml"`
+	BodyText     string            `json:"bodyText"`
+	Attachments  []smtp.Attachment `json:"attachments,omitempty"`
+}
 
 // DraftResult represents the result of saving a draft
 type DraftResult struct {
@@ -46,45 +54,114 @@ func (a *App) SaveDraft(accountID string, msg smtp.ComposeMessage, existingDraft
 		}
 	}
 
+	// Encrypt body to self if encryption is enabled (S/MIME or PGP, mutually exclusive)
+	bodyHTML := msg.HTMLBody
+	bodyText := msg.TextBody
+	encrypted := false
+	var encryptedBody []byte
+	pgpEncrypted := false
+	var pgpEncryptedBody []byte
+	var attachmentsData []byte
+
+	if msg.EncryptMessage {
+		// S/MIME encrypt-to-self
+		payload := draftBodyPayload{BodyHTML: msg.HTMLBody, BodyText: msg.TextBody, Attachments: msg.Attachments}
+		jsonBytes, jsonErr := json.Marshal(payload)
+		if jsonErr != nil {
+			return nil, fmt.Errorf("failed to serialize draft body: %w", jsonErr)
+		}
+
+		enc, encErr := a.smimeEncryptor.EncryptBytes(accountID, jsonBytes)
+		if encErr != nil {
+			log.Warn().Err(encErr).Msg("Failed to encrypt draft body, saving unencrypted")
+		} else {
+			encrypted = true
+			encryptedBody = enc
+			bodyHTML = ""
+			bodyText = ""
+		}
+	} else if msg.PGPEncryptMessage {
+		// PGP encrypt-to-self
+		payload := draftBodyPayload{BodyHTML: msg.HTMLBody, BodyText: msg.TextBody, Attachments: msg.Attachments}
+		jsonBytes, jsonErr := json.Marshal(payload)
+		if jsonErr != nil {
+			return nil, fmt.Errorf("failed to serialize draft body: %w", jsonErr)
+		}
+
+		enc, encErr := a.pgpEncryptor.EncryptBytes(accountID, jsonBytes)
+		if encErr != nil {
+			log.Warn().Err(encErr).Msg("Failed to PGP encrypt draft body, saving unencrypted")
+		} else {
+			pgpEncrypted = true
+			pgpEncryptedBody = enc
+			bodyHTML = ""
+			bodyText = ""
+		}
+	}
+
+	// For non-encrypted drafts, store attachments separately
+	if !encrypted && !pgpEncrypted && len(msg.Attachments) > 0 {
+		attJSON, attErr := json.Marshal(msg.Attachments)
+		if attErr != nil {
+			log.Warn().Err(attErr).Msg("Failed to serialize draft attachments")
+		} else {
+			attachmentsData = attJSON
+		}
+	}
+
 	if localDraft != nil {
 		// Update existing draft
 		localDraft.ToList = addressListToJSON(msg.To)
 		localDraft.CcList = addressListToJSON(msg.Cc)
 		localDraft.BccList = addressListToJSON(msg.Bcc)
 		localDraft.Subject = msg.Subject
-		localDraft.BodyHTML = msg.HTMLBody
-		localDraft.BodyText = msg.TextBody
+		localDraft.BodyHTML = bodyHTML
+		localDraft.BodyText = bodyText
 		localDraft.InReplyToID = msg.InReplyTo
+		localDraft.SignMessage = msg.SignMessage
+		localDraft.Encrypted = encrypted
+		localDraft.EncryptedBody = encryptedBody
+		localDraft.PGPSignMessage = msg.PGPSignMessage
+		localDraft.PGPEncrypted = pgpEncrypted
+		localDraft.PGPEncryptedBody = pgpEncryptedBody
+		localDraft.AttachmentsData = attachmentsData
 		localDraft.SyncStatus = draft.SyncStatusPending
 
 		if err := a.draftStore.Update(localDraft); err != nil {
 			return nil, fmt.Errorf("failed to update draft: %w", err)
 		}
-		log.Debug().Str("draftID", localDraft.ID).Msg("Updated existing draft")
+		log.Debug().Str("draftID", localDraft.ID).Bool("encrypted", encrypted).Bool("pgpEncrypted", pgpEncrypted).Msg("Updated existing draft")
 	} else {
 		// Create new draft
 		localDraft = &draft.Draft{
-			AccountID:   accountID,
-			ToList:      addressListToJSON(msg.To),
-			CcList:      addressListToJSON(msg.Cc),
-			BccList:     addressListToJSON(msg.Bcc),
-			Subject:     msg.Subject,
-			BodyHTML:    msg.HTMLBody,
-			BodyText:    msg.TextBody,
-			InReplyToID: msg.InReplyTo,
-			SyncStatus:  draft.SyncStatusPending,
+			AccountID:        accountID,
+			ToList:           addressListToJSON(msg.To),
+			CcList:           addressListToJSON(msg.Cc),
+			BccList:          addressListToJSON(msg.Bcc),
+			Subject:          msg.Subject,
+			BodyHTML:         bodyHTML,
+			BodyText:         bodyText,
+			InReplyToID:      msg.InReplyTo,
+			SignMessage:      msg.SignMessage,
+			Encrypted:        encrypted,
+			EncryptedBody:    encryptedBody,
+			PGPSignMessage:   msg.PGPSignMessage,
+			PGPEncrypted:     pgpEncrypted,
+			PGPEncryptedBody: pgpEncryptedBody,
+			AttachmentsData:  attachmentsData,
+			SyncStatus:       draft.SyncStatusPending,
 		}
 
 		if err := a.draftStore.Create(localDraft); err != nil {
 			return nil, fmt.Errorf("failed to create draft: %w", err)
 		}
-		log.Debug().Str("draftID", localDraft.ID).Msg("Created new draft")
+		log.Debug().Str("draftID", localDraft.ID).Bool("encrypted", encrypted).Bool("pgpEncrypted", pgpEncrypted).Msg("Created new draft")
 	}
 
 	// Sync to IMAP in background
 	go a.syncDraftToIMAP(localDraft, msg)
 
-	log.Info().Str("draftID", localDraft.ID).Msg("Draft saved locally, syncing to IMAP")
+	log.Info().Str("draftID", localDraft.ID).Bool("encrypted", encrypted).Msg("Draft saved locally, syncing to IMAP")
 	return &DraftResult{Draft: localDraft}, nil
 }
 
@@ -92,11 +169,22 @@ func (a *App) SaveDraft(accountID string, msg smtp.ComposeMessage, existingDraft
 func (a *App) syncDraftToIMAP(localDraft *draft.Draft, msg smtp.ComposeMessage) {
 	log := logging.WithComponent("app")
 
+	// Helper to emit sync status change event to frontend
+	emitSyncStatus := func(status draft.SyncStatus, imapUID uint32, syncError string) {
+		wailsRuntime.EventsEmit(a.ctx, "draft:syncStatusChanged", map[string]interface{}{
+			"draftId":    localDraft.ID,
+			"syncStatus": status,
+			"imapUid":    imapUID,
+			"error":      syncError,
+		})
+	}
+
 	// Find the Drafts folder for this account
 	draftsFolder, err := a.GetSpecialFolder(localDraft.AccountID, folder.TypeDrafts)
 	if err != nil || draftsFolder == nil {
 		log.Warn().Err(err).Str("account_id", localDraft.AccountID).Msg("No drafts folder found, skipping IMAP sync")
 		a.draftStore.UpdateSyncStatus(localDraft.ID, draft.SyncStatusFailed, 0, "", "no drafts folder found")
+		emitSyncStatus(draft.SyncStatusFailed, 0, "no drafts folder found")
 		return
 	}
 
@@ -105,6 +193,7 @@ func (a *App) syncDraftToIMAP(localDraft *draft.Draft, msg smtp.ComposeMessage) 
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to get IMAP connection, will retry later")
 		a.draftStore.UpdateSyncStatus(localDraft.ID, draft.SyncStatusFailed, 0, "", err.Error())
+		emitSyncStatus(draft.SyncStatusFailed, 0, err.Error())
 		return
 	}
 	defer a.imapPool.Release(poolConn)
@@ -125,7 +214,54 @@ func (a *App) syncDraftToIMAP(localDraft *draft.Draft, msg smtp.ComposeMessage) 
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to build RFC822 message")
 		a.draftStore.UpdateSyncStatus(localDraft.ID, draft.SyncStatusFailed, 0, "", err.Error())
+		emitSyncStatus(draft.SyncStatusFailed, 0, err.Error())
 		return
+	}
+
+	// Sign then encrypt draft for IMAP sync (mirrors send flow)
+	// S/MIME signing
+	if localDraft.SignMessage {
+		signedMsg, signErr := a.smimeSigner.SignMessage(localDraft.AccountID, rawMsg)
+		if signErr != nil {
+			log.Warn().Err(signErr).Msg("Failed to sign draft for IMAP sync, continuing unsigned")
+		} else {
+			rawMsg = signedMsg
+			log.Debug().Str("draftID", localDraft.ID).Msg("Draft S/MIME signed for IMAP sync")
+		}
+	}
+	// S/MIME encryption
+	if localDraft.Encrypted {
+		encryptedMsg, encErr := a.smimeEncryptor.EncryptMessageToSelf(localDraft.AccountID, rawMsg)
+		if encErr != nil {
+			log.Error().Err(encErr).Msg("Failed to encrypt draft for IMAP sync")
+			a.draftStore.UpdateSyncStatus(localDraft.ID, draft.SyncStatusFailed, 0, "", encErr.Error())
+			emitSyncStatus(draft.SyncStatusFailed, 0, encErr.Error())
+			return
+		}
+		rawMsg = encryptedMsg
+		log.Debug().Str("draftID", localDraft.ID).Msg("Draft S/MIME encrypted for IMAP sync")
+	}
+	// PGP signing (mutually exclusive with S/MIME)
+	if !localDraft.SignMessage && localDraft.PGPSignMessage {
+		signedMsg, signErr := a.pgpSigner.SignMessage(localDraft.AccountID, rawMsg)
+		if signErr != nil {
+			log.Warn().Err(signErr).Msg("Failed to PGP sign draft for IMAP sync, continuing unsigned")
+		} else {
+			rawMsg = signedMsg
+			log.Debug().Str("draftID", localDraft.ID).Msg("Draft PGP signed for IMAP sync")
+		}
+	}
+	// PGP encryption (mutually exclusive with S/MIME)
+	if !localDraft.Encrypted && localDraft.PGPEncrypted {
+		encryptedMsg, encErr := a.pgpEncryptor.EncryptMessageToSelf(localDraft.AccountID, rawMsg)
+		if encErr != nil {
+			log.Error().Err(encErr).Msg("Failed to PGP encrypt draft for IMAP sync")
+			a.draftStore.UpdateSyncStatus(localDraft.ID, draft.SyncStatusFailed, 0, "", encErr.Error())
+			emitSyncStatus(draft.SyncStatusFailed, 0, encErr.Error())
+			return
+		}
+		rawMsg = encryptedMsg
+		log.Debug().Str("draftID", localDraft.ID).Msg("Draft PGP encrypted for IMAP sync")
 	}
 
 	// Append to IMAP Drafts folder with \Draft and \Seen flags
@@ -134,6 +270,7 @@ func (a *App) syncDraftToIMAP(localDraft *draft.Draft, msg smtp.ComposeMessage) 
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to append draft to IMAP")
 		a.draftStore.UpdateSyncStatus(localDraft.ID, draft.SyncStatusFailed, 0, "", err.Error())
+		emitSyncStatus(draft.SyncStatusFailed, 0, err.Error())
 		return
 	}
 
@@ -141,6 +278,7 @@ func (a *App) syncDraftToIMAP(localDraft *draft.Draft, msg smtp.ComposeMessage) 
 	if err := a.draftStore.UpdateSyncStatus(localDraft.ID, draft.SyncStatusSynced, uint32(uid), draftsFolder.ID, ""); err != nil {
 		log.Warn().Err(err).Msg("Failed to update draft sync status")
 	}
+	emitSyncStatus(draft.SyncStatusSynced, uint32(uid), "")
 
 	log.Info().
 		Str("id", localDraft.ID).
@@ -199,16 +337,76 @@ func (a *App) syncAllPendingDrafts() {
 	}
 }
 
-// draftToComposeMessage converts a draft to a ComposeMessage
+// draftToComposeMessage converts a draft to a ComposeMessage.
+// If the draft is encrypted (S/MIME or PGP), decrypts the body first.
 func (a *App) draftToComposeMessage(d *draft.Draft) *smtp.ComposeMessage {
+	bodyHTML := d.BodyHTML
+	bodyText := d.BodyText
+	encryptMessage := false
+	pgpEncryptMessage := false
+	var attachments []smtp.Attachment
+
+	// S/MIME encrypted draft
+	if d.Encrypted && len(d.EncryptedBody) > 0 {
+		decrypted, err := a.smimeDecryptor.DecryptBytes(d.AccountID, d.EncryptedBody)
+		if err != nil {
+			log := logging.WithComponent("app")
+			log.Error().Err(err).Str("draftID", d.ID).Msg("Failed to decrypt S/MIME draft body")
+		} else {
+			var payload draftBodyPayload
+			if err := json.Unmarshal(decrypted, &payload); err != nil {
+				log := logging.WithComponent("app")
+				log.Error().Err(err).Str("draftID", d.ID).Msg("Failed to unmarshal decrypted S/MIME draft body")
+			} else {
+				bodyHTML = payload.BodyHTML
+				bodyText = payload.BodyText
+				attachments = payload.Attachments
+				encryptMessage = true
+			}
+		}
+	}
+
+	// PGP encrypted draft (mutually exclusive with S/MIME)
+	if !d.Encrypted && d.PGPEncrypted && len(d.PGPEncryptedBody) > 0 {
+		decrypted, err := a.pgpDecryptor.DecryptBytes(d.AccountID, d.PGPEncryptedBody)
+		if err != nil {
+			log := logging.WithComponent("app")
+			log.Error().Err(err).Str("draftID", d.ID).Msg("Failed to decrypt PGP draft body")
+		} else {
+			var payload draftBodyPayload
+			if err := json.Unmarshal(decrypted, &payload); err != nil {
+				log := logging.WithComponent("app")
+				log.Error().Err(err).Str("draftID", d.ID).Msg("Failed to unmarshal decrypted PGP draft body")
+			} else {
+				bodyHTML = payload.BodyHTML
+				bodyText = payload.BodyText
+				attachments = payload.Attachments
+				pgpEncryptMessage = true
+			}
+		}
+	}
+
+	// For non-encrypted drafts, restore attachments from separate column
+	if !d.Encrypted && !d.PGPEncrypted && len(d.AttachmentsData) > 0 {
+		if err := json.Unmarshal(d.AttachmentsData, &attachments); err != nil {
+			log := logging.WithComponent("app")
+			log.Warn().Err(err).Str("draftID", d.ID).Msg("Failed to unmarshal draft attachments")
+		}
+	}
+
 	return &smtp.ComposeMessage{
-		To:        parseAddressList(d.ToList),
-		Cc:        parseAddressList(d.CcList),
-		Bcc:       parseAddressList(d.BccList),
-		Subject:   d.Subject,
-		HTMLBody:  d.BodyHTML,
-		TextBody:  d.BodyText,
-		InReplyTo: d.InReplyToID,
+		To:                parseAddressList(d.ToList),
+		Cc:                parseAddressList(d.CcList),
+		Bcc:               parseAddressList(d.BccList),
+		Subject:           d.Subject,
+		HTMLBody:          bodyHTML,
+		TextBody:          bodyText,
+		Attachments:       attachments,
+		InReplyTo:         d.InReplyToID,
+		SignMessage:       d.SignMessage,
+		EncryptMessage:    encryptMessage,
+		PGPSignMessage:    d.PGPSignMessage,
+		PGPEncryptMessage: pgpEncryptMessage,
 	}
 }
 
@@ -225,9 +423,10 @@ func (a *App) DeleteDraft(draftID string) error {
 		return nil // Already deleted
 	}
 
-	// Delete from IMAP if synced
+	// Delete from IMAP if synced, and remember the folder for post-delete sync
+	var draftsFolder *folder.Folder
 	if d.IsSynced() {
-		draftsFolder, _ := a.GetSpecialFolder(d.AccountID, folder.TypeDrafts)
+		draftsFolder, _ = a.GetSpecialFolder(d.AccountID, folder.TypeDrafts)
 		if draftsFolder != nil {
 			poolConn, err := a.imapPool.GetConnection(a.ctx, d.AccountID)
 			if err == nil {
@@ -251,6 +450,17 @@ func (a *App) DeleteDraft(draftID string) error {
 	wailsRuntime.EventsEmit(a.ctx, "draft:deleted", map[string]interface{}{
 		"draftId": draftID,
 	})
+
+	// Sync the Drafts folder so the message list and sidebar counts update
+	if draftsFolder != nil {
+		accountID := d.AccountID
+		folderID := draftsFolder.ID
+		go func() {
+			if err := a.SyncFolder(accountID, folderID); err != nil {
+				log.Warn().Err(err).Str("folderID", folderID).Msg("Failed to sync Drafts folder after draft delete")
+			}
+		}()
+	}
 
 	log.Info().Str("draftID", draftID).Msg("Draft deleted")
 	return nil

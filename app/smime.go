@@ -1,0 +1,255 @@
+package app
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/hkdb/aerion/internal/smime"
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
+)
+
+// PickSMIMECertificateFile opens a file picker for .p12/.pfx files and returns the path
+func (a *App) PickSMIMECertificateFile() (string, error) {
+	path, err := wailsRuntime.OpenFileDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+		Title: "Select S/MIME Certificate",
+		Filters: []wailsRuntime.FileFilter{
+			{
+				DisplayName: "PKCS#12 Files (*.p12, *.pfx)",
+				Pattern:     "*.p12;*.pfx",
+			},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to open file dialog: %w", err)
+	}
+	return path, nil
+}
+
+// ImportSMIMECertificateFromPath imports a PKCS#12 certificate from a file path with password
+func (a *App) ImportSMIMECertificateFromPath(accountID, filePath, password string) (*smime.ImportResult, error) {
+	if filePath == "" {
+		return nil, fmt.Errorf("no file selected")
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read certificate file: %w", err)
+	}
+
+	privateKeyPEM, certChainPEM, cert, err := smime.ImportPKCS12(data, password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to import certificate: %w", err)
+	}
+
+	cert.AccountID = accountID
+
+	// Check if this is the first cert for this account (make it default)
+	existing, err := a.smimeStore.ListCertificates(accountID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check existing certificates: %w", err)
+	}
+	if len(existing) == 0 {
+		cert.IsDefault = true
+	}
+
+	// Store the certificate metadata
+	if err := a.smimeStore.SaveCertificate(cert, certChainPEM); err != nil {
+		return nil, fmt.Errorf("failed to save certificate: %w", err)
+	}
+
+	// Store the private key securely
+	if err := a.credStore.SetSMIMEPrivateKey(cert.ID, privateKeyPEM); err != nil {
+		// Rollback: delete the cert if key storage fails
+		a.smimeStore.DeleteCertificate(cert.ID)
+		return nil, fmt.Errorf("failed to store private key: %w", err)
+	}
+
+	// If this is the first cert, set it as default on the account
+	if cert.IsDefault {
+		a.smimeStore.SetDefaultCertificate(accountID, cert.ID)
+	}
+
+	// Count chain length (leaf + intermediates)
+	chainLength := 1
+	if certChainPEM != "" {
+		certs, _ := smime.ParseCertChainFromPEM(certChainPEM)
+		if certs != nil {
+			chainLength = len(certs)
+		}
+	}
+
+	return &smime.ImportResult{
+		Certificate: cert,
+		ChainLength: chainLength,
+	}, nil
+}
+
+// ListSMIMECertificates returns all S/MIME certificates for an account
+func (a *App) ListSMIMECertificates(accountID string) ([]*smime.Certificate, error) {
+	certs, err := a.smimeStore.ListCertificates(accountID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list certificates: %w", err)
+	}
+	if certs == nil {
+		return []*smime.Certificate{}, nil
+	}
+	return certs, nil
+}
+
+// DeleteSMIMECertificate removes an S/MIME certificate and its private key
+func (a *App) DeleteSMIMECertificate(certID string) error {
+	// Delete private key first
+	if err := a.credStore.DeleteSMIMEPrivateKey(certID); err != nil {
+		return fmt.Errorf("failed to delete private key: %w", err)
+	}
+
+	// Delete certificate
+	if err := a.smimeStore.DeleteCertificate(certID); err != nil {
+		return fmt.Errorf("failed to delete certificate: %w", err)
+	}
+
+	return nil
+}
+
+// SetDefaultSMIMECertificate sets the default signing certificate for an account
+func (a *App) SetDefaultSMIMECertificate(accountID, certID string) error {
+	return a.smimeStore.SetDefaultCertificate(accountID, certID)
+}
+
+// GetSMIMESignPolicy returns the signing policy for an account
+func (a *App) GetSMIMESignPolicy(accountID string) (string, error) {
+	return a.smimeStore.GetSignPolicy(accountID)
+}
+
+// SetSMIMESignPolicy sets the signing policy ('never', 'always')
+func (a *App) SetSMIMESignPolicy(accountID, policy string) error {
+	switch policy {
+	case "never", "always":
+		return a.smimeStore.SetSignPolicy(accountID, policy)
+	default:
+		return fmt.Errorf("invalid sign policy: %s", policy)
+	}
+}
+
+// ListSenderCerts returns all cached sender certificates
+func (a *App) ListSenderCerts() ([]*smime.SenderCert, error) {
+	certs, err := a.smimeStore.ListAllSenderCerts()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list sender certificates: %w", err)
+	}
+	if certs == nil {
+		return []*smime.SenderCert{}, nil
+	}
+	return certs, nil
+}
+
+// DeleteSenderCert removes a cached sender certificate
+func (a *App) DeleteSenderCert(certID string) error {
+	return a.smimeStore.DeleteSenderCert(certID)
+}
+
+// HasSMIMECertificate returns whether an account has a default S/MIME certificate configured
+func (a *App) HasSMIMECertificate(accountID string) bool {
+	cert, _, err := a.smimeStore.GetDefaultCertificate(accountID)
+	return err == nil && cert != nil && !cert.IsExpired
+}
+
+// shouldSignMessage determines whether a message should be S/MIME signed
+func (a *App) shouldSignMessage(accountID string, perMessageOverride bool) bool {
+	if perMessageOverride {
+		return a.HasSMIMECertificate(accountID)
+	}
+
+	policy, err := a.smimeStore.GetSignPolicy(accountID)
+	if err != nil {
+		return false
+	}
+
+	if policy != "always" {
+		return false
+	}
+
+	return a.HasSMIMECertificate(accountID)
+}
+
+// shouldEncryptMessage determines whether a message should be S/MIME encrypted
+func (a *App) shouldEncryptMessage(accountID string, perMessageOverride bool) bool {
+	if perMessageOverride {
+		return a.HasSMIMECertificate(accountID)
+	}
+
+	policy, err := a.smimeStore.GetEncryptPolicy(accountID)
+	if err != nil {
+		return false
+	}
+
+	if policy != "always" {
+		return false
+	}
+
+	return a.HasSMIMECertificate(accountID)
+}
+
+// GetSMIMEEncryptPolicy returns the encryption policy for an account
+func (a *App) GetSMIMEEncryptPolicy(accountID string) (string, error) {
+	return a.smimeStore.GetEncryptPolicy(accountID)
+}
+
+// SetSMIMEEncryptPolicy sets the encryption policy ('never', 'always')
+func (a *App) SetSMIMEEncryptPolicy(accountID, policy string) error {
+	switch policy {
+	case "never", "always":
+		return a.smimeStore.SetEncryptPolicy(accountID, policy)
+	default:
+		return fmt.Errorf("invalid encrypt policy: %s", policy)
+	}
+}
+
+// CheckRecipientCerts checks which recipients have S/MIME certificates available
+func (a *App) CheckRecipientCerts(emails []string) (map[string]bool, error) {
+	certPEMs, err := a.smimeStore.GetSenderCertPEMs(emails)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check recipient certs: %w", err)
+	}
+
+	result := make(map[string]bool)
+	for _, email := range emails {
+		_, hasCert := certPEMs[email]
+		result[email] = hasCert
+	}
+	return result, nil
+}
+
+// PickRecipientCertFile opens a file picker for certificate files (.pem, .cer, .crt, .der)
+func (a *App) PickRecipientCertFile() (string, error) {
+	path, err := wailsRuntime.OpenFileDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+		Title: "Select Recipient Certificate",
+		Filters: []wailsRuntime.FileFilter{
+			{
+				DisplayName: "Certificate Files (*.pem, *.cer, *.crt, *.der)",
+				Pattern:     "*.pem;*.cer;*.crt;*.der",
+			},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to open file dialog: %w", err)
+	}
+	return path, nil
+}
+
+// ImportRecipientCert imports a recipient's public certificate from a file
+func (a *App) ImportRecipientCert(email, filePath string) error {
+	if filePath == "" {
+		return fmt.Errorf("no file selected")
+	}
+	if email == "" {
+		return fmt.Errorf("email address required")
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read certificate file: %w", err)
+	}
+
+	return a.smimeStore.ImportSenderCertFromFile(email, data)
+}

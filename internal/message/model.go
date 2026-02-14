@@ -54,6 +54,24 @@ type Message struct {
 	ReadReceiptTo      string `json:"readReceiptTo,omitempty"` // Email requesting receipt (from Disposition-Notification-To header)
 	ReadReceiptHandled bool   `json:"readReceiptHandled"`      // Whether user has responded (sent or ignored)
 
+	// S/MIME status (empty = not S/MIME)
+	SMIMEStatus        string `json:"smimeStatus,omitempty"`
+	SMIMESignerEmail   string `json:"smimeSignerEmail,omitempty"`
+	SMIMESignerSubject string `json:"smimeSignerSubject,omitempty"`
+
+	// S/MIME encryption
+	SMIMEEncrypted bool `json:"smimeEncrypted,omitempty"` // Whether the message is encrypted
+	HasSMIME       bool `json:"hasSMIME,omitempty"`       // Computed: smime_raw_body IS NOT NULL
+
+	// PGP status (empty = not PGP)
+	PGPStatus      string `json:"pgpStatus,omitempty"`
+	PGPSignerEmail string `json:"pgpSignerEmail,omitempty"`
+	PGPSignerKeyID string `json:"pgpSignerKeyId,omitempty"`
+
+	// PGP encryption
+	PGPEncrypted bool `json:"pgpEncrypted,omitempty"` // Whether the message is PGP encrypted
+	HasPGP       bool `json:"hasPGP,omitempty"`       // Computed: pgp_raw_body IS NOT NULL
+
 	// Timestamps
 	ReceivedAt time.Time `json:"receivedAt"`
 }

@@ -50,18 +50,19 @@ func Open(path string) (*DB, error) {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
 
-	// Open database without immediate transaction locking.
-	// WAL mode handles concurrency well - it allows concurrent readers and
-	// a single writer without needing immediate locking. Removing _txlock=immediate
-	// reduces lock contention during heavy sync operations.
-	dsn := fmt.Sprintf("file:%s", path)
+	// Open database with PRAGMAs embedded in the DSN.
+	// SQLite PRAGMAs are per-connection, and Go's database/sql creates connections
+	// lazily in a pool. Using _pragma in the DSN ensures every new connection gets
+	// the same configuration (busy_timeout, WAL, etc.), preventing SQLITE_BUSY
+	// errors when a pooled connection lacks busy_timeout.
+	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(30000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)&_pragma=cache_size(-64000)", path)
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
 	// Configure connection pool for SQLite
-	// MaxOpenConns: High ceiling (128) - connections created on demand, no memory cost
+	// MaxOpenConns: Modest ceiling - SQLite WAL only allows one writer at a time
 	// MaxIdleConns: Start low, will be scaled dynamically based on account count
 	db.SetMaxOpenConns(MaxOpenConns)
 	db.SetMaxIdleConns(BaseIdleConns)
@@ -77,23 +78,6 @@ func Open(path string) (*DB, error) {
 	if err := os.Chmod(path, 0600); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("failed to set database permissions: %w", err)
-	}
-
-	// Configure SQLite via PRAGMAs.
-	// Order matters: busy_timeout should be set first to prevent SQLITE_BUSY
-	// errors while executing subsequent PRAGMAs or during concurrent access.
-	pragmas := []string{
-		"PRAGMA busy_timeout = 30000", // Wait up to 30 seconds for locks (sync can be heavy)
-		"PRAGMA journal_mode = WAL",   // Write-Ahead Logging for better concurrency
-		"PRAGMA synchronous = NORMAL", // Balance between safety and performance
-		"PRAGMA foreign_keys = ON",    // Enforce foreign key constraints
-		"PRAGMA cache_size = -64000",  // 64MB cache (negative value = KB)
-	}
-	for _, pragma := range pragmas {
-		if _, err := db.Exec(pragma); err != nil {
-			db.Close()
-			return nil, fmt.Errorf("failed to execute %s: %w", pragma, err)
-		}
 	}
 
 	return &DB{DB: db, path: path}, nil

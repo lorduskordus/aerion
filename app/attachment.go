@@ -10,6 +10,8 @@ import (
 	"github.com/hkdb/aerion/internal/email"
 	"github.com/hkdb/aerion/internal/logging"
 	"github.com/hkdb/aerion/internal/message"
+	"github.com/hkdb/aerion/internal/pgp"
+	"github.com/hkdb/aerion/internal/smime"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -317,5 +319,223 @@ func (a *App) SaveAllAttachments(messageID string) (string, error) {
 	}
 
 	log.Info().Int("count", savedCount).Str("folder", saveDir).Msg("Saved all attachments")
+	return saveDir, nil
+}
+
+// decryptMessageBody decrypts an encrypted message's raw body and returns the inner plaintext bytes.
+// Handles both S/MIME and PGP, and unwraps any inner signature layer.
+func (a *App) decryptMessageBody(msg *message.Message) ([]byte, error) {
+	// Try S/MIME first
+	if msg.HasSMIME {
+		rawBody, err := a.messageStore.GetSMIMERawBody(msg.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get S/MIME raw body: %w", err)
+		}
+		if rawBody == nil {
+			return nil, fmt.Errorf("no S/MIME raw body for message: %s", msg.ID)
+		}
+
+		innerBytes := rawBody
+		if msg.SMIMEEncrypted {
+			decrypted, _, decErr := a.smimeDecryptor.DecryptMessage(msg.AccountID, rawBody)
+			if decErr != nil {
+				return nil, fmt.Errorf("S/MIME decryption failed: %w", decErr)
+			}
+			innerBytes = decrypted
+		}
+
+		// Unwrap signature if present
+		ct := extractContentType(innerBytes)
+		if smime.IsSMIMESigned(ct) {
+			_, unwrapped := a.smimeVerifier.VerifyAndUnwrap(innerBytes)
+			if unwrapped != nil {
+				innerBytes = unwrapped
+			}
+		}
+
+		return innerBytes, nil
+	}
+
+	// Try PGP
+	if msg.HasPGP {
+		rawBody, err := a.messageStore.GetPGPRawBody(msg.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get PGP raw body: %w", err)
+		}
+		if rawBody == nil {
+			return nil, fmt.Errorf("no PGP raw body for message: %s", msg.ID)
+		}
+
+		innerBytes := rawBody
+		if msg.PGPEncrypted {
+			decrypted, _, decErr := a.pgpDecryptor.DecryptMessage(msg.AccountID, rawBody)
+			if decErr != nil {
+				return nil, fmt.Errorf("PGP decryption failed: %w", decErr)
+			}
+			innerBytes = decrypted
+		}
+
+		// Unwrap signature if present
+		ct := extractContentType(innerBytes)
+		if pgp.IsPGPSigned(ct) {
+			_, unwrapped := a.pgpVerifier.VerifyAndUnwrap(innerBytes)
+			if unwrapped != nil {
+				innerBytes = unwrapped
+			}
+		}
+
+		return innerBytes, nil
+	}
+
+	return nil, fmt.Errorf("message %s is not encrypted", msg.ID)
+}
+
+// DownloadEncryptedAttachment decrypts an encrypted message, extracts a specific attachment,
+// and saves it to disk. Returns the path where the file was saved.
+func (a *App) DownloadEncryptedAttachment(messageID, filename, savePath string) (string, error) {
+	log := logging.WithComponent("app")
+	log.Debug().Str("messageID", messageID).Str("filename", filename).Msg("DownloadEncryptedAttachment called")
+
+	msg, err := a.messageStore.Get(messageID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get message: %w", err)
+	}
+	if msg == nil {
+		return "", fmt.Errorf("message not found: %s", messageID)
+	}
+
+	// Decrypt and unwrap
+	innerBytes, err := a.decryptMessageBody(msg)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt message: %w", err)
+	}
+
+	// Extract attachment content from the decrypted body
+	downloader := email.NewAttachmentDownloader(a.paths.AttachmentsPath())
+	content, err := downloader.ExtractAttachmentContent(innerBytes, filename)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract attachment from decrypted message: %w", err)
+	}
+
+	// Create a temporary attachment record for SaveAttachment
+	att := &message.Attachment{
+		Filename:    filename,
+		ContentType: "application/octet-stream",
+		Size:        len(content),
+	}
+
+	localPath, err := downloader.SaveAttachment(att, content, savePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to save attachment: %w", err)
+	}
+
+	log.Info().Str("attachment", filename).Str("path", localPath).Int("size", len(content)).Msg("Encrypted attachment downloaded")
+	return localPath, nil
+}
+
+// SaveEncryptedAttachmentAs shows a Save As dialog and saves an attachment from an encrypted message.
+// Returns the path where the file was saved, or empty string if cancelled.
+func (a *App) SaveEncryptedAttachmentAs(messageID, filename string) (string, error) {
+	log := logging.WithComponent("app")
+	log.Debug().Str("messageID", messageID).Str("filename", filename).Msg("SaveEncryptedAttachmentAs called")
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = ""
+	}
+	defaultDir := filepath.Join(homeDir, "Downloads")
+
+	savePath, err := wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
+		DefaultDirectory: defaultDir,
+		DefaultFilename:  filename,
+		Title:            "Save Attachment",
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to show save dialog: %w", err)
+	}
+	if savePath == "" {
+		return "", nil
+	}
+
+	return a.DownloadEncryptedAttachment(messageID, filename, savePath)
+}
+
+// OpenEncryptedAttachment decrypts an encrypted message, extracts and opens an attachment.
+func (a *App) OpenEncryptedAttachment(messageID, filename string) error {
+	localPath, err := a.DownloadEncryptedAttachment(messageID, filename, "")
+	if err != nil {
+		return err
+	}
+	return a.openFile(localPath)
+}
+
+// SaveAllEncryptedAttachments shows a folder picker and saves all attachments from an encrypted message.
+// Returns the folder path where files were saved, or empty string if cancelled.
+func (a *App) SaveAllEncryptedAttachments(messageID string) (string, error) {
+	log := logging.WithComponent("app")
+
+	msg, err := a.messageStore.Get(messageID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get message: %w", err)
+	}
+	if msg == nil {
+		return "", fmt.Errorf("message not found: %s", messageID)
+	}
+
+	// Decrypt and unwrap
+	innerBytes, err := a.decryptMessageBody(msg)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt message: %w", err)
+	}
+
+	// Parse to get attachment list
+	parsed := a.syncEngine.ParseDecryptedBody(innerBytes, messageID)
+	var regularAtts []*message.Attachment
+	for _, att := range parsed.Attachments {
+		if !att.IsInline {
+			regularAtts = append(regularAtts, att)
+		}
+	}
+	if len(regularAtts) == 0 {
+		return "", fmt.Errorf("no attachments found in encrypted message")
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = ""
+	}
+	defaultDir := filepath.Join(homeDir, "Downloads")
+
+	saveDir, err := wailsRuntime.OpenDirectoryDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+		DefaultDirectory: defaultDir,
+		Title:            "Save All Attachments",
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to show folder dialog: %w", err)
+	}
+	if saveDir == "" {
+		return "", nil
+	}
+
+	downloader := email.NewAttachmentDownloader(a.paths.AttachmentsPath())
+	savedCount := 0
+
+	for _, att := range regularAtts {
+		content, err := downloader.ExtractAttachmentContent(innerBytes, att.Filename)
+		if err != nil {
+			log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to extract encrypted attachment")
+			continue
+		}
+
+		savePath := filepath.Join(saveDir, att.Filename)
+		_, err = downloader.SaveAttachment(att, content, savePath)
+		if err != nil {
+			log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to save encrypted attachment")
+			continue
+		}
+		savedCount++
+	}
+
+	log.Info().Int("count", savedCount).Str("folder", saveDir).Msg("Saved all encrypted attachments")
 	return saveDir, nil
 }

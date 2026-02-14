@@ -6,11 +6,47 @@ import (
 
 	goImap "github.com/emersion/go-imap/v2"
 	"github.com/hkdb/aerion/internal/folder"
+	"github.com/hkdb/aerion/internal/imap"
 	"github.com/hkdb/aerion/internal/logging"
 	"github.com/hkdb/aerion/internal/message"
 	"github.com/hkdb/aerion/internal/undo"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
+
+// withIMAPRetry wraps an IMAP operation with stale-connection retry.
+// If the operation fails with a connection error, the dead connection is discarded
+// and the operation is retried once with a fresh connection.
+func (a *App) withIMAPRetry(accountID string, op func(conn *imap.Client) error) error {
+	log := logging.WithComponent("app.imapRetry")
+
+	poolConn, err := a.imapPool.GetConnection(a.ctx, accountID)
+	if err != nil {
+		return fmt.Errorf("failed to get IMAP connection: %w", err)
+	}
+
+	err = op(poolConn.Client())
+	if err == nil {
+		a.imapPool.Release(poolConn)
+		return nil
+	}
+
+	if !imap.IsConnectionError(err) {
+		a.imapPool.Release(poolConn)
+		return err
+	}
+
+	// Stale connection — discard and retry once with fresh connection
+	log.Warn().Err(err).Str("account", accountID).Msg("IMAP connection error, retrying with fresh connection")
+	a.imapPool.Discard(poolConn)
+
+	poolConn, err = a.imapPool.GetConnection(a.ctx, accountID)
+	if err != nil {
+		return fmt.Errorf("failed to get IMAP connection on retry: %w", err)
+	}
+	defer a.imapPool.Release(poolConn)
+
+	return op(poolConn.Client())
+}
 
 // ============================================================================
 // Message Actions API - Exposed to frontend via Wails bindings
@@ -232,17 +268,6 @@ func (a *App) syncFlagsToIMAP(messages []*message.Message, folderID, flagType st
 		return fmt.Errorf("folder not found: %s", folderID)
 	}
 
-	poolConn, err := a.imapPool.GetConnection(a.ctx, messages[0].AccountID)
-	if err != nil {
-		return fmt.Errorf("failed to get IMAP connection: %w", err)
-	}
-	defer a.imapPool.Release(poolConn)
-
-	conn := poolConn.Client()
-	if _, err := conn.SelectMailbox(a.ctx, folderObj.Path); err != nil {
-		return fmt.Errorf("failed to select mailbox: %w", err)
-	}
-
 	uids := make([]goImap.UID, len(messages))
 	for i, m := range messages {
 		uids[i] = goImap.UID(m.UID)
@@ -256,10 +281,16 @@ func (a *App) syncFlagsToIMAP(messages []*message.Message, folderID, flagType st
 		flag = goImap.FlagFlagged
 	}
 
-	if flagValue {
-		return conn.AddMessageFlags(uids, []goImap.Flag{flag})
-	}
-	return conn.RemoveMessageFlags(uids, []goImap.Flag{flag})
+	return a.withIMAPRetry(messages[0].AccountID, func(conn *imap.Client) error {
+		if _, err := conn.SelectMailbox(a.ctx, folderObj.Path); err != nil {
+			return fmt.Errorf("failed to select mailbox: %w", err)
+		}
+
+		if flagValue {
+			return conn.AddMessageFlags(uids, []goImap.Flag{flag})
+		}
+		return conn.RemoveMessageFlags(uids, []goImap.Flag{flag})
+	})
 }
 
 // MoveToFolder moves messages to a specified folder
@@ -347,7 +378,7 @@ func (a *App) MoveToFolder(messageIDs []string, destFolderID string) error {
 		}
 	}()
 
-	// Sync to IMAP in background (COPY + DELETE)
+	// Sync to IMAP in background (COPY + DELETE), then sync destination to get correct UIDs
 	go func() {
 		for sourceFolderID, msgs := range byFolder {
 			if err := a.moveMessagesToIMAP(msgs, sourceFolderID, destFolder); err != nil {
@@ -355,7 +386,26 @@ func (a *App) MoveToFolder(messageIDs []string, destFolderID string) error {
 					Str("sourceFolderID", sourceFolderID).
 					Str("destFolderID", destFolderID).
 					Msg("Failed to move messages on IMAP")
+				return
 			}
+		}
+
+		// Sync destination folder so moved messages get correct UIDs (headers + bodies)
+		if len(messages) > 0 {
+			syncPeriodDays := 30
+			if acc, err := a.accountStore.Get(messages[0].AccountID); err == nil && acc != nil {
+				syncPeriodDays = acc.SyncPeriodDays
+			}
+			if err := a.syncEngine.SyncMessages(a.ctx, messages[0].AccountID, destFolderID, syncPeriodDays); err != nil {
+				log.Warn().Err(err).Str("destFolderID", destFolderID).Msg("Failed to sync destination folder after move")
+			}
+			if err := a.syncEngine.FetchBodiesInBackground(a.ctx, messages[0].AccountID, destFolderID, syncPeriodDays); err != nil {
+				log.Warn().Err(err).Str("destFolderID", destFolderID).Msg("Failed to fetch bodies for destination folder after move")
+			}
+			wailsRuntime.EventsEmit(a.ctx, "folder:synced", map[string]interface{}{
+				"accountId": messages[0].AccountID,
+				"folderId":  destFolderID,
+			})
 		}
 	}()
 
@@ -416,40 +466,37 @@ func (a *App) moveMessagesToIMAP(messages []*message.Message, sourceFolderID str
 		Int("count", len(messages)).
 		Msg("Starting IMAP move operation")
 
-	poolConn, err := a.imapPool.GetConnection(a.ctx, messages[0].AccountID)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to get IMAP connection")
-		return fmt.Errorf("failed to get IMAP connection: %w", err)
-	}
-	defer a.imapPool.Release(poolConn)
-
-	conn := poolConn.Client()
-
-	// Select source mailbox
-	log.Debug().Str("mailbox", sourceFolder.Path).Msg("Selecting source mailbox")
-	if _, err := conn.SelectMailbox(a.ctx, sourceFolder.Path); err != nil {
-		log.Error().Err(err).Str("mailbox", sourceFolder.Path).Msg("Failed to select source mailbox")
-		return fmt.Errorf("failed to select source mailbox: %w", err)
-	}
-
 	uids := make([]goImap.UID, len(messages))
 	for i, m := range messages {
 		uids[i] = goImap.UID(m.UID)
 	}
 
-	// COPY to destination
-	log.Debug().Str("destMailbox", destFolder.Path).Msg("Copying messages to destination")
-	if _, err := conn.CopyMessages(uids, destFolder.Path); err != nil {
-		log.Error().Err(err).Str("destMailbox", destFolder.Path).Msg("Failed to copy messages")
-		return fmt.Errorf("failed to copy messages: %w", err)
-	}
-	log.Debug().Msg("Messages copied successfully")
+	err = a.withIMAPRetry(messages[0].AccountID, func(conn *imap.Client) error {
+		// Select source mailbox
+		log.Debug().Str("mailbox", sourceFolder.Path).Msg("Selecting source mailbox")
+		if _, err := conn.SelectMailbox(a.ctx, sourceFolder.Path); err != nil {
+			return fmt.Errorf("failed to select source mailbox: %w", err)
+		}
 
-	// DELETE from source
-	log.Debug().Msg("Deleting messages from source (marking deleted + expunge)")
-	if err := conn.DeleteMessagesByUID(uids); err != nil {
-		log.Error().Err(err).Msg("Failed to delete messages from source")
-		return fmt.Errorf("failed to delete messages from source: %w", err)
+		// COPY to destination
+		log.Debug().Str("destMailbox", destFolder.Path).Msg("Copying messages to destination")
+		if _, err := conn.CopyMessages(uids, destFolder.Path); err != nil {
+			return fmt.Errorf("failed to copy messages: %w", err)
+		}
+		log.Debug().Msg("Messages copied successfully")
+
+		// DELETE from source
+		log.Debug().Msg("Deleting messages from source (marking deleted + expunge)")
+		if err := conn.DeleteMessagesByUID(uids); err != nil {
+			return fmt.Errorf("failed to delete messages from source: %w", err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		log.Error().Err(err).Msg("IMAP move operation failed")
+		return err
 	}
 
 	log.Info().
@@ -532,30 +579,23 @@ func (a *App) copyMessagesToIMAP(messages []*message.Message, sourceFolderID str
 		return fmt.Errorf("source folder not found")
 	}
 
-	poolConn, err := a.imapPool.GetConnection(a.ctx, messages[0].AccountID)
-	if err != nil {
-		return fmt.Errorf("failed to get IMAP connection: %w", err)
-	}
-	defer a.imapPool.Release(poolConn)
-
-	conn := poolConn.Client()
-
-	// Select source mailbox
-	if _, err := conn.SelectMailbox(a.ctx, sourceFolder.Path); err != nil {
-		return fmt.Errorf("failed to select source mailbox: %w", err)
-	}
-
 	uids := make([]goImap.UID, len(messages))
 	for i, m := range messages {
 		uids[i] = goImap.UID(m.UID)
 	}
 
-	// COPY to destination (no DELETE - messages stay in source)
-	if _, err := conn.CopyMessages(uids, destFolder.Path); err != nil {
-		return fmt.Errorf("failed to copy messages: %w", err)
-	}
+	return a.withIMAPRetry(messages[0].AccountID, func(conn *imap.Client) error {
+		if _, err := conn.SelectMailbox(a.ctx, sourceFolder.Path); err != nil {
+			return fmt.Errorf("failed to select source mailbox: %w", err)
+		}
 
-	return nil
+		// COPY to destination (no DELETE - messages stay in source)
+		if _, err := conn.CopyMessages(uids, destFolder.Path); err != nil {
+			return fmt.Errorf("failed to copy messages: %w", err)
+		}
+
+		return nil
+	})
 }
 
 // Archive moves messages to the Archive folder
@@ -730,21 +770,16 @@ func (a *App) deleteMessagesFromIMAP(messages []*message.Message, folderID strin
 		return fmt.Errorf("folder not found")
 	}
 
-	poolConn, err := a.imapPool.GetConnection(a.ctx, messages[0].AccountID)
-	if err != nil {
-		return fmt.Errorf("failed to get IMAP connection: %w", err)
-	}
-	defer a.imapPool.Release(poolConn)
-
-	conn := poolConn.Client()
-	if _, err := conn.SelectMailbox(a.ctx, folderObj.Path); err != nil {
-		return fmt.Errorf("failed to select mailbox: %w", err)
-	}
-
 	uids := make([]goImap.UID, len(messages))
 	for i, m := range messages {
 		uids[i] = goImap.UID(m.UID)
 	}
 
-	return conn.DeleteMessagesByUID(uids)
+	return a.withIMAPRetry(messages[0].AccountID, func(conn *imap.Client) error {
+		if _, err := conn.SelectMailbox(a.ctx, folderObj.Path); err != nil {
+			return fmt.Errorf("failed to select mailbox: %w", err)
+		}
+
+		return conn.DeleteMessagesByUID(uids)
+	})
 }

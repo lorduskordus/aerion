@@ -8,6 +8,10 @@ import {draft} from '../models';
 import {contact} from '../models';
 import {context} from '../models';
 
+export function CheckRecipientCerts(arg1:Array<string>):Promise<Record<string, boolean>>;
+
+export function CheckRecipientPGPKeys(arg1:Array<string>):Promise<Record<string, boolean>>;
+
 export function CloseWindow():Promise<void>;
 
 export function DeleteDraft(arg1:string):Promise<void>;
@@ -22,11 +26,37 @@ export function GetIdentities():Promise<Array<account.Identity>>;
 
 export function GetOriginalMessage():Promise<message.Message>;
 
+export function GetPGPEncryptPolicy():Promise<string>;
+
+export function GetPGPSignPolicy():Promise<string>;
+
+export function GetSMIMEEncryptPolicy():Promise<string>;
+
+export function GetSMIMESignPolicy():Promise<string>;
+
 export function GetSystemTheme():Promise<string>;
 
 export function GetThemeMode():Promise<string>;
 
+export function HasPGPKey():Promise<boolean>;
+
+export function HasSMIMECertificate():Promise<boolean>;
+
+export function ImportRecipientCert(arg1:string,arg2:string):Promise<void>;
+
+export function ImportRecipientPGPKey(arg1:string,arg2:string):Promise<void>;
+
+export function LookupHKP(arg1:string):Promise<string>;
+
+export function LookupPGPKey(arg1:string):Promise<string>;
+
+export function LookupWKD(arg1:string):Promise<string>;
+
 export function PickAttachmentFiles():Promise<Array<app.ComposerAttachment>>;
+
+export function PickRecipientCertFile():Promise<string>;
+
+export function PickRecipientPGPKeyFile():Promise<string>;
 
 export function PrepareReply():Promise<smtp.ComposeMessage>;
 

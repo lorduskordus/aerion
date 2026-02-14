@@ -8,6 +8,7 @@
   import AccountGeneralTab from './account/AccountGeneralTab.svelte'
   import AccountIdentityTab from './account/AccountIdentityTab.svelte'
   import AccountServerTab from './account/AccountServerTab.svelte'
+  import AccountSecurityTab from './account/AccountSecurityTab.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { oauthStore } from '$lib/stores/oauth.svelte'
   import { addToast } from '$lib/stores/toast'
@@ -288,7 +289,7 @@
     {#if editAccount}
       <!-- Edit Mode: Tabbed Interface -->
       <Tabs.Root bind:value={activeTab} class="flex-1 flex flex-col overflow-hidden">
-        <Tabs.List class="grid w-full grid-cols-3">
+        <Tabs.List class="grid w-full grid-cols-4">
           <Tabs.Trigger value="general" class="flex items-center gap-2">
             <Icon icon="mdi:cog" class="w-4 h-4" />
             General
@@ -300,6 +301,10 @@
           <Tabs.Trigger value="server" class="flex items-center gap-2">
             <Icon icon="mdi:server" class="w-4 h-4" />
             Server
+          </Tabs.Trigger>
+          <Tabs.Trigger value="security" class="flex items-center gap-2">
+            <Icon icon="mdi:shield-lock-outline" class="w-4 h-4" />
+            Security
           </Tabs.Trigger>
         </Tabs.List>
 
@@ -330,6 +335,10 @@
 
           <Tabs.Content value="identity" class="mt-0">
             <AccountIdentityTab accountId={editAccount.id} />
+          </Tabs.Content>
+
+          <Tabs.Content value="security" class="mt-0">
+            <AccountSecurityTab accountId={editAccount.id} />
           </Tabs.Content>
 
           <Tabs.Content value="server" class="mt-0">
@@ -375,7 +384,13 @@
         </div>
 
         <!-- Actions for General/Server tabs (not Identity - it has its own save) -->
-        {#if activeTab !== 'identity'}
+        {#if activeTab === 'identity' || activeTab === 'security'}
+          <div class="flex items-center justify-end gap-2 pt-4 border-t border-border mt-4">
+            <Button variant="ghost" onclick={handleCancel}>
+              Close
+            </Button>
+          </div>
+        {:else}
           <div class="flex items-center justify-end gap-2 pt-4 border-t border-border mt-4">
             <Button variant="ghost" onclick={handleCancel} disabled={saving}>
               Cancel
@@ -385,12 +400,6 @@
                 <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
               {/if}
               Save Changes
-            </Button>
-          </div>
-        {:else}
-          <div class="flex items-center justify-end gap-2 pt-4 border-t border-border mt-4">
-            <Button variant="ghost" onclick={handleCancel}>
-              Close
             </Button>
           </div>
         {/if}

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy, getContext } from 'svelte'
+  import { onMount, onDestroy, getContext, untrack } from 'svelte'
   import Icon from '@iconify/svelte'
   import type { Editor } from '@tiptap/core'
   import { createComposerEditor } from './composerEditor'
@@ -29,6 +29,7 @@
   import EditorToolbar from './EditorToolbar.svelte'
   import ComposerAttachmentList from './ComposerAttachmentList.svelte'
   import {
+    addParagraphStyles,
     base64ToBytes,
     htmlToPlainText,
     plainTextToHtml,
@@ -47,6 +48,7 @@
   } from './composerSignature'
   import * as Select from '$lib/components/ui/select'
   import * as AlertDialog from '$lib/components/ui/alert-dialog'
+  import Switch from '$lib/components/ui/switch/Switch.svelte'
   import { ConfirmDialog, ThreeOptionDialog } from '$lib/components/ui/confirm-dialog'
   import { addToast } from '$lib/stores/toast'
 
@@ -108,13 +110,49 @@
   // Read receipt request
   let requestReadReceipt = $state(false)
   let showReadReceiptOption = $state(false)  // Show checkbox when policy is 'ask'
-  
+
+  // S/MIME signing
+  let signMessage = $state(false)
+  let showSignOption = $state(false)  // Only show if account has a cert
+
+  // S/MIME encryption
+  let encryptMessage = $state(false)
+  let showEncryptOption = $state(false)  // Only show if account has a cert
+  let recipientCertStatus = $state<Record<string, boolean>>({})
+  let missingCertRecipients = $derived.by(() => {
+    if (!encryptMessage) return []
+    const allRecipients = [...toRecipients, ...ccRecipients, ...bccRecipients]
+    return allRecipients
+      .map(r => r.address)
+      .filter(email => email && recipientCertStatus[email] === false)
+  })
+
+  // PGP signing
+  let pgpSignMessage = $state(false)
+  let showPGPSignOption = $state(false)  // Only show if account has a PGP key
+
+  // PGP encryption
+  let pgpEncryptMessage = $state(false)
+  let showPGPEncryptOption = $state(false)  // Only show if account has a PGP key
+  let recipientPGPKeyStatus = $state<Record<string, boolean>>({})
+  let missingPGPKeyRecipients = $derived.by(() => {
+    if (!pgpEncryptMessage) return []
+    const allRecipients = [...toRecipients, ...ccRecipients, ...bccRecipients]
+    return allRecipients
+      .map(r => r.address)
+      .filter(email => email && recipientPGPKeyStatus[email] === false)
+  })
+
+  // Security mode for keyboard shortcuts (Alt+P / Alt+S activate, then s/e toggle sign/encrypt)
+  let securityMode = $state<'pgp' | 'smime' | null>(null)
+
   // Plain text mode toggle
   let isPlainTextMode = $state(false)
   let plainTextContent = $state('')  // Store plain text when in plain text mode
 
-  // Toolbar ref for Alt+T focus
+  // Component refs
   let toolbarRef = $state<{ focus: () => void } | null>(null)
+  let toInputRef = $state<{ focus: () => void } | null>(null)
 
   // Draft auto-save state
   let currentDraftId = $state<string | null>(null)
@@ -126,10 +164,152 @@
       currentDraftId = draftId
     }
   })
+
+  // Check recipient certs when encrypt is toggled on or recipients change
+  $effect(() => {
+    if (!encryptMessage) return
+    const allEmails = [...toRecipients, ...ccRecipients, ...bccRecipients]
+      .map(r => r.address)
+      .filter(Boolean)
+    if (allEmails.length === 0) return
+    checkRecipientCertsDebounced(allEmails)
+  })
+
+  let certCheckTimeout: ReturnType<typeof setTimeout> | null = null
+  function checkRecipientCertsDebounced(emails: string[]) {
+    if (certCheckTimeout) clearTimeout(certCheckTimeout)
+    certCheckTimeout = setTimeout(async () => {
+      try {
+        recipientCertStatus = await api.checkRecipientCerts(emails)
+      } catch (err) {
+        console.error('Failed to check recipient certs:', err)
+      }
+    }, 300)
+  }
+
+  // Check recipient PGP keys when encrypt is toggled on or recipients change
+  $effect(() => {
+    if (!pgpEncryptMessage) return
+    const allEmails = [...toRecipients, ...ccRecipients, ...bccRecipients]
+      .map(r => r.address)
+      .filter(Boolean)
+    if (allEmails.length === 0) return
+    checkRecipientPGPKeysDebounced(allEmails)
+  })
+
+  let pgpKeyCheckTimeout: ReturnType<typeof setTimeout> | null = null
+  function checkRecipientPGPKeysDebounced(emails: string[]) {
+    if (pgpKeyCheckTimeout) clearTimeout(pgpKeyCheckTimeout)
+    pgpKeyCheckTimeout = setTimeout(async () => {
+      try {
+        recipientPGPKeyStatus = await api.checkRecipientPGPKeys(emails)
+
+        // Auto-discover missing keys via unified WKD+HKP lookup
+        const missingEmails = emails.filter(e => !recipientPGPKeyStatus[e])
+        for (const email of missingEmails) {
+          try {
+            const armored = await api.lookupPGPKey(email)
+            if (armored) {
+              recipientPGPKeyStatus = { ...recipientPGPKeyStatus, [email]: true }
+            }
+          } catch { /* silent — lookup failure is not an error for the user */ }
+        }
+      } catch (err) {
+        console.error('Failed to check recipient PGP keys:', err)
+      }
+    }, 300)
+  }
+
+  async function handleImportRecipientCert() {
+    try {
+      const filePath = await api.pickRecipientCertFile()
+      if (!filePath) return
+      // Import for the first missing recipient
+      if (missingCertRecipients.length > 0) {
+        await api.importRecipientCert(missingCertRecipients[0], filePath)
+        addToast({ type: 'success', message: `Certificate imported for ${missingCertRecipients[0]}` })
+        // Re-check certs
+        const allEmails = [...toRecipients, ...ccRecipients, ...bccRecipients]
+          .map(r => r.address).filter(Boolean)
+        recipientCertStatus = await api.checkRecipientCerts(allEmails)
+      }
+    } catch (err) {
+      addToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to import certificate',
+      })
+    }
+  }
+
+  async function handleImportRecipientPGPKey() {
+    try {
+      const filePath = await api.pickRecipientPGPKeyFile()
+      if (!filePath) return
+      if (missingPGPKeyRecipients.length > 0) {
+        await api.importRecipientPGPKey(missingPGPKeyRecipients[0], filePath)
+        addToast({ type: 'success', message: `PGP key imported for ${missingPGPKeyRecipients[0]}` })
+        const allEmails = [...toRecipients, ...ccRecipients, ...bccRecipients]
+          .map(r => r.address).filter(Boolean)
+        recipientPGPKeyStatus = await api.checkRecipientPGPKeys(allEmails)
+      }
+    } catch (err) {
+      addToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to import PGP key',
+      })
+    }
+  }
+
   let syncStatus = $state<'pending' | 'synced' | 'failed'>('pending') // IMAP sync status
   let lastSavedAt = $state<Date | null>(null)
   let saveTimeoutId: ReturnType<typeof setTimeout> | null = null
   let lastContent = ''  // Track content changes to avoid unnecessary saves
+
+  // Computed draft status indicator
+  let draftStatusIcon = $derived.by(() => {
+    if (saveStatus === 'saving') return 'mdi:loading'
+    if (saveStatus === 'error') return 'mdi:alert-circle'
+    if (saveStatus !== 'saved' || !lastSavedAt) return ''
+    if (encryptMessage || pgpEncryptMessage) {
+      return syncStatus === 'synced' ? 'mdi:lock-check' : 'mdi:lock'
+    }
+    switch (syncStatus) {
+      case 'synced': return 'mdi:cloud-check'
+      case 'pending': return 'mdi:cloud-upload'
+      case 'failed': return 'mdi:cloud-off-outline'
+      default: return ''
+    }
+  })
+  let draftStatusColor = $derived.by(() => {
+    if (saveStatus === 'saving') return ''
+    if (saveStatus === 'error') return 'text-red-500'
+    if (saveStatus !== 'saved' || !lastSavedAt) return ''
+    switch (syncStatus) {
+      case 'synced': return 'text-green-500'
+      case 'pending': return 'text-blue-500'
+      case 'failed': return 'text-yellow-500'
+      default: return ''
+    }
+  })
+  let draftStatusLabel = $derived.by(() => {
+    if (saveStatus === 'saving') return (encryptMessage || pgpEncryptMessage) ? 'Encrypting...' : 'Saving...'
+    if (saveStatus === 'error') return 'Save failed'
+    if (saveStatus !== 'saved' || !lastSavedAt) return ''
+    if (encryptMessage || pgpEncryptMessage) {
+      switch (syncStatus) {
+        case 'synced': return 'Encrypted & synced'
+        case 'pending': return 'Encrypted draft'
+        case 'failed': return 'Encrypted (offline)'
+        default: return ''
+      }
+    }
+    switch (syncStatus) {
+      case 'synced': return 'Synced'
+      case 'pending': return 'Saved locally'
+      case 'failed': return 'Saved locally (offline)'
+      default: return ''
+    }
+  })
   
   // 10-second debounce like Geary
   const DRAFT_SAVE_DELAY = 10000
@@ -174,10 +354,7 @@
     
     // For each inline image, replace its data URL with cid: reference
     for (const img of inlineImages) {
-      // Escape special regex characters in the data URL
-      const escapedDataUrl = img.dataUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      const regex = new RegExp(escapedDataUrl, 'g')
-      result = result.replace(regex, `cid:${img.cid}`)
+      result = result.replaceAll(img.dataUrl, `cid:${img.cid}`)
     }
     
     return result
@@ -197,8 +374,9 @@
       htmlContent = ''  // No HTML version when composing in plain text
     } else {
       // In rich text mode, we have both
-      // Convert data URLs to CID references for inline images
-      htmlContent = convertDataUrlsToCid(editor?.getHTML() || '')
+      // Add inline margin:0 to paragraphs for single-spacing in recipients' email clients,
+      // then convert data URLs to CID references for inline images
+      htmlContent = convertDataUrlsToCid(addParagraphStyles(editor?.getHTML() || ''))
       textContent = editor?.getText() || ''
     }
 
@@ -237,6 +415,10 @@
       in_reply_to: inReplyTo,
       references: references,
       request_read_receipt: requestReadReceipt,
+      sign_message: signMessage,
+      encrypt_message: encryptMessage,
+      pgp_sign_message: pgpSignMessage,
+      pgp_encrypt_message: pgpEncryptMessage,
     })
   }
   
@@ -256,6 +438,11 @@
       clearTimeout(saveTimeoutId)
     }
 
+    // Reset indicator immediately when content changes (makes it disappear on input)
+    if (saveStatus === 'saved') {
+      saveStatus = 'idle'
+    }
+
     saveTimeoutId = setTimeout(async () => {
       // Only save if there's content
       if (!hasContent()) {
@@ -267,10 +454,6 @@
       if (currentHash === lastContent) {
         return
       }
-
-      // Content changed - reset status indicators
-      saveStatus = 'idle'
-      syncStatus = 'pending'
 
       await saveDraft()
     }, DRAFT_SAVE_DELAY)
@@ -316,8 +499,10 @@
   // Watch for content changes and trigger auto-save
   $effect(() => {
     // Dependencies to watch
-    const _ = [toRecipients, ccRecipients, bccRecipients, subject]
-    scheduleDraftSave()
+    const _ = [toRecipients, ccRecipients, bccRecipients, subject, signMessage, encryptMessage, pgpSignMessage, pgpEncryptMessage]
+    // untrack prevents $effect from creating a reactive dependency on saveStatus
+    // (which scheduleDraftSave reads), avoiding a circular re-run that causes flash
+    untrack(() => scheduleDraftSave())
   })
 
   // Watch for close request from parent (detached window)
@@ -364,12 +549,52 @@
       console.error('Failed to load account settings:', err)
     }
 
+    // Load S/MIME signing/encryption availability
+    try {
+      const hasCert = await api.hasSMIMECertificate(accountId)
+      if (hasCert) {
+        showSignOption = true
+        showEncryptOption = true
+        const [signPolicy, encryptPolicy] = await Promise.all([
+          api.getSMIMESignPolicy(accountId),
+          api.getSMIMEEncryptPolicy(accountId),
+        ])
+        signMessage = signPolicy === 'always'
+        encryptMessage = encryptPolicy === 'always'
+      }
+    } catch (err) {
+      console.error('Failed to load S/MIME settings:', err)
+    }
+
+    // Load PGP signing/encryption availability
+    try {
+      const hasKey = await api.hasPGPKey(accountId)
+      if (hasKey) {
+        showPGPSignOption = true
+        showPGPEncryptOption = true
+        const [pgpSignPolicy, pgpEncryptPolicy] = await Promise.all([
+          api.getPGPSignPolicy(accountId),
+          api.getPGPEncryptPolicy(accountId),
+        ])
+        // Only enable PGP defaults if S/MIME is not already active (mutual exclusivity)
+        if (!signMessage) {
+          pgpSignMessage = pgpSignPolicy === 'always'
+        }
+        if (!encryptMessage) {
+          pgpEncryptMessage = pgpEncryptPolicy === 'always'
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load PGP settings:', err)
+    }
+
     // Initialize TipTap editor
     if (editorElement) {
       editor = createComposerEditor(editorElement, {
         onUpdate: scheduleDraftSave,
         onPasteImage: handleInlineImageFile,
         onDropImage: handleInlineImageFile,
+        onShiftTab: () => document.getElementById('composer-subject')?.focus(),
       })
     }
 
@@ -382,6 +607,7 @@
 
     // Append signature for the selected identity (after editor is ready)
     // Only if signature doesn't already exist in content (e.g., from loaded draft)
+    // Then focus the To field once everything is initialized
     setTimeout(() => {
       const identity = identities.find(i => i.id === selectedIdentityId)
       if (identity) {
@@ -391,19 +617,24 @@
           appendSignatureForIdentity(identity)
         }
       }
+      // Focus editor body for reply/reply-all, To field for new/forward
+      const mode = getDisplayMode()
+      switch (mode) {
+        case 'reply':
+        case 'reply-all':
+          editor?.commands.focus('start')
+          break
+        default:
+          toInputRef?.focus()
+      }
     }, 50)
-    
+
     // Listen for draft sync status changes from backend
     EventsOn('draft:syncStatusChanged', (data: { draftId: string, syncStatus: string, imapUid: number, error: string }) => {
       if (data.draftId === currentDraftId) {
         syncStatus = data.syncStatus as 'pending' | 'synced' | 'failed'
       }
     })
-    
-    // Focus editor at start after initialization (setTimeout ensures DOM is ready)
-    setTimeout(() => {
-      editor?.commands.focus('start')
-    }, 0)
   })
 
   // Select identity based on reply/forward recipient matching
@@ -445,7 +676,6 @@
     )
 
     editor.commands.setContent(newContent)
-    editor.commands.focus('start')
   }
 
   // Handle identity change from the From dropdown
@@ -494,7 +724,7 @@
     toRecipients = (initialMessage.to || []).map(toSmtpAddress)
     ccRecipients = (initialMessage.cc || []).map(toSmtpAddress)
     bccRecipients = (initialMessage.bcc || []).map(toSmtpAddress)
-    
+
     // Show Cc field if there are Cc recipients
     if (ccRecipients.length > 0) {
       showCc = true
@@ -507,16 +737,83 @@
     inReplyTo = initialMessage.in_reply_to
     references = initialMessage.references || []
 
-    // Set editor content
-    if (editor && initialMessage.html_body) {
-      editor.commands.setContent(initialMessage.html_body)
+    // Restore attachments and inline images from draft
+    // Go []byte is serialized as base64 string via JSON, but TS type says number[]
+    let htmlBody = initialMessage.html_body || ''
+    if (initialMessage.attachments?.length > 0) {
+      for (const att of initialMessage.attachments) {
+        const base64Data = att.content as unknown as string
+        if (!base64Data) continue
+
+        if (att.inline && att.content_id) {
+          // Inline image - restore to inlineImages array and replace CID with data URL
+          const dataUrl = `data:${att.content_type};base64,${base64Data}`
+          inlineImages = [...inlineImages, {
+            cid: att.content_id,
+            dataUrl,
+            contentType: att.content_type,
+            data: base64Data,
+            filename: att.filename,
+          }]
+          htmlBody = htmlBody.replaceAll(`cid:${att.content_id}`, dataUrl)
+        } else if (!att.inline) {
+          // Regular attachment
+          attachments = [...attachments, {
+            filename: att.filename,
+            contentType: att.content_type,
+            size: base64Data.length,
+            data: base64Data,
+          }]
+        }
+      }
+      // Ensure new inline images get unique CIDs
+      inlineImageCounter = Math.max(inlineImageCounter, inlineImages.length)
+    }
+
+    // Set editor content (with restored data URLs for inline images)
+    if (editor && htmlBody) {
+      editor.commands.setContent(htmlBody)
       // Move cursor to beginning (before the quoted content)
       editor.commands.focus('start')
+    }
+
+    // Restore S/MIME toggles from draft
+    if (initialMessage.sign_message) {
+      signMessage = true
+    }
+    if (initialMessage.encrypt_message) {
+      encryptMessage = true
+    }
+
+    // Restore PGP toggles from draft
+    if ((initialMessage as any).pgp_sign_message) {
+      pgpSignMessage = true
+    }
+    if ((initialMessage as any).pgp_encrypt_message) {
+      pgpEncryptMessage = true
     }
   }
 
   // Pre-send validation - returns true if we should proceed, false if waiting for confirmation
   function validateBeforeSend(): boolean {
+    // Block send if encrypt is on but recipients are missing certs
+    if (encryptMessage && missingCertRecipients.length > 0) {
+      addToast({
+        type: 'error',
+        message: `Cannot encrypt: missing S/MIME certificate for ${missingCertRecipients.join(', ')}`,
+      })
+      return false
+    }
+
+    // Block send if PGP encrypt is on but recipients are missing keys
+    if (pgpEncryptMessage && missingPGPKeyRecipients.length > 0) {
+      addToast({
+        type: 'error',
+        message: `Cannot encrypt: missing PGP key for ${missingPGPKeyRecipients.join(', ')}`,
+      })
+      return false
+    }
+
     // Check for missing attachment
     if (attachments.length === 0 && bodyMentionsAttachment()) {
       showMissingAttachmentDialog = true
@@ -699,11 +996,15 @@
 
   // Insert image via file picker
   function insertImage() {
-    // Create a hidden file input and click it
+    // Create a hidden file input, append to DOM (required for WebKitGTK),
+    // then click it to open the file picker
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = 'image/*'
+    input.style.display = 'none'
+    document.body.appendChild(input)
     input.onchange = async (e) => {
+      input.remove()
       const file = (e.target as HTMLInputElement).files?.[0]
       if (file) {
         await handleInlineImageFile(file)
@@ -729,6 +1030,39 @@
 
   // Keyboard shortcuts
   function handleKeyDown(e: KeyboardEvent) {
+    // Security mode key handling (must be early in handleKeyDown)
+    if (securityMode) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        securityMode = null
+        return
+      }
+      if (e.key === 's' || e.key === 'S') {
+        e.preventDefault()
+        if (securityMode === 'pgp' && showPGPSignOption) {
+          pgpSignMessage = !pgpSignMessage
+          if (pgpSignMessage) signMessage = false
+        } else if (securityMode === 'smime' && showSignOption) {
+          signMessage = !signMessage
+          if (signMessage) pgpSignMessage = false
+        }
+        return
+      }
+      if (e.key === 'e' || e.key === 'E') {
+        e.preventDefault()
+        if (securityMode === 'pgp' && showPGPEncryptOption) {
+          pgpEncryptMessage = !pgpEncryptMessage
+          if (pgpEncryptMessage) encryptMessage = false
+        } else if (securityMode === 'smime' && showEncryptOption) {
+          encryptMessage = !encryptMessage
+          if (encryptMessage) pgpEncryptMessage = false
+        }
+        return
+      }
+      // Any other key exits security mode
+      securityMode = null
+    }
+
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
       handleSend()
@@ -746,6 +1080,19 @@
     if (e.key === 'a' && e.altKey) {
       e.preventDefault()
       handleAttachFiles()
+    }
+    // Alt+P / Alt+S to toggle security mode
+    if (e.altKey && (e.key === 'p' || e.key === 's')) {
+      if (e.key === 'p' && (showPGPSignOption || showPGPEncryptOption)) {
+        e.preventDefault()
+        securityMode = securityMode === 'pgp' ? null : 'pgp'
+        return
+      }
+      if (e.key === 's' && (showSignOption || showEncryptOption)) {
+        e.preventDefault()
+        securityMode = securityMode === 'smime' ? null : 'smime'
+        return
+      }
     }
     if (e.key === 'Escape') {
       handleClose()
@@ -801,10 +1148,15 @@
   // Attachment handling — uses HTML file input so WebKitGTK routes through
   // the FileChooser portal (required for Flatpak sandbox file access)
   function handleAttachFiles() {
+    // Append to DOM before clicking (required for WebKitGTK to reliably
+    // open the file chooser dialog on the first click)
     const input = document.createElement('input')
     input.type = 'file'
     input.multiple = true
+    input.style.display = 'none'
+    document.body.appendChild(input)
     input.onchange = async (e) => {
+      input.remove()
       const fileList = (e.target as HTMLInputElement).files
       if (!fileList || fileList.length === 0) return
 
@@ -918,26 +1270,12 @@
         {/if}
       </h2>
       <!-- Draft status indicator -->
-      <span class="text-xs text-muted-foreground flex items-center gap-1">
-        {#if saveStatus === 'saving'}
-          <Icon icon="mdi:loading" class="w-3 h-3 animate-spin" />
-          Saving...
-        {:else if saveStatus === 'saved' && lastSavedAt}
-          {#if syncStatus === 'synced'}
-            <Icon icon="mdi:cloud-check" class="w-3 h-3 text-green-500" />
-            Synced
-          {:else if syncStatus === 'pending'}
-            <Icon icon="mdi:cloud-upload" class="w-3 h-3 text-blue-500" />
-            Saved locally
-          {:else if syncStatus === 'failed'}
-            <Icon icon="mdi:cloud-off-outline" class="w-3 h-3 text-yellow-500" />
-            Saved locally (offline)
-          {/if}
-        {:else if saveStatus === 'error'}
-          <Icon icon="mdi:alert-circle" class="w-3 h-3 text-red-500" />
-          Save failed
-        {/if}
-      </span>
+      {#if draftStatusLabel}
+        <span class="text-xs text-muted-foreground flex items-center gap-1">
+          <Icon icon={draftStatusIcon} class="w-3 h-3 {draftStatusColor} {saveStatus === 'saving' ? 'animate-spin' : ''}" />
+          {draftStatusLabel}
+        </span>
+      {/if}
     </div>
     <div class="flex items-center gap-2">
       <!-- Pop-out button (only shown in main window, not detached) -->
@@ -1012,6 +1350,7 @@
       <span class="text-sm text-muted-foreground w-16 pt-1">To:</span>
       <div class="flex-1">
         <RecipientInput
+          bind:this={toInputRef}
           bind:recipients={toRecipients}
           placeholder="Add recipients..."
         />
@@ -1064,7 +1403,7 @@
         placeholder="Subject"
         class="flex-1 bg-transparent text-sm focus:outline-none"
         onkeydown={(e) => {
-          // Tab skips toolbar and goes directly to body
+          // Tab skips security rows + toolbar and goes directly to body
           if (e.key === 'Tab' && !e.shiftKey) {
             e.preventDefault()
             editor?.commands.focus('start')
@@ -1072,6 +1411,58 @@
         }}
       />
     </div>
+
+    <!-- Security toggles -->
+    {#if showPGPSignOption || showPGPEncryptOption}
+      <div class="flex items-center px-4 py-3.5 border-b border-border text-xs {securityMode === 'pgp' ? 'bg-muted/50' : ''}">
+        <div class="flex items-center gap-1.5">
+          <Icon icon="mdi:lock-outline" class="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+          <span class="text-muted-foreground font-medium">PGP</span>
+        </div>
+        <div class="flex items-center gap-3 ml-auto">
+          {#if securityMode === 'pgp'}
+            <span class="text-muted-foreground">S = sign · E = encrypt · Esc = exit</span>
+          {/if}
+          {#if showPGPSignOption}
+            <div class="flex items-center gap-1.5" title="PGP sign this message">
+              <span>Sign</span>
+              <Switch bind:checked={pgpSignMessage} onCheckedChange={(v) => { if (v) { signMessage = false } }} class="scale-75 origin-left" />
+            </div>
+          {/if}
+          {#if showPGPEncryptOption}
+            <div class="flex items-center gap-1.5" title="PGP encrypt this message">
+              <span>Encrypt</span>
+              <Switch bind:checked={pgpEncryptMessage} onCheckedChange={(v) => { if (v) { encryptMessage = false } }} class="scale-75 origin-left" />
+            </div>
+          {/if}
+        </div>
+      </div>
+    {/if}
+    {#if showSignOption || showEncryptOption}
+      <div class="flex items-center px-4 py-3.5 border-b border-border text-xs {securityMode === 'smime' ? 'bg-muted/50' : ''}">
+        <div class="flex items-center gap-1.5">
+          <Icon icon="mdi:shield-outline" class="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+          <span class="text-muted-foreground font-medium">S/MIME</span>
+        </div>
+        <div class="flex items-center gap-3 ml-auto">
+          {#if securityMode === 'smime'}
+            <span class="text-muted-foreground">S = sign · E = encrypt · Esc = exit</span>
+          {/if}
+          {#if showSignOption}
+            <div class="flex items-center gap-1.5" title="S/MIME sign this message">
+              <span>Sign</span>
+              <Switch bind:checked={signMessage} onCheckedChange={(v) => { if (v) { pgpSignMessage = false } }} class="scale-75 origin-left" />
+            </div>
+          {/if}
+          {#if showEncryptOption}
+            <div class="flex items-center gap-1.5" title="S/MIME encrypt this message">
+              <span>Encrypt</span>
+              <Switch bind:checked={encryptMessage} onCheckedChange={(v) => { if (v) { pgpEncryptMessage = false } }} class="scale-75 origin-left" />
+            </div>
+          {/if}
+        </div>
+      </div>
+    {/if}
 
     <!-- Toolbar - extracted to separate component for performance -->
     <!-- Alt+T to focus toolbar, Tab skips it -->
@@ -1100,9 +1491,29 @@
     <!-- Attachments List -->
     <ComposerAttachmentList {attachments} onRemove={removeAttachment} />
 
+    <!-- Missing S/MIME cert warning -->
+    {#if encryptMessage && missingCertRecipients.length > 0}
+      <div class="flex items-center gap-2 text-xs px-3 py-1.5 bg-amber-50 dark:bg-amber-950/30 border-t border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300">
+        <Icon icon="mdi:alert" class="w-3.5 h-3.5 flex-shrink-0" />
+        <span class="flex-1">Cannot encrypt: no S/MIME certificate for {missingCertRecipients.join(', ')}</span>
+        <button onclick={handleImportRecipientCert} class="px-2 py-0.5 rounded bg-amber-200 dark:bg-amber-800 hover:bg-amber-300 dark:hover:bg-amber-700 font-medium transition-colors">Import</button>
+        <button onclick={() => encryptMessage = false} class="px-2 py-0.5 rounded hover:bg-amber-200 dark:hover:bg-amber-800 font-medium transition-colors">Cancel</button>
+      </div>
+    {/if}
+
+    <!-- Missing PGP key warning -->
+    {#if pgpEncryptMessage && missingPGPKeyRecipients.length > 0}
+      <div class="flex items-center gap-2 text-xs px-3 py-1.5 bg-amber-50 dark:bg-amber-950/30 border-t border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300">
+        <Icon icon="mdi:alert" class="w-3.5 h-3.5 flex-shrink-0" />
+        <span class="flex-1">Cannot encrypt: no PGP key for {missingPGPKeyRecipients.join(', ')}</span>
+        <button onclick={handleImportRecipientPGPKey} class="px-2 py-0.5 rounded bg-amber-200 dark:bg-amber-800 hover:bg-amber-300 dark:hover:bg-amber-700 font-medium transition-colors">Import</button>
+        <button onclick={() => pgpEncryptMessage = false} class="px-2 py-0.5 rounded hover:bg-amber-200 dark:hover:bg-amber-800 font-medium transition-colors">Cancel</button>
+      </div>
+    {/if}
+
     <!-- Footer -->
     <div class="flex items-center gap-2 px-4 py-2 border-t border-border text-sm text-muted-foreground">
-      <button 
+      <button
         onclick={handleAttachFiles}
         class="flex items-center gap-1 hover:text-foreground transition-colors"
       >
@@ -1189,6 +1600,11 @@
 />
 
 <style>
+  /* Zero-margin paragraphs so Enter looks like a single line break */
+  :global(.composer-editor p) {
+    margin: 0;
+  }
+
   :global(.ProseMirror p.is-editor-empty:first-child::before) {
     color: #adb5bd;
     content: attr(data-placeholder);

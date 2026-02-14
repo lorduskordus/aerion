@@ -1,9 +1,8 @@
 /**
  * TipTap editor configuration for the email composer
  */
-import { Editor } from '@tiptap/core'
+import { Editor, Extension } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
-import HardBreak from '@tiptap/extension-hard-break'
 import Link from '@tiptap/extension-link'
 import Underline from '@tiptap/extension-underline'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -63,40 +62,11 @@ export const ExtendedColor = Color.extend({
   },
 })
 
-/**
- * Custom HardBreak extension that makes Enter insert <br> instead of new paragraph
- */
-export const ComposerHardBreak = HardBreak.extend({
-  addKeyboardShortcuts() {
-    return {
-      Enter: ({ editor }) => {
-        const { state, view } = editor
-        const { schema } = state
-        const hardBreak = schema.nodes.hardBreak
-        if (!hardBreak) return false
-
-        const tr = state.tr.replaceSelectionWith(hardBreak.create()).scrollIntoView()
-        view.dispatch(tr)
-        return true
-      },
-      'Shift-Enter': ({ editor }) => {
-        const { state, view } = editor
-        const { schema } = state
-        const hardBreak = schema.nodes.hardBreak
-        if (!hardBreak) return false
-
-        const tr = state.tr.replaceSelectionWith(hardBreak.create()).scrollIntoView()
-        view.dispatch(tr)
-        return true
-      },
-    }
-  }
-})
-
 export interface ComposerEditorHandlers {
   onUpdate?: () => void
   onPasteImage?: (file: File) => void
   onDropImage?: (file: File) => void
+  onShiftTab?: () => void
 }
 
 /**
@@ -109,10 +79,7 @@ export function createComposerEditor(
   return new Editor({
     element,
     extensions: [
-      StarterKit.configure({
-        hardBreak: false, // Disable default HardBreak, we use our own
-      }),
-      ComposerHardBreak,
+      StarterKit,
       Underline,
       ExtendedTextStyle,
       ExtendedColor,
@@ -135,6 +102,18 @@ export function createComposerEditor(
       }),
       Placeholder.configure({
         placeholder: 'Write your message...',
+      }),
+      Extension.create({
+        name: 'shiftTabHandler',
+        addKeyboardShortcuts() {
+          return {
+            'Shift-Tab': () => {
+              handlers.onShiftTab?.()
+              return true
+            },
+            'Mod-Enter': () => true,
+          }
+        },
       }),
     ],
     content: '',

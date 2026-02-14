@@ -84,7 +84,8 @@ export function insertSignatureIntoContent(
       const pStart = before.lastIndexOf('<p')
       if (pStart > -1) {
         const quotedContent = content.substring(pStart)
-        return '<p><br></p>' + signatureHtml + '<p><br></p>' + quotedContent
+        // typing area + blank line below content + signature + 2 blank lines before citation
+        return '<p></p><p></p>' + signatureHtml + '<p></p><p></p>' + quotedContent
       }
     }
 
@@ -92,16 +93,18 @@ export function insertSignatureIntoContent(
     const blockquoteIndex = content.indexOf('<blockquote')
     if (blockquoteIndex > -1) {
       const blockquote = content.substring(blockquoteIndex)
-      return '<p><br></p>' + signatureHtml + '<p><br></p>' + blockquote
+      // typing area + blank line below content + signature + 2 blank lines before citation
+      return '<p></p><p></p>' + signatureHtml + '<p></p><p></p>' + blockquote
     }
   }
 
   // New message or no quoted content found
   const isEmpty = content === '<p></p>' || content === '' || content === '<p><br></p>'
   if (isEmpty) {
-    return '<p><br></p>' + signatureHtml
+    // typing area + blank line below content + signature
+    return '<p></p><p></p>' + signatureHtml
   }
-  return content + '<br><br>' + signatureHtml
+  return content + '<p></p>' + signatureHtml
 }
 
 /**

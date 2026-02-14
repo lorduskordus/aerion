@@ -65,6 +65,10 @@ type ComposeMessage struct {
 
 	// Options
 	RequestReadReceipt bool `json:"request_read_receipt"`
+	SignMessage         bool `json:"sign_message"`    // S/MIME sign this message
+	EncryptMessage      bool `json:"encrypt_message"` // S/MIME encrypt this message
+	PGPSignMessage      bool `json:"pgp_sign_message"`    // PGP sign this message
+	PGPEncryptMessage   bool `json:"pgp_encrypt_message"` // PGP encrypt this message
 }
 
 // AllRecipients returns all recipients (To + Cc + Bcc)
@@ -244,66 +248,76 @@ func writeMultipartMixed(w *bytes.Buffer, m *ComposeMessage, attachments, inline
 	writeHeader(w, "Content-Type", fmt.Sprintf("multipart/mixed; boundary=%q", boundary))
 	w.WriteString("\r\n")
 
-	// Write the body part (could be alternative or just text/html)
-	bodyHeader := textproto.MIMEHeader{}
-
 	hasHTML := m.HTMLBody != ""
 	hasText := m.TextBody != ""
 
 	if hasHTML && hasText {
-		// Create nested multipart/alternative
-		altWriter := multipart.NewWriter(w)
-		altBoundary := altWriter.Boundary()
-		bodyHeader.Set("Content-Type", fmt.Sprintf("multipart/alternative; boundary=%q", altBoundary))
+		// Create multipart/alternative nested inside the mixed section.
+		// The altWriter MUST write to bodyPart (not w) so its boundaries
+		// are properly nested inside the mixed boundary.
+		altBoundary := uuid.New().String()
+		altHeader := textproto.MIMEHeader{}
+		altHeader.Set("Content-Type", fmt.Sprintf("multipart/alternative; boundary=%q", altBoundary))
 
-		bodyPart, err := mpWriter.CreatePart(bodyHeader)
+		bodyPart, err := mpWriter.CreatePart(altHeader)
 		if err != nil {
 			return err
 		}
 
-		// Plain text
+		altWriter := multipart.NewWriter(bodyPart)
+		if err := altWriter.SetBoundary(altBoundary); err != nil {
+			return err
+		}
+
+		// Plain text alternative
 		textHeader := textproto.MIMEHeader{}
 		textHeader.Set("Content-Type", "text/plain; charset=utf-8")
 		textHeader.Set("Content-Transfer-Encoding", "quoted-printable")
-		textPart, _ := altWriter.CreatePart(textHeader)
+		textPart, err := altWriter.CreatePart(textHeader)
+		if err != nil {
+			return err
+		}
 		writeQuotedPrintable(textPart, m.TextBody)
 
-		// HTML with possible inline attachments
+		// HTML alternative (with optional inline attachments)
 		if len(inlineAttachments) > 0 {
-			if err := writeRelatedHTML(bodyPart, m.HTMLBody, inlineAttachments); err != nil {
+			if err := writeRelatedPart(altWriter, m.HTMLBody, inlineAttachments); err != nil {
 				return err
 			}
 		} else {
 			htmlHeader := textproto.MIMEHeader{}
 			htmlHeader.Set("Content-Type", "text/html; charset=utf-8")
 			htmlHeader.Set("Content-Transfer-Encoding", "quoted-printable")
-			htmlPart, _ := altWriter.CreatePart(htmlHeader)
-			writeQuotedPrintable(htmlPart, m.HTMLBody)
-		}
-
-		altWriter.Close()
-	} else if hasHTML {
-		if len(inlineAttachments) > 0 {
-			bodyPart, err := mpWriter.CreatePart(bodyHeader)
+			htmlPart, err := altWriter.CreatePart(htmlHeader)
 			if err != nil {
 				return err
 			}
-			if err := writeRelatedHTML(bodyPart, m.HTMLBody, inlineAttachments); err != nil {
+			writeQuotedPrintable(htmlPart, m.HTMLBody)
+		}
+
+		if err := altWriter.Close(); err != nil {
+			return err
+		}
+	} else if hasHTML {
+		if len(inlineAttachments) > 0 {
+			if err := writeRelatedPart(mpWriter, m.HTMLBody, inlineAttachments); err != nil {
 				return err
 			}
 		} else {
-			bodyHeader.Set("Content-Type", "text/html; charset=utf-8")
-			bodyHeader.Set("Content-Transfer-Encoding", "quoted-printable")
-			bodyPart, err := mpWriter.CreatePart(bodyHeader)
+			htmlHeader := textproto.MIMEHeader{}
+			htmlHeader.Set("Content-Type", "text/html; charset=utf-8")
+			htmlHeader.Set("Content-Transfer-Encoding", "quoted-printable")
+			bodyPart, err := mpWriter.CreatePart(htmlHeader)
 			if err != nil {
 				return err
 			}
 			writeQuotedPrintable(bodyPart, m.HTMLBody)
 		}
 	} else if hasText {
-		bodyHeader.Set("Content-Type", "text/plain; charset=utf-8")
-		bodyHeader.Set("Content-Transfer-Encoding", "quoted-printable")
-		bodyPart, err := mpWriter.CreatePart(bodyHeader)
+		textHeader := textproto.MIMEHeader{}
+		textHeader.Set("Content-Type", "text/plain; charset=utf-8")
+		textHeader.Set("Content-Transfer-Encoding", "quoted-printable")
+		bodyPart, err := mpWriter.CreatePart(textHeader)
 		if err != nil {
 			return err
 		}
@@ -320,25 +334,34 @@ func writeMultipartMixed(w *bytes.Buffer, m *ComposeMessage, attachments, inline
 	return mpWriter.Close()
 }
 
-// writeRelatedHTML writes a multipart/related section with HTML and inline images
-func writeRelatedHTML(w io.Writer, htmlBody string, inlineAttachments []Attachment) error {
-	relWriter := multipart.NewWriter(w)
-	boundary := relWriter.Boundary()
+// writeRelatedPart creates a multipart/related part inside a parent multipart writer,
+// containing HTML and inline attachments with proper MIME headers.
+func writeRelatedPart(parentWriter *multipart.Writer, htmlBody string, inlineAttachments []Attachment) error {
+	relBoundary := uuid.New().String()
+	relHeader := textproto.MIMEHeader{}
+	relHeader.Set("Content-Type", fmt.Sprintf("multipart/related; boundary=%q", relBoundary))
 
-	fmt.Fprintf(w, "Content-Type: multipart/related; boundary=%q\r\n\r\n", boundary)
+	relPart, err := parentWriter.CreatePart(relHeader)
+	if err != nil {
+		return err
+	}
 
-	// Write HTML part
+	relWriter := multipart.NewWriter(relPart)
+	if err := relWriter.SetBoundary(relBoundary); err != nil {
+		return err
+	}
+
+	// HTML sub-part
 	htmlHeader := textproto.MIMEHeader{}
 	htmlHeader.Set("Content-Type", "text/html; charset=utf-8")
 	htmlHeader.Set("Content-Transfer-Encoding", "quoted-printable")
-
 	htmlPart, err := relWriter.CreatePart(htmlHeader)
 	if err != nil {
 		return err
 	}
 	writeQuotedPrintable(htmlPart, htmlBody)
 
-	// Write inline attachments
+	// Inline attachments
 	for _, att := range inlineAttachments {
 		if err := writeInlineAttachment(relWriter, att); err != nil {
 			return err

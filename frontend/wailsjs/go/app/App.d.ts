@@ -11,7 +11,9 @@ import {context} from '../models';
 import {smtp} from '../models';
 import {imap} from '../models';
 import {settings} from '../models';
+import {pgp} from '../models';
 import {appstate} from '../models';
+import {smime} from '../models';
 import {draft} from '../models';
 
 export function AcceptCertificate(arg1:string,arg2:certificate.CertificateInfo,arg3:boolean):Promise<void>;
@@ -23,6 +25,8 @@ export function AddContact(arg1:string,arg2:string):Promise<void>;
 export function AddContactSource(arg1:carddav.SourceConfig):Promise<carddav.Source>;
 
 export function AddImageAllowlist(arg1:string,arg2:string):Promise<void>;
+
+export function AddPGPKeyServer(arg1:string):Promise<void>;
 
 export function Archive(arg1:Array<string>):Promise<void>;
 
@@ -44,6 +48,10 @@ export function CancelFolderSync(arg1:string,arg2:string):Promise<void>;
 
 export function CancelOAuthFlow():Promise<void>;
 
+export function CheckRecipientCerts(arg1:Array<string>):Promise<Record<string, boolean>>;
+
+export function CheckRecipientPGPKeys(arg1:Array<string>):Promise<Record<string, boolean>>;
+
 export function ClearContactSourceError(arg1:string):Promise<void>;
 
 export function CompleteContactSourceOAuthSetup(arg1:string,arg2:number):Promise<carddav.Source>;
@@ -64,11 +72,21 @@ export function DeleteIdentity(arg1:string):Promise<void>;
 
 export function DeleteLocalMessages(arg1:Array<string>):Promise<void>;
 
+export function DeletePGPKey(arg1:string):Promise<void>;
+
+export function DeletePGPSenderKey(arg1:string):Promise<void>;
+
 export function DeletePermanently(arg1:Array<string>):Promise<void>;
+
+export function DeleteSMIMECertificate(arg1:string):Promise<void>;
+
+export function DeleteSenderCert(arg1:string):Promise<void>;
 
 export function DiscoverCardDAVAddressbooks(arg1:string,arg2:string,arg3:string):Promise<Array<carddav.AddressbookInfo>>;
 
 export function DownloadAttachment(arg1:string,arg2:string):Promise<string>;
+
+export function DownloadEncryptedAttachment(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function FetchMessageBody(arg1:string):Promise<message.Message>;
 
@@ -150,9 +168,19 @@ export function GetMessages(arg1:string,arg2:string,arg3:number,arg4:number):Pro
 
 export function GetOAuthStatus(arg1:string):Promise<app.OAuthStatus>;
 
+export function GetPGPEncryptPolicy(arg1:string):Promise<string>;
+
+export function GetPGPKeyServers():Promise<Array<pgp.KeyServer>>;
+
+export function GetPGPSignPolicy(arg1:string):Promise<string>;
+
 export function GetPendingMailto():Promise<app.MailtoData>;
 
 export function GetReadReceiptResponsePolicy():Promise<string>;
+
+export function GetSMIMEEncryptPolicy(arg1:string):Promise<string>;
+
+export function GetSMIMESignPolicy(arg1:string):Promise<string>;
 
 export function GetSearchCount(arg1:string,arg2:string,arg3:string):Promise<number>;
 
@@ -182,7 +210,19 @@ export function GetUnifiedInboxCount():Promise<number>;
 
 export function GetUnifiedInboxUnreadCount():Promise<number>;
 
+export function HasPGPKey(arg1:string):Promise<boolean>;
+
+export function HasSMIMECertificate(arg1:string):Promise<boolean>;
+
 export function IgnoreReadReceipt(arg1:string,arg2:string):Promise<void>;
+
+export function ImportPGPKeyFromPath(arg1:string,arg2:string,arg3:string):Promise<pgp.ImportResult>;
+
+export function ImportRecipientCert(arg1:string,arg2:string):Promise<void>;
+
+export function ImportRecipientPGPKey(arg1:string,arg2:string):Promise<void>;
+
+export function ImportSMIMECertificateFromPath(arg1:string,arg2:string,arg3:string):Promise<smime.ImportResult>;
 
 export function InitiateShutdown():Promise<void>;
 
@@ -200,6 +240,20 @@ export function ListContacts(arg1:number):Promise<Array<contact.Contact>>;
 
 export function ListDrafts(arg1:string):Promise<Array<draft.Draft>>;
 
+export function ListPGPKeys(arg1:string):Promise<Array<pgp.Key>>;
+
+export function ListPGPSenderKeys():Promise<Array<pgp.SenderKey>>;
+
+export function ListSMIMECertificates(arg1:string):Promise<Array<smime.Certificate>>;
+
+export function ListSenderCerts():Promise<Array<smime.SenderCert>>;
+
+export function LookupHKP(arg1:string):Promise<string>;
+
+export function LookupPGPKey(arg1:string):Promise<string>;
+
+export function LookupWKD(arg1:string):Promise<string>;
+
 export function MarkAsNotSpam(arg1:Array<string>):Promise<void>;
 
 export function MarkAsRead(arg1:Array<string>):Promise<void>;
@@ -216,6 +270,8 @@ export function OpenAttachment(arg1:string):Promise<void>;
 
 export function OpenComposerWindow(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
+export function OpenEncryptedAttachment(arg1:string,arg2:string):Promise<void>;
+
 export function OpenFile(arg1:string):Promise<void>;
 
 export function OpenFolder(arg1:string):Promise<void>;
@@ -224,7 +280,19 @@ export function OpenURL(arg1:string):Promise<void>;
 
 export function PickAttachmentFiles():Promise<Array<app.ComposerAttachment>>;
 
+export function PickPGPKeyFile():Promise<string>;
+
+export function PickRecipientCertFile():Promise<string>;
+
+export function PickRecipientPGPKeyFile():Promise<string>;
+
+export function PickSMIMECertificateFile():Promise<string>;
+
 export function PrepareReply(arg1:string,arg2:string):Promise<smtp.ComposeMessage>;
+
+export function ProcessPGPMessage(arg1:string):Promise<app.PGPViewResult>;
+
+export function ProcessSMIMEMessage(arg1:string):Promise<app.SMIMEViewResult>;
 
 export function ReadFileAsAttachment(arg1:string):Promise<app.ComposerAttachment>;
 
@@ -238,15 +306,21 @@ export function RemoveAccount(arg1:string):Promise<void>;
 
 export function RemoveImageAllowlist(arg1:number):Promise<void>;
 
+export function RemovePGPKeyServer(arg1:number):Promise<void>;
+
 export function RemoveTrustedCertificate(arg1:string):Promise<void>;
 
 export function ReorderAccounts(arg1:Array<string>):Promise<void>;
 
 export function SaveAllAttachments(arg1:string):Promise<string>;
 
+export function SaveAllEncryptedAttachments(arg1:string):Promise<string>;
+
 export function SaveAttachmentAs(arg1:string):Promise<string>;
 
 export function SaveDraft(arg1:string,arg2:smtp.ComposeMessage,arg3:string):Promise<app.DraftResult>;
+
+export function SaveEncryptedAttachmentAs(arg1:string,arg2:string):Promise<string>;
 
 export function SaveOAuthTokens(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number):Promise<void>;
 
@@ -270,13 +344,25 @@ export function SetAddressbookEnabled(arg1:string,arg2:boolean):Promise<void>;
 
 export function SetDefaultIdentity(arg1:string,arg2:string):Promise<void>;
 
+export function SetDefaultPGPKey(arg1:string,arg2:string):Promise<void>;
+
+export function SetDefaultSMIMECertificate(arg1:string,arg2:string):Promise<void>;
+
 export function SetMarkAsReadDelay(arg1:number):Promise<void>;
 
 export function SetMessageListDensity(arg1:string):Promise<void>;
 
 export function SetMessageListSortOrder(arg1:string):Promise<void>;
 
+export function SetPGPEncryptPolicy(arg1:string,arg2:string):Promise<void>;
+
+export function SetPGPSignPolicy(arg1:string,arg2:string):Promise<void>;
+
 export function SetReadReceiptResponsePolicy(arg1:string):Promise<void>;
+
+export function SetSMIMEEncryptPolicy(arg1:string,arg2:string):Promise<void>;
+
+export function SetSMIMESignPolicy(arg1:string,arg2:string):Promise<void>;
 
 export function SetShowTitleBar(arg1:boolean):Promise<void>;
 

@@ -2,7 +2,7 @@
   import { onMount, onDestroy, tick } from 'svelte'
   import Icon from '@iconify/svelte'
   // @ts-ignore - wailsjs bindings
-  import { GetConversation, GetReadReceiptResponsePolicy, SendReadReceipt, IgnoreReadReceipt, GetMarkAsReadDelay, GetMessageSource } from '../../../../wailsjs/go/app/App'
+  import { GetConversation, GetReadReceiptResponsePolicy, SendReadReceipt, IgnoreReadReceipt, GetMarkAsReadDelay, GetMessageSource, ProcessSMIMEMessage, ProcessPGPMessage } from '../../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs bindings
   import { MarkAsRead, MarkAsUnread, Star, Unstar, Archive, Trash, MarkAsSpam, MarkAsNotSpam, DeletePermanently, Undo } from '../../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs path
@@ -42,10 +42,51 @@
     isFlashing = false,
   }: Props = $props()
 
+  // Decrypted attachment metadata
+  interface DecryptedAttachment {
+    filename: string
+    contentType: string
+    size: number
+    isInline: boolean
+    contentId: string
+  }
+
+  // S/MIME on-view processing result type
+  interface SMIMEViewResult {
+    bodyHtml: string
+    bodyText: string
+    smimeStatus: string
+    smimeSignerEmail: string
+    smimeSignerSubject: string
+    smimeEncrypted: boolean
+    inlineAttachments?: Record<string, string>
+    attachments?: DecryptedAttachment[]
+  }
+
+  // PGP on-view processing result type
+  interface PGPViewResult {
+    bodyHtml: string
+    bodyText: string
+    pgpStatus: string
+    pgpSignerEmail: string
+    pgpSignerKeyId: string
+    pgpEncrypted: boolean
+    inlineAttachments?: Record<string, string>
+    attachments?: DecryptedAttachment[]
+  }
+
   // State
   let conversation = $state<messageModels.Conversation | null>(null)
   let loading = $state(false)
   let error = $state<string | null>(null)
+
+  // S/MIME on-view processing results per message
+  let smimeResults = $state<Record<string, SMIMEViewResult>>({})
+  let smimeLoading = $state<Set<string>>(new Set())
+
+  // PGP on-view processing results per message
+  let pgpResults = $state<Record<string, PGPViewResult>>({})
+  let pgpLoading = $state<Set<string>>(new Set())
 
   // Track which messages are expanded (unread messages auto-expand)
   let expandedMessages = $state<Set<string>>(new Set())
@@ -159,28 +200,22 @@
     cleanupFunctions.push(
       EventsOn('messages:updated', (data: { accountId: string; folderId: string }) => {
         if (threadId && folderId && accountId && data.accountId === accountId && data.folderId === folderId) {
-          // Save scroll position before reload
-          const scrollTop = contentContainerRef?.scrollTop ?? 0
-          loadConversation(threadId, folderId).then(() => {
-            // Restore scroll position after reload
-            if (contentContainerRef) {
-              contentContainerRef.scrollTop = scrollTop
-            }
-          })
+          refreshConversation(threadId, folderId)
         }
       })
     )
 
     cleanupFunctions.push(
       EventsOn('folder:synced', (data: { accountId: string; folderId: string }) => {
-        // Only reload if the conversation isn't currently loaded successfully
-        // Other event listeners handle specific changes (flags, deletions, moves)
-        // This prevents unnecessary reloads when viewing a message during sync
         if (threadId && folderId && accountId && data.accountId === accountId) {
-          // Skip reload if conversation is already loaded (not loading, not error)
-          if (!conversation || loading || error) {
+          // If conversation hasn't loaded yet or errored, do a full load
+          if (!conversation || error) {
             loadConversation(threadId, folderId)
+            return
           }
+          // Otherwise, smart refresh: only update DOM if messages actually changed.
+          // This covers cross-folder threads (e.g., sent reply appearing in Inbox conversation).
+          refreshConversation(threadId, folderId)
         }
       })
     )
@@ -261,6 +296,48 @@
     }
   })
 
+  // Lightweight refresh: fetches the conversation but only updates the DOM
+  // if something actually changed (new messages, different count, etc.).
+  // This avoids the visible flash/re-render when a sync completes with no changes.
+  async function refreshConversation(tid: string, fid: string) {
+    try {
+      const updated = await GetConversation(tid, fid)
+      if (!updated?.messages || !conversation?.messages) return
+
+      // Compare message count and latest message ID to detect actual changes
+      if (updated.messages.length === conversation.messages.length) {
+        const currentLatestId = conversation.messages[conversation.messages.length - 1]?.id
+        const updatedLatestId = updated.messages[updated.messages.length - 1]?.id
+        if (currentLatestId === updatedLatestId) return
+      }
+
+      // Something changed — update conversation, preserving scroll position
+      const scrollTop = contentContainerRef?.scrollTop ?? 0
+      conversation = updated
+
+      // Expand any new unread messages
+      if (conversation.messages) {
+        const newExpanded = new Set(expandedMessages)
+        conversation.messages.forEach((m, i) => {
+          if (!m.isRead || i === conversation!.messages!.length - 1) {
+            newExpanded.add(m.id)
+          }
+        })
+        expandedMessages = newExpanded
+        scheduleMarkAsRead(tid, conversation.messages)
+        processSMIMEMessages(conversation.messages)
+        processPGPMessages(conversation.messages)
+      }
+
+      await tick()
+      if (contentContainerRef) {
+        contentContainerRef.scrollTop = scrollTop
+      }
+    } catch (err) {
+      console.error('Failed to refresh conversation:', err)
+    }
+  }
+
   async function loadConversation(tid: string, fid: string) {
     // Clear any pending mark-as-read timer from previous conversation
     if (markAsReadTimer) {
@@ -287,6 +364,12 @@
 
         // Schedule auto-mark-as-read for unread messages
         scheduleMarkAsRead(tid, conversation.messages)
+
+        // Process S/MIME messages on-view
+        processSMIMEMessages(conversation.messages)
+
+        // Process PGP messages on-view
+        processPGPMessages(conversation.messages)
       }
     } catch (err) {
       error = err instanceof Error ? err.message : String(err)
@@ -298,6 +381,53 @@
       if (contentContainerRef) {
         contentContainerRef.scrollTop = contentContainerRef.scrollHeight
       }
+    }
+  }
+
+  // Process S/MIME messages on-view (verify/decrypt fresh each time)
+  function processSMIMEMessages(messages: messageModels.Message[]) {
+    // Clear previous results
+    smimeResults = {}
+    smimeLoading = new Set()
+
+    for (const msg of messages) {
+      if (!msg.hasSMIME) continue
+      smimeLoading = new Set([...smimeLoading, msg.id])
+
+      ProcessSMIMEMessage(msg.id).then(result => {
+        smimeResults = { ...smimeResults, [msg.id]: result }
+        const next = new Set(smimeLoading)
+        next.delete(msg.id)
+        smimeLoading = next
+      }).catch(err => {
+        console.error('Failed to process S/MIME message:', msg.id, err)
+        const next = new Set(smimeLoading)
+        next.delete(msg.id)
+        smimeLoading = next
+      })
+    }
+  }
+
+  // Process PGP messages on-view (verify/decrypt fresh each time)
+  function processPGPMessages(messages: messageModels.Message[]) {
+    pgpResults = {}
+    pgpLoading = new Set()
+
+    for (const msg of messages) {
+      if (!msg.hasPGP) continue
+      pgpLoading = new Set([...pgpLoading, msg.id])
+
+      ProcessPGPMessage(msg.id).then(result => {
+        pgpResults = { ...pgpResults, [msg.id]: result }
+        const next = new Set(pgpLoading)
+        next.delete(msg.id)
+        pgpLoading = next
+      }).catch(err => {
+        console.error('Failed to process PGP message:', msg.id, err)
+        const next = new Set(pgpLoading)
+        next.delete(msg.id)
+        pgpLoading = next
+      })
     }
   }
 
@@ -420,28 +550,48 @@
 
   // Get the last message ID in the conversation (for reply actions)
   // Exported for keyboard shortcut use from App.svelte
+  export function hasFocusedMessage(): boolean {
+    return focusedMessageId !== null
+  }
+
+  export function selectAllText() {
+    const targetId = focusedMessageId ?? getLastMessageId()
+    if (!targetId || !expandedMessages.has(targetId)) return
+    const messageEl = document.querySelector(`[data-message-id="${targetId}"]`)
+    if (!messageEl) return
+    const iframe = messageEl.querySelector('iframe') as HTMLIFrameElement | null
+    if (!iframe?.contentWindow) return
+    iframe.contentWindow.postMessage({ type: 'select-all' }, '*')
+  }
+
   export function getLastMessageId(): string | null {
     if (!conversation?.messages || conversation.messages.length === 0) return null
     return conversation.messages[conversation.messages.length - 1].id
   }
 
+  // Get the target message ID for actions:
+  // Use focused message if one is focused, otherwise fall back to last message
+  function getTargetMessageId(): string | null {
+    return focusedMessageId ?? getLastMessageId()
+  }
+
   // Action button handlers
   function handleReply() {
-    const messageId = getLastMessageId()
+    const messageId = getTargetMessageId()
     if (messageId && onReply) {
       onReply('reply', messageId)
     }
   }
 
   function handleReplyAll() {
-    const messageId = getLastMessageId()
+    const messageId = getTargetMessageId()
     if (messageId && onReply) {
       onReply('reply-all', messageId)
     }
   }
 
   function handleForward() {
-    const messageId = getLastMessageId()
+    const messageId = getTargetMessageId()
     if (messageId && onReply) {
       onReply('forward', messageId)
     }
@@ -725,10 +875,18 @@
   }
 
   export function trash() {
+    if (focusedMessageId) {
+      handleDeleteFocusedMessage()
+      return
+    }
     handleDelete()
   }
 
   export function deletePermanently() {
+    if (focusedMessageId) {
+      handleDeleteFocusedMessage()
+      return
+    }
     handleConfirmPermanentDelete()
   }
 
@@ -1101,26 +1259,133 @@
                         </div>
                       {/if}
 
-                      <!-- Body -->
+                      <!-- S/MIME Loading Spinner (on-view processing) -->
+                      {#if smimeLoading.has(msg.id)}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-muted/50 border border-border rounded-md text-sm text-muted-foreground">
+                          <Icon icon="mdi:loading" class="w-4 h-4 animate-spin flex-shrink-0" />
+                          <span>Processing S/MIME message...</span>
+                        </div>
+                      {/if}
+
+                      <!-- S/MIME Encryption Banner -->
+                      {#if smimeResults[msg.id]?.smimeEncrypted}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md text-sm text-blue-700 dark:text-blue-300">
+                          <Icon icon="mdi:lock-check" class="w-4 h-4 flex-shrink-0" />
+                          <span>This message was encrypted with S/MIME</span>
+                        </div>
+                      {/if}
+
+                      <!-- S/MIME Signature Banner (on-view result for S/MIME messages, cached for non-S/MIME) -->
+                      {#if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'signed'}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-md text-sm text-green-700 dark:text-green-300">
+                          <Icon icon="mdi:shield-check" class="w-4 h-4 flex-shrink-0" />
+                          <span>Signed by {(msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || 'unknown'} with S/MIME</span>
+                        </div>
+                      {:else if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'unknown_signer'}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-700 dark:text-amber-300">
+                          <Icon icon="mdi:shield-alert" class="w-4 h-4 flex-shrink-0" />
+                          <span>Signed with S/MIME — Unknown signer ({(msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || 'unknown'})</span>
+                        </div>
+                      {:else if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'self_signed'}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-700 dark:text-amber-300">
+                          <Icon icon="mdi:shield-alert" class="w-4 h-4 flex-shrink-0" />
+                          <span>Signed by {(msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || 'unknown'} with S/MIME — Self-signed certificate</span>
+                        </div>
+                      {:else if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'expired_cert'}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
+                          <Icon icon="mdi:shield-off" class="w-4 h-4 flex-shrink-0" />
+                          <span>Signed by {(msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || 'unknown'} with S/MIME — Certificate expired</span>
+                        </div>
+                      {:else if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'invalid'}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
+                          <Icon icon="mdi:shield-off" class="w-4 h-4 flex-shrink-0" />
+                          <span>S/MIME signature invalid</span>
+                        </div>
+                      {:else if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'decrypt_failed'}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
+                          <Icon icon="mdi:lock-off" class="w-4 h-4 flex-shrink-0" />
+                          <span>S/MIME decryption failed</span>
+                        </div>
+                      {/if}
+
+                      <!-- PGP Loading Spinner (on-view processing) -->
+                      {#if pgpLoading.has(msg.id)}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-muted/50 border border-border rounded-md text-sm text-muted-foreground">
+                          <Icon icon="mdi:loading" class="w-4 h-4 animate-spin flex-shrink-0" />
+                          <span>Processing PGP message...</span>
+                        </div>
+                      {/if}
+
+                      <!-- PGP Encryption Banner -->
+                      {#if pgpResults[msg.id]?.pgpEncrypted}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md text-sm text-blue-700 dark:text-blue-300">
+                          <Icon icon="mdi:lock-check" class="w-4 h-4 flex-shrink-0" />
+                          <span>This message was encrypted with PGP</span>
+                        </div>
+                      {/if}
+
+                      <!-- PGP Signature Banner -->
+                      {#if pgpResults[msg.id]?.pgpStatus === 'signed'}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-md text-sm text-green-700 dark:text-green-300">
+                          <Icon icon="mdi:key-check" class="w-4 h-4 flex-shrink-0" />
+                          <span>Signed by {pgpResults[msg.id]?.pgpSignerEmail || 'unknown'} with PGP</span>
+                        </div>
+                      {:else if pgpResults[msg.id]?.pgpStatus === 'unknown_key'}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-700 dark:text-amber-300">
+                          <Icon icon="mdi:key-alert" class="w-4 h-4 flex-shrink-0" />
+                          <span>Signed with PGP — Unknown key {pgpResults[msg.id]?.pgpSignerKeyId || ''}</span>
+                        </div>
+                      {:else if pgpResults[msg.id]?.pgpStatus === 'expired_key'}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-700 dark:text-amber-300">
+                          <Icon icon="mdi:key-alert" class="w-4 h-4 flex-shrink-0" />
+                          <span>Signed by {pgpResults[msg.id]?.pgpSignerEmail || 'unknown'} with PGP — Key expired</span>
+                        </div>
+                      {:else if pgpResults[msg.id]?.pgpStatus === 'revoked_key'}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
+                          <Icon icon="mdi:key-remove" class="w-4 h-4 flex-shrink-0" />
+                          <span>Signed by {pgpResults[msg.id]?.pgpSignerEmail || 'unknown'} with PGP — Key revoked</span>
+                        </div>
+                      {:else if pgpResults[msg.id]?.pgpStatus === 'invalid'}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
+                          <Icon icon="mdi:key-remove" class="w-4 h-4 flex-shrink-0" />
+                          <span>PGP signature invalid</span>
+                        </div>
+                      {:else if pgpResults[msg.id]?.pgpStatus === 'decrypt_failed'}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
+                          <Icon icon="mdi:lock-off" class="w-4 h-4 flex-shrink-0" />
+                          <span>PGP decryption failed</span>
+                        </div>
+                      {/if}
+
+                      <!-- Body (use on-view result for S/MIME or PGP messages) -->
                       <div class="mb-4">
-                        <EmailBody
-                          messageId={msg.id}
-                          accountId={msg.accountId}
-                          bodyHtml={msg.bodyHtml}
-                          bodyText={msg.bodyText}
-                          fromEmail={msg.fromEmail}
-                          onCompose={onComposeToAddress}
-                        />
+                        {#if (msg.hasSMIME && !smimeResults[msg.id] && smimeLoading.has(msg.id)) || (msg.hasPGP && !pgpResults[msg.id] && pgpLoading.has(msg.id))}
+                          <!-- Show placeholder while processing -->
+                          <div class="text-muted-foreground text-sm italic py-4">Decrypting message...</div>
+                        {:else}
+                          <EmailBody
+                            messageId={msg.id}
+                            accountId={msg.accountId}
+                            bodyHtml={msg.hasPGP && pgpResults[msg.id] ? pgpResults[msg.id].bodyHtml : msg.hasSMIME && smimeResults[msg.id] ? smimeResults[msg.id].bodyHtml : msg.bodyHtml}
+                            bodyText={msg.hasPGP && pgpResults[msg.id] ? pgpResults[msg.id].bodyText : msg.hasSMIME && smimeResults[msg.id] ? smimeResults[msg.id].bodyText : msg.bodyText}
+                            fromEmail={msg.fromEmail}
+                            onCompose={onComposeToAddress}
+                            encryptedInlineAttachments={pgpResults[msg.id]?.inlineAttachments ?? smimeResults[msg.id]?.inlineAttachments}
+                          />
+                        {/if}
                       </div>
 
                       <!-- Attachments -->
-                      {#if msg.hasAttachments}
+                      {#if msg.hasAttachments || (pgpResults[msg.id]?.attachments?.length ?? 0) > 0 || (smimeResults[msg.id]?.attachments?.length ?? 0) > 0}
                         <div class="border-t border-border pt-4 mt-4">
                           <h3 class="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
                             <Icon icon="mdi:paperclip" class="w-4 h-4" />
                             Attachments
                           </h3>
-                          <AttachmentList messageId={msg.id} />
+                          <AttachmentList
+                            messageId={msg.id}
+                            encryptedAttachments={pgpResults[msg.id]?.attachments ?? smimeResults[msg.id]?.attachments}
+                          />
                         </div>
                       {/if}
 

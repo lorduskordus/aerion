@@ -40,15 +40,21 @@ func (s *Store) Create(d *Draft) error {
 		INSERT INTO drafts (
 			id, account_id, to_list, cc_list, bcc_list, subject,
 			body_html, body_text, in_reply_to_id, reply_type, references_list,
-			identity_id, sync_status, imap_uid, folder_id,
+			identity_id, sign_message, encrypted, encrypted_body,
+			pgp_sign_message, pgp_encrypted, pgp_encrypted_body,
+			attachments_data,
+			sync_status, imap_uid, folder_id,
 			last_sync_attempt, sync_error, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := s.db.Exec(query,
 		d.ID, d.AccountID, d.ToList, d.CcList, d.BccList, d.Subject,
 		d.BodyHTML, d.BodyText, nullString(d.InReplyToID), nullString(d.ReplyType), nullString(d.ReferencesList),
-		nullString(d.IdentityID), d.SyncStatus, nullUint32(d.IMAPUID), nullString(d.FolderID),
+		nullString(d.IdentityID), d.SignMessage, d.Encrypted, nullBytes(d.EncryptedBody),
+		d.PGPSignMessage, d.PGPEncrypted, nullBytes(d.PGPEncryptedBody),
+		nullBytes(d.AttachmentsData),
+		d.SyncStatus, nullUint32(d.IMAPUID), nullString(d.FolderID),
 		nullTime(d.LastSyncAttempt), nullString(d.SyncError), d.CreatedAt, d.UpdatedAt,
 	)
 	if err != nil {
@@ -71,7 +77,11 @@ func (s *Store) Update(d *Draft) error {
 		UPDATE drafts SET
 			to_list = ?, cc_list = ?, bcc_list = ?, subject = ?,
 			body_html = ?, body_text = ?, in_reply_to_id = ?, reply_type = ?,
-			references_list = ?, identity_id = ?, sync_status = ?, imap_uid = ?,
+			references_list = ?, identity_id = ?, sign_message = ?,
+			encrypted = ?, encrypted_body = ?,
+			pgp_sign_message = ?, pgp_encrypted = ?, pgp_encrypted_body = ?,
+			attachments_data = ?,
+			sync_status = ?, imap_uid = ?,
 			folder_id = ?, last_sync_attempt = ?, sync_error = ?, updated_at = ?
 		WHERE id = ?
 	`
@@ -79,7 +89,11 @@ func (s *Store) Update(d *Draft) error {
 	_, err := s.db.Exec(query,
 		d.ToList, d.CcList, d.BccList, d.Subject,
 		d.BodyHTML, d.BodyText, nullString(d.InReplyToID), nullString(d.ReplyType),
-		nullString(d.ReferencesList), nullString(d.IdentityID), d.SyncStatus, nullUint32(d.IMAPUID),
+		nullString(d.ReferencesList), nullString(d.IdentityID), d.SignMessage,
+		d.Encrypted, nullBytes(d.EncryptedBody),
+		d.PGPSignMessage, d.PGPEncrypted, nullBytes(d.PGPEncryptedBody),
+		nullBytes(d.AttachmentsData),
+		d.SyncStatus, nullUint32(d.IMAPUID),
 		nullString(d.FolderID), nullTime(d.LastSyncAttempt), nullString(d.SyncError), d.UpdatedAt,
 		d.ID,
 	)
@@ -100,7 +114,10 @@ func (s *Store) Get(id string) (*Draft, error) {
 	query := `
 		SELECT id, account_id, to_list, cc_list, bcc_list, subject,
 			body_html, body_text, in_reply_to_id, reply_type, references_list,
-			identity_id, sync_status, imap_uid, folder_id,
+			identity_id, sign_message, encrypted, encrypted_body,
+			pgp_sign_message, pgp_encrypted, pgp_encrypted_body,
+			attachments_data,
+			sync_status, imap_uid, folder_id,
 			last_sync_attempt, sync_error, created_at, updated_at
 		FROM drafts
 		WHERE id = ?
@@ -110,11 +127,15 @@ func (s *Store) Get(id string) (*Draft, error) {
 	var inReplyToID, replyType, referencesList, identityID, folderID, syncError sql.NullString
 	var imapUID sql.NullInt64
 	var lastSyncAttempt sql.NullTime
+	var encryptedBody, pgpEncryptedBody, attachmentsData []byte
 
 	err := s.db.QueryRow(query, id).Scan(
 		&d.ID, &d.AccountID, &d.ToList, &d.CcList, &d.BccList, &d.Subject,
 		&d.BodyHTML, &d.BodyText, &inReplyToID, &replyType, &referencesList,
-		&identityID, &d.SyncStatus, &imapUID, &folderID,
+		&identityID, &d.SignMessage, &d.Encrypted, &encryptedBody,
+		&d.PGPSignMessage, &d.PGPEncrypted, &pgpEncryptedBody,
+		&attachmentsData,
+		&d.SyncStatus, &imapUID, &folderID,
 		&lastSyncAttempt, &syncError, &d.CreatedAt, &d.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -128,6 +149,9 @@ func (s *Store) Get(id string) (*Draft, error) {
 	d.ReplyType = replyType.String
 	d.ReferencesList = referencesList.String
 	d.IdentityID = identityID.String
+	d.EncryptedBody = encryptedBody
+	d.PGPEncryptedBody = pgpEncryptedBody
+	d.AttachmentsData = attachmentsData
 	d.FolderID = folderID.String
 	d.SyncError = syncError.String
 	if imapUID.Valid {
@@ -145,7 +169,10 @@ func (s *Store) GetByIMAPUID(folderID string, imapUID uint32) (*Draft, error) {
 	query := `
 		SELECT id, account_id, to_list, cc_list, bcc_list, subject,
 			body_html, body_text, in_reply_to_id, reply_type, references_list,
-			identity_id, sync_status, imap_uid, folder_id,
+			identity_id, sign_message, encrypted, encrypted_body,
+			pgp_sign_message, pgp_encrypted, pgp_encrypted_body,
+			attachments_data,
+			sync_status, imap_uid, folder_id,
 			last_sync_attempt, sync_error, created_at, updated_at
 		FROM drafts
 		WHERE folder_id = ? AND imap_uid = ?
@@ -155,11 +182,15 @@ func (s *Store) GetByIMAPUID(folderID string, imapUID uint32) (*Draft, error) {
 	var inReplyToID, replyType, referencesList, identityID, folderIDVal, syncError sql.NullString
 	var imapUIDVal sql.NullInt64
 	var lastSyncAttempt sql.NullTime
+	var encryptedBody, pgpEncryptedBody, attachmentsData []byte
 
 	err := s.db.QueryRow(query, folderID, imapUID).Scan(
 		&d.ID, &d.AccountID, &d.ToList, &d.CcList, &d.BccList, &d.Subject,
 		&d.BodyHTML, &d.BodyText, &inReplyToID, &replyType, &referencesList,
-		&identityID, &d.SyncStatus, &imapUIDVal, &folderIDVal,
+		&identityID, &d.SignMessage, &d.Encrypted, &encryptedBody,
+		&d.PGPSignMessage, &d.PGPEncrypted, &pgpEncryptedBody,
+		&attachmentsData,
+		&d.SyncStatus, &imapUIDVal, &folderIDVal,
 		&lastSyncAttempt, &syncError, &d.CreatedAt, &d.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -173,6 +204,9 @@ func (s *Store) GetByIMAPUID(folderID string, imapUID uint32) (*Draft, error) {
 	d.ReplyType = replyType.String
 	d.ReferencesList = referencesList.String
 	d.IdentityID = identityID.String
+	d.EncryptedBody = encryptedBody
+	d.PGPEncryptedBody = pgpEncryptedBody
+	d.AttachmentsData = attachmentsData
 	d.FolderID = folderIDVal.String
 	d.SyncError = syncError.String
 	if imapUIDVal.Valid {
@@ -201,7 +235,10 @@ func (s *Store) ListByAccount(accountID string) ([]*Draft, error) {
 	query := `
 		SELECT id, account_id, to_list, cc_list, bcc_list, subject,
 			body_html, body_text, in_reply_to_id, reply_type, references_list,
-			identity_id, sync_status, imap_uid, folder_id,
+			identity_id, sign_message, encrypted, encrypted_body,
+			pgp_sign_message, pgp_encrypted, pgp_encrypted_body,
+			attachments_data,
+			sync_status, imap_uid, folder_id,
 			last_sync_attempt, sync_error, created_at, updated_at
 		FROM drafts
 		WHERE account_id = ?
@@ -222,7 +259,10 @@ func (s *Store) ListPendingSync(accountID string) ([]*Draft, error) {
 	query := `
 		SELECT id, account_id, to_list, cc_list, bcc_list, subject,
 			body_html, body_text, in_reply_to_id, reply_type, references_list,
-			identity_id, sync_status, imap_uid, folder_id,
+			identity_id, sign_message, encrypted, encrypted_body,
+			pgp_sign_message, pgp_encrypted, pgp_encrypted_body,
+			attachments_data,
+			sync_status, imap_uid, folder_id,
 			last_sync_attempt, sync_error, created_at, updated_at
 		FROM drafts
 		WHERE account_id = ? AND sync_status IN ('pending', 'failed')
@@ -284,11 +324,15 @@ func (s *Store) scanDrafts(rows *sql.Rows) ([]*Draft, error) {
 		var inReplyToID, replyType, referencesList, identityID, folderID, syncError sql.NullString
 		var imapUID sql.NullInt64
 		var lastSyncAttempt sql.NullTime
+		var encryptedBody, pgpEncryptedBody, attachmentsData []byte
 
 		err := rows.Scan(
 			&d.ID, &d.AccountID, &d.ToList, &d.CcList, &d.BccList, &d.Subject,
 			&d.BodyHTML, &d.BodyText, &inReplyToID, &replyType, &referencesList,
-			&identityID, &d.SyncStatus, &imapUID, &folderID,
+			&identityID, &d.SignMessage, &d.Encrypted, &encryptedBody,
+			&d.PGPSignMessage, &d.PGPEncrypted, &pgpEncryptedBody,
+			&attachmentsData,
+			&d.SyncStatus, &imapUID, &folderID,
 			&lastSyncAttempt, &syncError, &d.CreatedAt, &d.UpdatedAt,
 		)
 		if err != nil {
@@ -299,6 +343,9 @@ func (s *Store) scanDrafts(rows *sql.Rows) ([]*Draft, error) {
 		d.ReplyType = replyType.String
 		d.ReferencesList = referencesList.String
 		d.IdentityID = identityID.String
+		d.EncryptedBody = encryptedBody
+		d.PGPEncryptedBody = pgpEncryptedBody
+		d.AttachmentsData = attachmentsData
 		d.FolderID = folderID.String
 		d.SyncError = syncError.String
 		if imapUID.Valid {
@@ -320,6 +367,13 @@ func nullString(s string) interface{} {
 		return nil
 	}
 	return s
+}
+
+func nullBytes(b []byte) interface{} {
+	if len(b) == 0 {
+		return nil
+	}
+	return b
 }
 
 func nullUint32(v uint32) interface{} {

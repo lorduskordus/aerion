@@ -1,5 +1,28 @@
 # CHANGELOG
 
+**v0.1.21 - 02-13-2026**
+---
+
+- Added PGP support - needs more testing
+- Added S/MIME support - needs more testing
+- Fixed composer rapid enter lag issue with 0 margin <p> instead of <br>
+- Added auto refresh of draft folder on discard
+- Added logic to prevent uneccessary reloads of loaded conversations if there's no change
+- Fixed draft synced to server indication regression
+- Fixed inserted images and attachments saved in draft folder
+- Max window size fix [#4](https://github.com/hkdb/aerion/issues/4)
+- Auto-focus to the To: field on launch of new composer and on forwards
+- Fixed reliability issues with attach file and insert image
+- Fixed deletion while syncing
+- Improved dead connections handling which makes wake from sleep more reliable & should fix [#9](https://github.com/hkdb/aerion/issues/9)
+- Fixed delete mail from trash [#9](https://github.com/hkdb/aerion/issues/9)
+- Added reply, reply-all, and forward of a specific message
+- Fixed move mail from trash back to inbox
+- Improved Sent Folder detection (Wrong sent folder mapping will break threading)
+- Ctrl+A when focused on message list will select all messages [#14](https://github.com/hkdb/aerion/issues/14)
+- Ctrl+A when focused on conversation viewer will select all text of the expanded email in viewport
+    
+
 **v0.1.20 - 02-11-2026**
 ---
 

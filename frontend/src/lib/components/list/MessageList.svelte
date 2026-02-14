@@ -5,7 +5,9 @@
   import { DropdownMenu } from 'bits-ui'
   import { cn } from '$lib/utils'
   // @ts-ignore - wailsjs bindings
-  import { GetConversations, GetConversationCount, SyncFolder, ForceSyncFolder, CancelFolderSync, SetMessageListSortOrder, GetUnifiedInboxConversations, GetUnifiedInboxCount, SearchConversations, SearchUnifiedInbox, GetSearchCount, GetSearchCountUnifiedInbox, GetFTSIndexStatus, IsFTSIndexing } from '../../../../wailsjs/go/app/App'
+  import { GetConversations, GetConversationCount, SyncFolder, ForceSyncFolder, CancelFolderSync, SetMessageListSortOrder, GetUnifiedInboxConversations, GetUnifiedInboxCount, SearchConversations, SearchUnifiedInbox, GetSearchCount, GetSearchCountUnifiedInbox, GetFTSIndexStatus, IsFTSIndexing, Trash, DeletePermanently, Undo } from '../../../../wailsjs/go/app/App'
+  import { toasts } from '$lib/stores/toast'
+  import { ConfirmDialog } from '$lib/components/ui/confirm-dialog'
   // @ts-ignore - wailsjs path
   import { message } from '../../../../wailsjs/go/models'
   // @ts-ignore - wailsjs runtime
@@ -822,6 +824,55 @@
     lastClickedIndex = null
   }
 
+  export function selectAll() {
+    checkedThreadIds = new Set(activeList.map(c => c.threadId))
+  }
+
+  // Permanent delete confirmation state
+  let showDeleteConfirm = $state(false)
+  let pendingDeleteIds = $state<string[]>([])
+
+  async function handleUndo() {
+    try {
+      const description = await Undo()
+      toasts.success(`Undone: ${description}`)
+    } catch (err) {
+      toasts.error(`Undo failed: ${err}`)
+    }
+  }
+
+  async function handleConfirmPermanentDelete() {
+    try {
+      await DeletePermanently(pendingDeleteIds)
+      toasts.success('Permanently deleted')
+      clearChecked()
+      handleActionComplete(true)
+    } catch (err) {
+      toasts.error(`Failed to delete: ${err}`)
+    }
+    showDeleteConfirm = false
+    pendingDeleteIds = []
+  }
+
+  // Shared delete handler — same flow as context menu "Delete" action
+  // Set permanent=true to force permanent delete (e.g. Shift+Delete)
+  export function requestDelete(messageIds: string[], permanent: boolean = false) {
+    if (permanent || folderType === 'trash') {
+      pendingDeleteIds = messageIds
+      showDeleteConfirm = true
+      return
+    }
+    Trash(messageIds)
+      .then(() => {
+        toasts.success('Moved to trash', [{ label: 'Undo', onClick: handleUndo }])
+        clearChecked()
+        handleActionComplete(true)
+      })
+      .catch((err) => {
+        toasts.error(`Failed to delete: ${err}`)
+      })
+  }
+
   // Scroll to a specific index in the list
   function scrollToIndex(index: number) {
     if (!listContainerRef) return
@@ -1111,3 +1162,14 @@
     {/if}
   </div>
 </div>
+
+<!-- Permanent Delete Confirmation Dialog -->
+<ConfirmDialog
+  bind:open={showDeleteConfirm}
+  title="Delete Permanently?"
+  description="This will permanently delete the selected message(s). This action cannot be undone."
+  confirmLabel="Delete Permanently"
+  variant="destructive"
+  onConfirm={handleConfirmPermanentDelete}
+  onCancel={() => { showDeleteConfirm = false; pendingDeleteIds = [] }}
+/>

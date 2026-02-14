@@ -144,6 +144,11 @@
     }, 200)
   }
 
+  // Allow parent to focus the input programmatically
+  export function focus() {
+    inputElement?.focus()
+  }
+
   function handleFocus() {
     if (inputValue.length >= 2 && suggestions.length > 0) {
       showSuggestions = true

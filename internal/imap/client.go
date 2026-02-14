@@ -396,6 +396,28 @@ func (c *Client) ListMailboxes() ([]*Mailbox, error) {
 		return nil, fmt.Errorf("failed to list mailboxes: %w", err)
 	}
 
+	// Dedup special types: if a type was claimed via SPECIAL-USE attribute,
+	// demote any name-only matches to plain folders. This prevents stale
+	// "Sent" or "sent-mail" folders (created by other clients) from shadowing
+	// the real provider folder (e.g. [Gmail]/Sent Mail).
+	attrTypes := make(map[FolderType]bool)
+	for _, mb := range mailboxes {
+		if mb.Type != FolderTypeFolder && mb.Type != FolderTypeInbox && hasSpecialUseAttr(mb.Attributes) {
+			attrTypes[mb.Type] = true
+		}
+	}
+	if len(attrTypes) > 0 {
+		for _, mb := range mailboxes {
+			if mb.Type != FolderTypeFolder && mb.Type != FolderTypeInbox && attrTypes[mb.Type] && !hasSpecialUseAttr(mb.Attributes) {
+				c.log.Debug().
+					Str("mailbox", mb.Name).
+					Str("type", string(mb.Type)).
+					Msg("Demoting name-matched folder (SPECIAL-USE folder exists for this type)")
+				mb.Type = FolderTypeFolder
+			}
+		}
+	}
+
 	c.log.Debug().Int("count", len(mailboxes)).Msg("Listed mailboxes")
 
 	return mailboxes, nil
@@ -466,6 +488,19 @@ func containsIgnoreCase(s, substr string) bool {
 			}
 		}
 		if match {
+			return true
+		}
+	}
+	return false
+}
+
+// hasSpecialUseAttr checks if a mailbox has any RFC 6154 SPECIAL-USE attribute
+func hasSpecialUseAttr(attrs []string) bool {
+	for _, attr := range attrs {
+		switch imap.MailboxAttr(attr) {
+		case imap.MailboxAttrAll, imap.MailboxAttrArchive, imap.MailboxAttrDrafts,
+			imap.MailboxAttrJunk, imap.MailboxAttrSent, imap.MailboxAttrTrash,
+			imap.MailboxAttrFlagged:
 			return true
 		}
 	}

@@ -37,8 +37,53 @@ export interface ComposerApi {
   
   /** Get account details */
   getAccount: (accountId: string) => Promise<account.Account>
-  
-  /** 
+
+  /** Check if account has a valid default S/MIME certificate */
+  hasSMIMECertificate: (accountId: string) => Promise<boolean>
+
+  /** Get the S/MIME signing policy for an account */
+  getSMIMESignPolicy: (accountId: string) => Promise<string>
+
+  /** Get the S/MIME encryption policy for an account */
+  getSMIMEEncryptPolicy: (accountId: string) => Promise<string>
+
+  /** Check which recipients have S/MIME certificates available */
+  checkRecipientCerts: (emails: string[]) => Promise<Record<string, boolean>>
+
+  /** Open a file picker for recipient certificate files */
+  pickRecipientCertFile: () => Promise<string>
+
+  /** Import a recipient's public certificate from a file */
+  importRecipientCert: (email: string, filePath: string) => Promise<void>
+
+  /** Check if account has a valid default PGP key */
+  hasPGPKey: (accountId: string) => Promise<boolean>
+
+  /** Get the PGP signing policy for an account */
+  getPGPSignPolicy: (accountId: string) => Promise<string>
+
+  /** Get the PGP encryption policy for an account */
+  getPGPEncryptPolicy: (accountId: string) => Promise<string>
+
+  /** Check which recipients have PGP public keys available */
+  checkRecipientPGPKeys: (emails: string[]) => Promise<Record<string, boolean>>
+
+  /** Open a file picker for recipient PGP public key files */
+  pickRecipientPGPKeyFile: () => Promise<string>
+
+  /** Import a recipient's PGP public key from a file */
+  importRecipientPGPKey: (email: string, filePath: string) => Promise<void>
+
+  /** Perform a WKD lookup for a recipient's PGP key */
+  lookupWKD: (email: string) => Promise<string>
+
+  /** Perform an HKP key server lookup for a recipient's PGP key */
+  lookupHKP: (email: string) => Promise<string>
+
+  /** Perform a unified WKD+HKP lookup for a recipient's PGP key */
+  lookupPGPKey: (email: string) => Promise<string>
+
+  /**
    * Open a detached composer window (only available in main window).
    * Returns undefined in detached composer windows.
    */
@@ -94,7 +139,82 @@ export function createMainWindowApi(): ComposerApi {
       const { GetAccount } = await import('../../wailsjs/go/app/App.js')
       return GetAccount(accountId)
     },
-    
+
+    hasSMIMECertificate: async (accountId: string) => {
+      const { HasSMIMECertificate } = await import('../../wailsjs/go/app/App.js')
+      return HasSMIMECertificate(accountId)
+    },
+
+    getSMIMESignPolicy: async (accountId: string) => {
+      const { GetSMIMESignPolicy } = await import('../../wailsjs/go/app/App.js')
+      return GetSMIMESignPolicy(accountId)
+    },
+
+    getSMIMEEncryptPolicy: async (accountId: string) => {
+      const { GetSMIMEEncryptPolicy } = await import('../../wailsjs/go/app/App.js')
+      return GetSMIMEEncryptPolicy(accountId)
+    },
+
+    checkRecipientCerts: async (emails: string[]) => {
+      const { CheckRecipientCerts } = await import('../../wailsjs/go/app/App.js')
+      return CheckRecipientCerts(emails)
+    },
+
+    pickRecipientCertFile: async () => {
+      const { PickRecipientCertFile } = await import('../../wailsjs/go/app/App.js')
+      return PickRecipientCertFile()
+    },
+
+    importRecipientCert: async (email: string, filePath: string) => {
+      const { ImportRecipientCert } = await import('../../wailsjs/go/app/App.js')
+      return ImportRecipientCert(email, filePath)
+    },
+
+    hasPGPKey: async (accountId: string) => {
+      const { HasPGPKey } = await import('../../wailsjs/go/app/App.js')
+      return HasPGPKey(accountId)
+    },
+
+    getPGPSignPolicy: async (accountId: string) => {
+      const { GetPGPSignPolicy } = await import('../../wailsjs/go/app/App.js')
+      return GetPGPSignPolicy(accountId)
+    },
+
+    getPGPEncryptPolicy: async (accountId: string) => {
+      const { GetPGPEncryptPolicy } = await import('../../wailsjs/go/app/App.js')
+      return GetPGPEncryptPolicy(accountId)
+    },
+
+    checkRecipientPGPKeys: async (emails: string[]) => {
+      const { CheckRecipientPGPKeys } = await import('../../wailsjs/go/app/App.js')
+      return CheckRecipientPGPKeys(emails)
+    },
+
+    pickRecipientPGPKeyFile: async () => {
+      const { PickRecipientPGPKeyFile } = await import('../../wailsjs/go/app/App.js')
+      return PickRecipientPGPKeyFile()
+    },
+
+    importRecipientPGPKey: async (email: string, filePath: string) => {
+      const { ImportRecipientPGPKey } = await import('../../wailsjs/go/app/App.js')
+      return ImportRecipientPGPKey(email, filePath)
+    },
+
+    lookupWKD: async (email: string) => {
+      const { LookupWKD } = await import('../../wailsjs/go/app/App.js')
+      return LookupWKD(email)
+    },
+
+    lookupHKP: async (email: string) => {
+      const { LookupHKP } = await import('../../wailsjs/go/app/App.js')
+      return LookupHKP(email)
+    },
+
+    lookupPGPKey: async (email: string) => {
+      const { LookupPGPKey } = await import('../../wailsjs/go/app/App.js')
+      return LookupPGPKey(email)
+    },
+
     openComposerWindow: async (accountId: string, mode: string, messageId: string, draftId: string) => {
       const { OpenComposerWindow } = await import('../../wailsjs/go/app/App.js')
       return OpenComposerWindow(accountId, mode, messageId, draftId)
@@ -148,6 +268,83 @@ export function createComposerWindowApi(accountId: string): ComposerApi {
       const { GetAccount } = await import('../../wailsjs/go/app/ComposerApp.js')
       // ComposerApp.GetAccount doesn't take accountId (it's set in config)
       return GetAccount()
+    },
+
+    hasSMIMECertificate: async (_accountId: string) => {
+      const { HasSMIMECertificate } = await import('../../wailsjs/go/app/ComposerApp.js')
+      // ComposerApp.HasSMIMECertificate doesn't take accountId (it's set in config)
+      return HasSMIMECertificate()
+    },
+
+    getSMIMESignPolicy: async (_accountId: string) => {
+      const { GetSMIMESignPolicy } = await import('../../wailsjs/go/app/ComposerApp.js')
+      // ComposerApp.GetSMIMESignPolicy doesn't take accountId (it's set in config)
+      return GetSMIMESignPolicy()
+    },
+
+    getSMIMEEncryptPolicy: async (_accountId: string) => {
+      const { GetSMIMEEncryptPolicy } = await import('../../wailsjs/go/app/ComposerApp.js')
+      return GetSMIMEEncryptPolicy()
+    },
+
+    checkRecipientCerts: async (emails: string[]) => {
+      const { CheckRecipientCerts } = await import('../../wailsjs/go/app/ComposerApp.js')
+      return CheckRecipientCerts(emails)
+    },
+
+    pickRecipientCertFile: async () => {
+      const { PickRecipientCertFile } = await import('../../wailsjs/go/app/ComposerApp.js')
+      return PickRecipientCertFile()
+    },
+
+    importRecipientCert: async (email: string, filePath: string) => {
+      const { ImportRecipientCert } = await import('../../wailsjs/go/app/ComposerApp.js')
+      return ImportRecipientCert(email, filePath)
+    },
+
+    hasPGPKey: async (_accountId: string) => {
+      const { HasPGPKey } = await import('../../wailsjs/go/app/ComposerApp.js')
+      return HasPGPKey()
+    },
+
+    getPGPSignPolicy: async (_accountId: string) => {
+      const { GetPGPSignPolicy } = await import('../../wailsjs/go/app/ComposerApp.js')
+      return GetPGPSignPolicy()
+    },
+
+    getPGPEncryptPolicy: async (_accountId: string) => {
+      const { GetPGPEncryptPolicy } = await import('../../wailsjs/go/app/ComposerApp.js')
+      return GetPGPEncryptPolicy()
+    },
+
+    checkRecipientPGPKeys: async (emails: string[]) => {
+      const { CheckRecipientPGPKeys } = await import('../../wailsjs/go/app/ComposerApp.js')
+      return CheckRecipientPGPKeys(emails)
+    },
+
+    pickRecipientPGPKeyFile: async () => {
+      const { PickRecipientPGPKeyFile } = await import('../../wailsjs/go/app/ComposerApp.js')
+      return PickRecipientPGPKeyFile()
+    },
+
+    importRecipientPGPKey: async (email: string, filePath: string) => {
+      const { ImportRecipientPGPKey } = await import('../../wailsjs/go/app/ComposerApp.js')
+      return ImportRecipientPGPKey(email, filePath)
+    },
+
+    lookupWKD: async (email: string) => {
+      const { LookupWKD } = await import('../../wailsjs/go/app/ComposerApp.js')
+      return LookupWKD(email)
+    },
+
+    lookupHKP: async (email: string) => {
+      const { LookupHKP } = await import('../../wailsjs/go/app/ComposerApp.js')
+      return LookupHKP(email)
+    },
+
+    lookupPGPKey: async (email: string) => {
+      const { LookupPGPKey } = await import('../../wailsjs/go/app/ComposerApp.js')
+      return LookupPGPKey(email)
     },
   }
 }

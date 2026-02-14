@@ -58,6 +58,46 @@ func (a *App) SendMessage(accountID string, msg smtp.ComposeMessage) error {
 		return fmt.Errorf("failed to build message: %w", err)
 	}
 
+	// S/MIME signing (if configured for this account/message)
+	if a.shouldSignMessage(accountID, msg.SignMessage) {
+		signedMsg, signErr := a.smimeSigner.SignMessage(accountID, rawMsg)
+		if signErr != nil {
+			return fmt.Errorf("failed to sign message: %w", signErr)
+		}
+		rawMsg = signedMsg
+		log.Info().Str("accountID", accountID).Msg("Message signed with S/MIME")
+	}
+
+	// S/MIME encryption (if configured for this account/message) — sign-then-encrypt per RFC 5751
+	if a.shouldEncryptMessage(accountID, msg.EncryptMessage) {
+		encryptedMsg, encErr := a.smimeEncryptor.EncryptMessage(accountID, msg.AllRecipients(), rawMsg)
+		if encErr != nil {
+			return fmt.Errorf("failed to encrypt message: %w", encErr)
+		}
+		rawMsg = encryptedMsg
+		log.Info().Str("accountID", accountID).Msg("Message encrypted with S/MIME")
+	}
+
+	// PGP signing (mutually exclusive with S/MIME — only if S/MIME sign was not applied)
+	if !msg.SignMessage && a.shouldPGPSignMessage(accountID, msg.PGPSignMessage) {
+		signedMsg, signErr := a.pgpSigner.SignMessage(accountID, rawMsg)
+		if signErr != nil {
+			return fmt.Errorf("failed to PGP sign message: %w", signErr)
+		}
+		rawMsg = signedMsg
+		log.Info().Str("accountID", accountID).Msg("Message signed with PGP")
+	}
+
+	// PGP encryption (mutually exclusive with S/MIME — only if S/MIME encrypt was not applied)
+	if !msg.EncryptMessage && a.shouldPGPEncryptMessage(accountID, msg.PGPEncryptMessage) {
+		encryptedMsg, encErr := a.pgpEncryptor.EncryptMessage(accountID, msg.AllRecipients(), rawMsg)
+		if encErr != nil {
+			return fmt.Errorf("failed to PGP encrypt message: %w", encErr)
+		}
+		rawMsg = encryptedMsg
+		log.Info().Str("accountID", accountID).Msg("Message encrypted with PGP")
+	}
+
 	// Create SMTP client config
 	smtpConfig := smtp.DefaultConfig()
 	smtpConfig.Host = acc.SMTPHost
@@ -366,14 +406,14 @@ func (a *App) PrepareReply(messageID, mode string) (*smtp.ComposeMessage, error)
 	var htmlBody, textBody string
 	if mode == "forward" {
 		// Forward format
-		htmlBody = fmt.Sprintf("<br><br>---------- Forwarded message ----------<br>From: %s<br>Subject: %s<br>Date: %s<br>To: %s<br><br>%s",
+		htmlBody = fmt.Sprintf("<p></p><p></p><p>---------- Forwarded message ----------<br>From: %s<br>Subject: %s<br>Date: %s<br>To: %s</p><p></p>%s",
 			escapeHTML(sender), escapeHTML(msg.Subject), escapeHTML(dateStr), escapeHTML(msg.ToList), msg.BodyHTML)
 		textBody = fmt.Sprintf("\n\n---------- Forwarded message ----------\nFrom: %s\nSubject: %s\nDate: %s\nTo: %s\n\n%s",
 			sender, msg.Subject, dateStr, msg.ToList, msg.BodyText)
 	} else {
 		// Reply format
 		citation := fmt.Sprintf("On %s, %s wrote:", dateStr, sender)
-		htmlBody = fmt.Sprintf("<p><br></p><p>%s</p><blockquote type=\"cite\">%s</blockquote>", escapeHTML(citation), msg.BodyHTML)
+		htmlBody = fmt.Sprintf("<p></p><p></p><p>%s</p><blockquote type=\"cite\">%s</blockquote>", escapeHTML(citation), msg.BodyHTML)
 		textBody = fmt.Sprintf("\n\n%s\n%s", citation, quoteText(msg.BodyText))
 	}
 
@@ -526,11 +566,20 @@ func parseAddressList(s string) []smtp.Address {
 		return nil
 	}
 
-	// Try JSON format first - the DB stores addresses with "email" field (message.Address),
-	// but we need to return smtp.Address which uses "address" field
+	// Try smtp.Address JSON format first (uses "address" field) —
+	// this is what addressListToJSON stores for drafts
+	var smtpAddrs []smtp.Address
+	if err := json.Unmarshal([]byte(s), &smtpAddrs); err == nil {
+		// Check if the addresses actually have data (not just zero values)
+		if len(smtpAddrs) > 0 && smtpAddrs[0].Address != "" {
+			return smtpAddrs
+		}
+	}
+
+	// Try message.Address JSON format (uses "email" field) —
+	// this is what the message store uses
 	var msgAddrs []message.Address
 	if err := json.Unmarshal([]byte(s), &msgAddrs); err == nil {
-		// Convert message.Address to smtp.Address
 		var addrs []smtp.Address
 		for _, msgAddr := range msgAddrs {
 			addrs = append(addrs, smtp.Address{
@@ -538,7 +587,9 @@ func parseAddressList(s string) []smtp.Address {
 				Address: strings.TrimSpace(msgAddr.Email),
 			})
 		}
-		return addrs
+		if len(addrs) > 0 && addrs[0].Address != "" {
+			return addrs
+		}
 	}
 
 	// Try as comma-separated list (legacy format)
