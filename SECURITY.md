@@ -24,7 +24,7 @@ Please include the following information in your report:
 
 ### What to Expect
 
-- **Acknowledgment**: We will acknowledge receipt of your vulnerability report within 48 hours.
+- **Acknowledgment**: We will acknowledge receipt of your vulnerability report within 72 hours.
 - **Communication**: We will keep you informed of the progress toward a fix and full announcement.
 - **Credit**: We will credit you in our release notes and security advisories (unless you prefer to remain anonymous).
 
