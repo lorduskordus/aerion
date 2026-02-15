@@ -1,11 +1,5 @@
 # Security Policy
 
-## Supported Versions
-
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.x.x   | :white_check_mark: |
-
 ## Reporting a Vulnerability
 
 We take the security of Aerion seriously. If you believe you have found a security vulnerability, please report it to us as described below.
@@ -14,9 +8,9 @@ We take the security of Aerion seriously. If you believe you have found a securi
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
-Instead, please report them via email to: **security@[your-domain].com**
+Instead, please report them via email to: aerion@3df.io
 
-You should receive a response within 48 hours. If for some reason you do not, please follow up via email to ensure we received your original message.
+You should receive a response within 72 hours. If for some reason you do not, please follow up via email to ensure we received your original message.
 
 Please include the following information in your report:
 
@@ -44,7 +38,7 @@ Please include the following information in your report:
 
 ### OAuth Credentials
 
-If you are self-hosting Aerion:
+If you are compiling Aerion from source:
 
 1. **Never commit OAuth credentials** to version control
 2. Use the `.env.example` file as a template and create your own `.env` file
@@ -76,6 +70,6 @@ Aerion includes the following security measures:
 
 ## Known Limitations
 
-- Aerion is currently in pre-release development
+- Aerion is currently in early stage active development
 - Security audits have not yet been performed by third parties
-- Use at your own risk for sensitive communications until v1.0 release
+- Use at your own risk for sensitive communications
