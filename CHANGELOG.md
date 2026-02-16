@@ -1,5 +1,11 @@
 # CHANGELOG
 
+**v0.1.23 - 02-16-2026**
+---
+
+- Fixed race condition on marking message read when notification clicked
+
+
 **v0.1.22 - 02-16-2026**
 ---
 

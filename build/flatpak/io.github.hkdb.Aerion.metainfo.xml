@@ -63,6 +63,13 @@
   </provides>
 
   <releases>
+    <release version="0.1.23" date="2026-02-16">
+      <description>
+        <ul>
+          <li>Fixed race condition on marking message read when notification clicked</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.22" date="2026-02-16">
       <description>
         <ul>

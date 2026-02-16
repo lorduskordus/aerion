@@ -68,6 +68,11 @@
   // Debounce timer for reloading after flag changes
   let reloadTimer: ReturnType<typeof setTimeout> | null = null
 
+  // Buffer for flag changes that arrive while loadConversations() is in-flight.
+  // On notification click, loadConversations (folder change) and MarkAsRead race —
+  // the flagsChanged event may fire before the new conversations array is ready.
+  let pendingFlagChanges: Array<{messageIds: string[], isRead: boolean}> = []
+
   // Search state
   let showSearch = $state(false)
   let searchQuery = $state('')
@@ -109,15 +114,24 @@
     // Listen for message flag changes (e.g., marked as read)
     EventsOn('messages:flagsChanged', (data: { messageIds: string[], isRead: boolean }) => {
       // Update conversations locally instead of reloading from DB
+      let anyUpdated = false
       for (const c of conversations) {
         const affectedCount = (c.messageIds || []).filter(id => data.messageIds.includes(id)).length
         if (affectedCount > 0) {
+          anyUpdated = true
           const delta = data.isRead ? -affectedCount : affectedCount
           c.unreadCount = Math.max(0, (c.unreadCount || 0) + delta)
         }
       }
-      // Trigger reactivity by reassigning
-      conversations = conversations
+      if (anyUpdated) {
+        conversations = conversations
+        return
+      }
+      // loadConversations() is in-flight — the new array isn't ready yet.
+      // Buffer this change so we can apply it after the load completes.
+      if (loading) {
+        pendingFlagChanges.push({ messageIds: data.messageIds, isRead: data.isRead })
+      }
     })
 
     // Listen for FTS indexing progress
@@ -282,6 +296,23 @@
 
       if (currentOffset === 0) {
         conversations = convList || []
+
+        // Apply any flag changes that arrived while we were loading.
+        // This fixes the race where MarkAsRead fires before the new array is ready.
+        if (pendingFlagChanges.length > 0) {
+          for (const change of pendingFlagChanges) {
+            for (const c of conversations) {
+              const affectedCount = (c.messageIds || []).filter(
+                (id: string) => change.messageIds.includes(id)
+              ).length
+              if (affectedCount > 0) {
+                const delta = change.isRead ? -affectedCount : affectedCount
+                c.unreadCount = Math.max(0, (c.unreadCount || 0) + delta)
+              }
+            }
+          }
+          pendingFlagChanges = []
+        }
 
         // Check if we switched to a different folder
         const folderChanged = lastLoadedFolderId !== folderId
