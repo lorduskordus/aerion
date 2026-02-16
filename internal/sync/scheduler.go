@@ -38,6 +38,7 @@ type Scheduler struct {
 	// Callbacks
 	newMailCallback       NewMailCallback
 	syncCompletedCallback SyncCompletedCallback
+	isConnected           func() bool // optional: skip sync when offline
 
 	// Control
 	ctx           context.Context
@@ -77,6 +78,13 @@ func (s *Scheduler) SetNewMailCallback(callback NewMailCallback) {
 // SetSyncCompletedCallback sets the callback for sync completion notifications
 func (s *Scheduler) SetSyncCompletedCallback(callback SyncCompletedCallback) {
 	s.syncCompletedCallback = callback
+}
+
+// SetConnectivityCheck sets a function to check network connectivity.
+// When set, the scheduler skips sync ticks when offline to avoid wasted
+// connection attempts and unnecessary error logging.
+func (s *Scheduler) SetConnectivityCheck(check func() bool) {
+	s.isConnected = check
 }
 
 // Start starts the background sync scheduler
@@ -142,6 +150,12 @@ func (s *Scheduler) run() {
 
 // syncDueAccounts checks all accounts and syncs those that are due
 func (s *Scheduler) syncDueAccounts() {
+	// Skip sync tick if we know we're offline
+	if s.isConnected != nil && !s.isConnected() {
+		s.log.Debug().Msg("Skipping sync tick — offline")
+		return
+	}
+
 	accounts, err := s.accountStore.List()
 	if err != nil {
 		s.log.Error().Err(err).Msg("Failed to list accounts for sync check")

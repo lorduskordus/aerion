@@ -281,7 +281,7 @@ func (c *Client) loginOAuth2() error {
 	return nil
 }
 
-// Close closes the connection to the IMAP server
+// Close closes the connection to the IMAP server with a graceful logout
 func (c *Client) Close() error {
 	if c.client == nil {
 		return nil
@@ -293,6 +293,27 @@ func (c *Client) Close() error {
 	if err := c.client.Logout().Wait(); err != nil {
 		c.log.Warn().Err(err).Msg("Logout failed, closing anyway")
 	}
+
+	return c.client.Close()
+}
+
+// ForceClose closes the IMAP connection without waiting for a server response.
+// It sends LOGOUT (fire-and-forget) so the server can release the connection
+// slot, then immediately closes the socket. Use when the connection may be
+// dead (e.g., after network changes) to avoid blocking on unresponsive
+// TCP sockets while still being a good citizen to the IMAP server.
+func (c *Client) ForceClose() error {
+	if c.client == nil {
+		return nil
+	}
+
+	c.log.Debug().Msg("Force-closing IMAP connection")
+
+	// Send LOGOUT without waiting for the BYE response.
+	// On live connections the server receives it and frees the slot.
+	// On dead connections the write may fail silently — either way
+	// we close the socket below.
+	c.client.Logout()
 
 	return c.client.Close()
 }

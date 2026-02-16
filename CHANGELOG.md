@@ -1,5 +1,15 @@
 # CHANGELOG
 
+**v0.1.22 - 02-16-2026**
+---
+
+- Fixed wake from sleep flow - [#17](https://github.com/hkdb/aerion/issues/17)
+- Added proper network state monitoring
+- Improved wake, scheduled syncs, idle, and status logic with net state
+- Added proper logic for offline mode
+- Fixed S/MIME algo - [#13](https://github.com/hkdb/aerion/issues/13)
+
+
 **v0.1.21 - 02-14-2026**
 ---
 

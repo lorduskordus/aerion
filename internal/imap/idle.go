@@ -57,6 +57,7 @@ type IdleConnection struct {
 	accountName    string
 	config         IdleConfig
 	getCredentials func(accountID string) (*ClientConfig, error)
+	isConnected    func() bool // optional: wait for connectivity before reconnecting
 	log            zerolog.Logger
 
 	// State
@@ -169,6 +170,13 @@ func (ic *IdleConnection) run(ctx context.Context) {
 			ic.log.Debug().Msg("Stop requested, stopping IDLE")
 			return
 		default:
+		}
+
+		// Stop if offline — processNetworkEvents will restart IDLE
+		// when connectivity is restored, avoiding wasteful retries
+		if ic.isConnected != nil && !ic.isConnected() {
+			ic.log.Debug().Msg("Offline, stopping IDLE (will restart when online)")
+			return
 		}
 
 		// Connect if needed
@@ -411,6 +419,7 @@ func (ic *IdleConnection) idleCycle(ctx context.Context) error {
 type IdleManager struct {
 	config         IdleConfig
 	getCredentials func(accountID string) (*ClientConfig, error)
+	isConnected    func() bool // optional: propagated to connections
 	log            zerolog.Logger
 
 	// Connections per account
@@ -435,6 +444,13 @@ func NewIdleManager(config IdleConfig, getCredentials func(accountID string) (*C
 		connections:    make(map[string]*IdleConnection),
 		events:         make(chan MailEvent, 100),
 	}
+}
+
+// SetConnectivityCheck sets a function to check network connectivity.
+// When set, IDLE connections will skip reconnect attempts when offline
+// to avoid wasted connection attempts and unnecessary error logging.
+func (m *IdleManager) SetConnectivityCheck(check func() bool) {
+	m.isConnected = check
 }
 
 // Start starts the IDLE manager
@@ -472,13 +488,22 @@ func (m *IdleManager) StartAccount(accountID, accountName string) {
 	defer m.mu.Unlock()
 
 	// Check if already running
-	if _, exists := m.connections[accountID]; exists {
-		m.log.Debug().Str("account", accountName).Msg("IDLE already running for account")
-		return
+	if conn, exists := m.connections[accountID]; exists {
+		conn.mu.Lock()
+		running := conn.running
+		conn.mu.Unlock()
+		if running {
+			m.log.Debug().Str("account", accountName).Msg("IDLE already running for account")
+			return
+		}
+		// Goroutine exited (e.g., max reconnect attempts reached) — remove stale entry
+		m.log.Debug().Str("account", accountName).Msg("Replacing dead IDLE connection")
+		delete(m.connections, accountID)
 	}
 
 	// Create and start IDLE connection
 	conn := newIdleConnection(accountID, accountName, m.config, m.getCredentials)
+	conn.isConnected = m.isConnected
 	m.connections[accountID] = conn
 
 	m.wg.Add(1)

@@ -166,6 +166,10 @@ func (p *Pool) GetConnection(ctx context.Context, accountID string) (*PooledConn
 	// Wait for a connection, context cancellation, or timeout
 	select {
 	case conn := <-waiter:
+		if conn == nil {
+			// Channel was closed by CloseAccount/CloseAll — pool is being cleared
+			return nil, fmt.Errorf("connection pool closed")
+		}
 		return conn, nil
 	case <-ctx.Done():
 		// Remove ourselves from waiters
@@ -200,6 +204,12 @@ func (p *Pool) GetConnection(ctx context.Context, accountID string) (*PooledConn
 
 // createConnection creates a new connection for an account
 func (p *Pool) createConnection(ctx context.Context, accountID string) (*PooledConnection, error) {
+	return p.createConnectionWithRetry(ctx, accountID, 0)
+}
+
+// createConnectionWithRetry creates a connection with retry logic for transient errors
+// like "max connections exceeded" (server still has ghost connections after network change).
+func (p *Pool) createConnectionWithRetry(ctx context.Context, accountID string, attempt int) (*PooledConnection, error) {
 	p.log.Debug().
 		Str("account", accountID).
 		Msg("Creating new connection")
@@ -232,7 +242,7 @@ func (p *Pool) createConnection(ctx context.Context, accountID string) (*PooledC
 		p.log.Debug().Str("account", accountID).Msg("IMAP connected, logging in")
 		if err := client.Login(); err != nil {
 			p.log.Error().Err(err).Str("account", accountID).Msg("IMAP Login failed")
-			client.Close()
+			client.ForceClose()
 			done <- err
 			return
 		}
@@ -243,13 +253,25 @@ func (p *Pool) createConnection(ctx context.Context, accountID string) (*PooledC
 	select {
 	case err := <-done:
 		if err != nil {
+			// Retry once for "max connections" errors — the server may still
+			// have ghost connections from force-closed sessions (network change).
+			// Wait 15s to give the server time to drop stale connections.
+			if attempt == 0 && strings.Contains(err.Error(), "Maximum number of connections") {
+				p.log.Warn().Str("account", accountID).Msg("Max connections exceeded, retrying after 15s")
+				select {
+				case <-time.After(15 * time.Second):
+					return p.createConnectionWithRetry(ctx, accountID, attempt+1)
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
+			}
 			p.log.Error().Err(err).Str("account", accountID).Msg("Connection failed")
 			return nil, fmt.Errorf("failed to connect: %w", err)
 		}
 	case <-ctx.Done():
 		// Try to close the client if it was created
 		p.log.Warn().Str("account", accountID).Msg("Connection timed out (context cancelled)")
-		go client.Close()
+		go client.ForceClose()
 		return nil, ctx.Err()
 	}
 
@@ -281,10 +303,37 @@ func (p *Pool) Release(conn *PooledConnection) {
 	conn.mu.Lock()
 	conn.inUse = false
 	conn.lastUsed = time.Now()
+	healthy := conn.isHealthyLocked()
 	conn.mu.Unlock()
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	// Verify the connection is still tracked by the pool and healthy before
+	// handing it to a waiter. After CloseAll (sleep), dead connections from
+	// deferred Release calls must not be given to waiters.
+	if !healthy {
+		p.log.Debug().
+			Str("account", conn.accountID).
+			Msg("Released connection is unhealthy, discarding")
+		return
+	}
+
+	inPool := false
+	if conns, ok := p.connections[conn.accountID]; ok {
+		for _, c := range conns {
+			if c == conn {
+				inPool = true
+				break
+			}
+		}
+	}
+	if !inPool {
+		p.log.Debug().
+			Str("account", conn.accountID).
+			Msg("Released connection no longer in pool, discarding")
+		return
+	}
 
 	// Check if anyone is waiting for a connection for this account
 	if waiters, ok := p.waiters[conn.accountID]; ok && len(waiters) > 0 {
@@ -306,6 +355,7 @@ func (p *Pool) Release(conn *PooledConnection) {
 
 // Discard removes a connection from the pool without returning it for reuse.
 // Use this when a connection is known to be dead/unhealthy (e.g., after connection errors).
+// Uses ForceClose to avoid blocking on dead TCP sockets.
 func (p *Pool) Discard(conn *PooledConnection) {
 	if conn == nil {
 		return
@@ -314,10 +364,10 @@ func (p *Pool) Discard(conn *PooledConnection) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// Close the connection
+	// Force-close the connection (known dead, skip graceful logout)
 	conn.mu.Lock()
 	if conn.client != nil {
-		conn.client.Close()
+		conn.client.ForceClose()
 		conn.client = nil
 	}
 	conn.mu.Unlock()
@@ -341,7 +391,8 @@ func (p *Pool) Discard(conn *PooledConnection) {
 		Msg("Discarded dead connection from pool")
 }
 
-// CloseAccount closes all connections for a specific account
+// CloseAccount closes all connections for a specific account.
+// Uses ForceClose to avoid blocking on dead TCP sockets (e.g., after network changes).
 func (p *Pool) CloseAccount(accountID string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -354,7 +405,8 @@ func (p *Pool) CloseAccount(accountID string) {
 	for _, conn := range conns {
 		conn.mu.Lock()
 		if conn.client != nil {
-			conn.client.Close()
+			conn.client.ForceClose()
+			conn.client = nil
 		}
 		conn.mu.Unlock()
 	}
@@ -410,7 +462,7 @@ func (p *Pool) CleanupIdle() {
 			if idle {
 				conn.mu.Lock()
 				if conn.client != nil {
-					conn.client.Close()
+					conn.client.ForceClose()
 				}
 				conn.mu.Unlock()
 				cleaned++

@@ -382,7 +382,10 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 	if err != nil {
 		return fmt.Errorf("failed to get connection: %w", err)
 	}
-	defer e.pool.Release(conn)
+	// Use closure so defer releases the current conn (which may be reassigned during
+	// connection recovery in the header batch loop). A bare defer Release(conn) would
+	// capture the original pointer and leak the replacement connection.
+	defer func() { e.pool.Release(conn) }()
 
 	// Select the mailbox
 	mailbox, err := conn.Client().SelectMailbox(ctx, f.Path)

@@ -114,6 +114,9 @@ func (s *Signer) SignMessage(accountID string, rawMsg []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to create signed data: %w", err)
 	}
 
+	// Use SHA-256 instead of the default SHA-1 (rejected by modern NSS/GnuTLS clients)
+	signedData.SetDigestAlgorithm(pkcs7.OIDDigestAlgorithmSHA256)
+
 	// Add the signer with the certificate chain
 	if err := signedData.AddSigner(certs[0], signer, pkcs7.SignerInfoConfig{}); err != nil {
 		return nil, fmt.Errorf("failed to add signer: %w", err)

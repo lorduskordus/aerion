@@ -170,14 +170,23 @@ class AccountStore {
       }
     })
 
-    // Track online/offline status using browser API
+    // Track online/offline status using browser API + backend connectivity events
     this.isOnline = navigator.onLine
-    
+
     window.addEventListener('online', () => {
       this.isOnline = true
     })
 
     window.addEventListener('offline', () => {
+      this.isOnline = false
+    })
+
+    // Backend connectivity detection (wake from sleep IMAP reachability check)
+    EventsOn('network:online', () => {
+      this.isOnline = true
+    })
+
+    EventsOn('network:offline', () => {
       this.isOnline = false
     })
   }

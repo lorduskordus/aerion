@@ -63,6 +63,17 @@
   </provides>
 
   <releases>
+    <release version="0.1.22" date="2026-02-16">
+      <description>
+        <ul>
+          <li>Fixed wake from sleep flow - #17</li>
+          <li>Added proper network state monitoring</li>
+          <li>Improved wake, scheduled syncs, idle, and status logic with net state</li>
+          <li>Added proper logic for offline mode</li>
+          <li>Fixed S/MIME algo - #13</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.21" date="2026-02-14">
       <description>
         <ul>

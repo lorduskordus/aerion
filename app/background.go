@@ -47,6 +47,11 @@ func (a *App) initBackgroundSync(ctx context.Context) {
 		}
 	})
 
+	// Wire up network connectivity check so scheduler skips ticks when offline
+	if a.networkMonitor != nil {
+		a.syncScheduler.SetConnectivityCheck(a.networkMonitor.IsConnected)
+	}
+
 	// Start the polling scheduler
 	a.syncScheduler.Start(ctx)
 	log.Info().Msg("Email sync scheduler started")
@@ -54,16 +59,25 @@ func (a *App) initBackgroundSync(ctx context.Context) {
 	// Initialize the IDLE manager for real-time push notifications
 	idleConfig := imap.DefaultIdleConfig()
 	a.idleManager = imap.NewIdleManager(idleConfig, a.getIMAPCredentials)
+
+	// Wire up network connectivity check so IDLE skips reconnects when offline
+	if a.networkMonitor != nil {
+		a.idleManager.SetConnectivityCheck(a.networkMonitor.IsConnected)
+	}
+
 	a.idleManager.Start(ctx)
 
-	// Start IDLE for all enabled accounts
-	accounts, err := a.accountStore.List()
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to list accounts for IDLE")
-	} else {
-		for _, acc := range accounts {
-			if acc.Enabled {
-				a.idleManager.StartAccount(acc.ID, acc.Name)
+	// Start IDLE for all enabled accounts if online.
+	// If offline, processNetworkEvents will start them when connectivity is restored.
+	if a.networkMonitor == nil || a.networkMonitor.IsConnected() {
+		accounts, err := a.accountStore.List()
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to list accounts for IDLE")
+		} else {
+			for _, acc := range accounts {
+				if acc.Enabled {
+					a.idleManager.StartAccount(acc.ID, acc.Name)
+				}
 			}
 		}
 	}
@@ -364,6 +378,67 @@ func (a *App) initNotifications(ctx context.Context) {
 }
 
 // ============================================================================
+// Network Connectivity Monitoring
+// ============================================================================
+
+// initNetworkMonitor initializes the network connectivity monitor.
+// This runs for the app's lifetime, providing event-driven (zero polling)
+// connectivity state that other components can use to avoid wasted operations.
+func (a *App) initNetworkMonitor(ctx context.Context) {
+	log := logging.WithComponent("app.network")
+
+	a.networkMonitor = platform.NewNetworkMonitor()
+
+	if err := a.networkMonitor.Start(ctx); err != nil {
+		log.Warn().Err(err).Msg("Failed to start network monitor — assuming online")
+		return
+	}
+
+	// Process connectivity change events in background
+	go a.processNetworkEvents(ctx)
+
+	log.Info().Msg("Network connectivity monitor initialized")
+}
+
+// processNetworkEvents handles network connectivity changes:
+// offline → stop IDLE, clear pool, notify frontend
+// online  → clear stale connections, full sync, restart IDLE, notify frontend
+func (a *App) processNetworkEvents(ctx context.Context) {
+	log := logging.WithComponent("app.network")
+
+	if a.networkMonitor == nil {
+		return
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case event, ok := <-a.networkMonitor.Events():
+			if !ok {
+				return
+			}
+
+			if event.Connected {
+				log.Info().Msg("Network connectivity restored — starting full sync")
+				wailsRuntime.EventsEmit(a.ctx, "network:online", nil)
+				a.syncAfterWake()
+			} else {
+				log.Info().Msg("Network connectivity lost — stopping IDLE and clearing pool")
+				wailsRuntime.EventsEmit(a.ctx, "network:offline", nil)
+
+				if a.idleManager != nil {
+					a.idleManager.Stop()
+				}
+				if a.imapPool != nil {
+					a.imapPool.CloseAll()
+				}
+			}
+		}
+	}
+}
+
+// ============================================================================
 // Sleep/Wake Detection for Auto-Sync
 // ============================================================================
 
@@ -426,24 +501,106 @@ func (a *App) handleSystemSleep() {
 		a.imapPool.CloseAll()
 	}
 
+	// Invalidate the network monitor's cached state so WaitForConnection
+	// will wait for a fresh signal on wake instead of returning immediately
+	if a.networkMonitor != nil {
+		a.networkMonitor.Invalidate()
+	}
+
 	log.Info().Msg("IMAP connections closed for sleep")
 }
 
 // handleSystemWake handles system waking from sleep
-// Waits for network, restarts IDLE connections, and syncs all accounts
+// Waits for network via the network monitor, then syncs all accounts and restarts IDLE
 func (a *App) handleSystemWake() {
 	log := logging.WithComponent("app.sleep-wake")
 	log.Info().Msg("System woke from sleep - waiting for network...")
 
-	// Wait for network to be available (3 seconds)
-	time.Sleep(sleepWakeSyncDelay)
+	// NOTE: We intentionally do NOT call Invalidate() or CloseAll() here.
+	// handleSystemSleep already did both. Calling them here would race with
+	// portal signals that may have already arrived and triggered a sync via
+	// processNetworkEvents — Invalidate would reset connected=false after
+	// the portal set it to true, and CloseAll would kill in-progress sync
+	// connections.
 
-	log.Info().Msg("Restarting IDLE connections and syncing all accounts")
+	// Wait for network connectivity (event-driven, no polling).
+	// Use a 30-second timeout so we don't block forever if network never comes up.
+	// The network monitor will trigger a sync via processNetworkEvents if
+	// connectivity is restored later.
+	waitCtx, waitCancel := context.WithTimeout(a.ctx, 30*time.Second)
+	defer waitCancel()
+
+	if a.networkMonitor == nil || !a.networkMonitor.WaitForConnection(waitCtx) {
+		log.Warn().Msg("Network not available after wake — deferring to network monitor / scheduler")
+		return
+	}
+
+	wailsRuntime.EventsEmit(a.ctx, "network:online", nil)
+	log.Info().Msg("Network available — syncing all accounts after wake")
+	a.syncAfterWake()
+}
+
+// syncAfterWake performs the post-wake sync: updates LastSync, runs SyncAllComplete,
+// then restarts IDLE. Called from handleSystemWake and from processNetworkEvents
+// when connectivity is restored. Both paths may fire on the same wake event
+// (sleep/wake monitor + network online signal), so the guard ensures only one
+// sync actually runs.
+func (a *App) syncAfterWake() {
+	log := logging.WithComponent("app.sleep-wake")
+
+	// Guard: only one syncAfterWake can run at a time.
+	// Both handleSystemWake and processNetworkEvents may call this for the
+	// same wake event — the first caller runs, the second returns immediately.
+	a.syncMu.Lock()
+	if a.wakeSyncing {
+		a.syncMu.Unlock()
+		log.Debug().Msg("syncAfterWake already in progress, skipping")
+		return
+	}
+	a.wakeSyncing = true
+	a.syncMu.Unlock()
+
+	// Cooldown: skip sync if any inbox was synced within the last 2 minutes.
+	// This prevents excessive syncs when the network flaps.
+	// IDLE is always restarted regardless of cooldown since handleSystemSleep
+	// stops all IDLE connections.
+	const syncCooldown = 2 * time.Minute
+	skipSync := false
+	accounts, err := a.accountStore.List()
+	if err == nil {
+		for _, acc := range accounts {
+			if !acc.Enabled {
+				continue
+			}
+			inbox, err := a.folderStore.GetByType(acc.ID, folder.TypeInbox)
+			if err == nil && inbox != nil && inbox.LastSync != nil {
+				if time.Since(*inbox.LastSync) < syncCooldown {
+					log.Info().Str("account", acc.Name).Msg("Skipping full sync — last sync was recent")
+					skipSync = true
+					break
+				}
+			}
+		}
+	}
+
+	if skipSync {
+		// Still restart IDLE even though we're skipping the sync
+		a.restartIDLE()
+		a.syncMu.Lock()
+		a.wakeSyncing = false
+		a.syncMu.Unlock()
+		return
+	}
+
+	// Clear stale pool connections in case old goroutines created some
+	if a.imapPool != nil {
+		a.imapPool.CloseAll()
+	}
 
 	// Update LastSync on all inbox folders BEFORE starting sync
 	// This prevents the scheduler from thinking sync is overdue and interfering
 	now := time.Now()
-	accounts, err := a.accountStore.List()
+	accounts, err = a.accountStore.List()
 	if err == nil {
 		for _, acc := range accounts {
 			if !acc.Enabled {
@@ -459,31 +616,51 @@ func (a *App) handleSystemWake() {
 		}
 	}
 
-	// Restart IDLE manager
-	if a.idleManager != nil {
-		a.idleManager.Start(a.ctx)
-
-		// Restart IDLE for all enabled accounts
-		accounts, err := a.accountStore.List()
-		if err == nil {
-			for _, acc := range accounts {
-				if acc.Enabled {
-					a.idleManager.StartAccount(acc.ID, acc.Name)
-				}
-			}
-			log.Info().Int("accounts", len(accounts)).Msg("IDLE restarted for accounts")
-		}
-	}
-
-	// Trigger master sync for all accounts (same as manual sync button)
-	// Run in goroutine since SyncAllComplete is blocking
+	// Trigger master sync for all accounts, then restart IDLE after.
+	// IDLE is restarted AFTER sync completes to avoid pool contention:
+	// IDLE detects new mail immediately and triggers its own SyncMessages +
+	// FetchBodiesInBackground, consuming pool connections that SyncAllComplete
+	// also needs (max 3 per account), causing 2+ minute waiter timeouts.
 	go func() {
+		defer func() {
+			a.syncMu.Lock()
+			a.wakeSyncing = false
+			a.syncMu.Unlock()
+		}()
+
 		if err := a.SyncAllComplete(); err != nil {
 			log.Warn().Err(err).Msg("Post-wake sync encountered errors")
 		} else {
 			log.Info().Msg("Post-wake sync completed successfully")
 		}
+
+		// Now restart IDLE for real-time push notifications going forward
+		a.restartIDLE()
 	}()
 
 	log.Info().Msg("Post-wake sync triggered for all accounts")
+}
+
+// restartIDLE restarts IDLE connections for all enabled accounts.
+func (a *App) restartIDLE() {
+	log := logging.WithComponent("app.sleep-wake")
+
+	if a.idleManager == nil {
+		return
+	}
+
+	a.idleManager.Start(a.ctx)
+
+	accounts, err := a.accountStore.List()
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to list accounts for IDLE restart")
+		return
+	}
+
+	for _, acc := range accounts {
+		if acc.Enabled {
+			a.idleManager.StartAccount(acc.ID, acc.Name)
+		}
+	}
+	log.Info().Int("accounts", len(accounts)).Msg("IDLE restarted for accounts")
 }

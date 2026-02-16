@@ -126,10 +126,15 @@ type App struct {
 	// Sync management - tracks active syncs per account for cancel-and-restart
 	syncContexts    map[string]context.CancelFunc // keyed by "accountID:folderID"
 	syncLastRequest map[string]time.Time          // last sync request time for debounce
+	syncCancelled   bool                          // set by CancelAllSyncs to stop SyncAllComplete loop
+	wakeSyncing     bool                          // guards syncAfterWake against concurrent calls
 	syncMu          goSync.Mutex                  // protects sync maps
 
 	// Sleep/wake detection for auto-sync on wake
 	sleepWakeMonitor platform.SleepWakeMonitor
+
+	// Network connectivity monitoring (event-driven, zero polling)
+	networkMonitor platform.NetworkMonitor
 
 	// System theme detection (XDG Settings Portal on Linux)
 	themeMonitor platform.ThemeMonitor
@@ -281,6 +286,11 @@ func (a *App) Startup(ctx context.Context) {
 	a.carddavSyncer = carddav.NewSyncer(a.carddavStore, a.credStore)
 	a.carddavScheduler = carddav.NewScheduler(a.carddavSyncer, a.carddavStore)
 
+	// Wire up network connectivity check so CardDAV scheduler skips ticks when offline
+	if a.networkMonitor != nil {
+		a.carddavScheduler.SetConnectivityCheck(a.networkMonitor.IsConnected)
+	}
+
 	// Set up access token getters for OAuth contact sources
 	a.carddavSyncer.SetAccessTokenGetters(
 		// Account token getter - for sources linked to email accounts
@@ -328,6 +338,11 @@ func (a *App) Startup(ctx context.Context) {
 
 	// Initialize IPC for multi-window support
 	a.initIPC(ctx)
+
+	// Initialize network connectivity monitor (event-driven, zero polling).
+	// Must be initialized before background sync so scheduler and IDLE
+	// can use it to skip operations when offline.
+	a.initNetworkMonitor(ctx)
 
 	// Initialize and start background email sync (polling + IDLE)
 	a.initBackgroundSync(ctx)
@@ -464,6 +479,12 @@ func (a *App) Shutdown(ctx context.Context) {
 	if a.sleepWakeMonitor != nil {
 		a.sleepWakeMonitor.Stop()
 		log.Info().Msg("Sleep/wake monitor stopped")
+	}
+
+	// Stop network monitor
+	if a.networkMonitor != nil {
+		a.networkMonitor.Stop()
+		log.Info().Msg("Network monitor stopped")
 	}
 
 	// Stop theme monitor

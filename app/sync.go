@@ -199,6 +199,14 @@ func (a *App) SyncAccountComplete(accountID string) error {
 	log := logging.WithComponent("app.masterSync")
 	log.Info().Str("accountID", accountID).Msg("Starting complete account sync")
 
+	// Check if sync was cancelled before starting
+	a.syncMu.Lock()
+	cancelled := a.syncCancelled
+	a.syncMu.Unlock()
+	if cancelled {
+		return fmt.Errorf("sync cancelled")
+	}
+
 	// 1. Sync folder list first (required for message sync)
 	if err := a.SyncFolders(accountID); err != nil {
 		return fmt.Errorf("folder sync failed: %w", err)
@@ -213,6 +221,15 @@ func (a *App) SyncAccountComplete(accountID string) error {
 
 	var syncErrors []string
 	for _, folderType := range coreFolderTypes {
+		// Check if sync was cancelled between folders
+		a.syncMu.Lock()
+		cancelled := a.syncCancelled
+		a.syncMu.Unlock()
+		if cancelled {
+			log.Info().Str("accountID", accountID).Msg("Sync cancelled, stopping folder loop")
+			return fmt.Errorf("sync cancelled")
+		}
+
 		log.Debug().Str("type", string(folderType)).Msg("Looking for special folder")
 		f, err := a.GetSpecialFolder(accountID, folderType)
 		if err != nil {
@@ -246,6 +263,36 @@ func (a *App) SyncAccountComplete(accountID string) error {
 // This is the master sync function called from the sidebar sync button.
 func (a *App) SyncAllComplete() error {
 	log := logging.WithComponent("app.masterSync")
+
+	// Reset cancellation flag for this sync run
+	a.syncMu.Lock()
+	a.syncCancelled = false
+	a.syncMu.Unlock()
+
+	// Skip if we know we're offline — avoids connection errors and the
+	// error indicator that would appear on the sidebar account menu.
+	// Emit folder:synced for each account so the frontend clears its
+	// syncing state (otherwise it stays stuck on the spinner).
+	if a.networkMonitor != nil && !a.networkMonitor.IsConnected() {
+		log.Info().Msg("Skipping complete sync — offline")
+		accounts, listErr := a.accountStore.List()
+		if listErr == nil {
+			for _, acc := range accounts {
+				if !acc.Enabled {
+					continue
+				}
+				inbox, inboxErr := a.folderStore.GetByType(acc.ID, folder.TypeInbox)
+				if inboxErr == nil && inbox != nil {
+					wailsRuntime.EventsEmit(a.ctx, "folder:synced", map[string]interface{}{
+						"accountId": acc.ID,
+						"folderId":  inbox.ID,
+					})
+				}
+			}
+		}
+		return nil
+	}
+
 	log.Info().Msg("Starting complete sync of all accounts and contacts")
 
 	accounts, err := a.accountStore.List()
@@ -261,6 +308,16 @@ func (a *App) SyncAllComplete() error {
 		if !acc.Enabled {
 			continue
 		}
+
+		// Check if sync was cancelled between accounts
+		a.syncMu.Lock()
+		cancelled := a.syncCancelled
+		a.syncMu.Unlock()
+		if cancelled {
+			log.Info().Msg("Sync cancelled, stopping account loop")
+			break
+		}
+
 		if err := a.SyncAccountComplete(acc.ID); err != nil {
 			errors = append(errors, fmt.Sprintf("%s: %v", acc.Email, err))
 			// Continue with other accounts
@@ -269,9 +326,19 @@ func (a *App) SyncAllComplete() error {
 
 	// Then: Sync CardDAV contacts (after email sync completes)
 	// This avoids SQLITE_BUSY errors from concurrent writes
-	if err := a.SyncAllContactSources(); err != nil {
-		errors = append(errors, fmt.Sprintf("contacts: %v", err))
+	a.syncMu.Lock()
+	cancelled := a.syncCancelled
+	a.syncMu.Unlock()
+	if !cancelled {
+		if err := a.SyncAllContactSources(); err != nil {
+			errors = append(errors, fmt.Sprintf("contacts: %v", err))
+		}
 	}
+
+	// Restart IDLE connections — they may have died during network changes
+	// or exhausted their reconnect attempts. StartAccount is a no-op for
+	// accounts that already have a healthy IDLE connection.
+	a.restartIDLE()
 
 	if len(errors) > 0 {
 		return fmt.Errorf("sync errors: %s", strings.Join(errors, "; "))
@@ -310,17 +377,32 @@ func (a *App) CancelAccountSync(accountID string) {
 			delete(a.syncContexts, key)
 		}
 	}
+
 }
 
-// CancelAllSyncs cancels all running syncs
+// CancelAllSyncs cancels all running syncs and force-closes pool connections.
+// Force-closing is needed because context cancellation cannot interrupt blocked
+// TCP reads on dead sockets (e.g., after network changes). ForceClose kills the
+// sockets immediately so goroutines unblock and emit folder:synced events.
 func (a *App) CancelAllSyncs() {
 	log := logging.WithComponent("app")
 	a.syncMu.Lock()
-	defer a.syncMu.Unlock()
+
+	// Set cancellation flag so SyncAllComplete/SyncAccountComplete loops stop
+	a.syncCancelled = true
 
 	for syncKey, cancel := range a.syncContexts {
 		log.Info().Str("syncKey", syncKey).Msg("Cancelling sync")
 		cancel()
 	}
 	a.syncContexts = make(map[string]context.CancelFunc)
+
+	a.syncMu.Unlock()
+
+	// Force-close all pool connections to unblock goroutines stuck on dead
+	// TCP sockets. This uses ForceClose (no graceful logout) so it returns
+	// instantly even if connections are unresponsive.
+	if a.imapPool != nil {
+		a.imapPool.CloseAll()
+	}
 }

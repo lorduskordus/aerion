@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"os/exec"
-	"time"
 
 	"github.com/hkdb/aerion/internal/folder"
 	"github.com/hkdb/aerion/internal/ipc"
@@ -308,6 +307,3 @@ func (a *App) GetConnectedComposers() int {
 	}
 	return len(a.ipcServer.Clients())
 }
-
-// sleepWakeSyncDelay is the delay after system wake before starting sync
-const sleepWakeSyncDelay = 3 * time.Second

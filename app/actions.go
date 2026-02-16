@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -378,8 +379,13 @@ func (a *App) MoveToFolder(messageIDs []string, destFolderID string) error {
 		}
 	}()
 
-	// Sync to IMAP in background (COPY + DELETE), then sync destination to get correct UIDs
+	// Sync to IMAP in background (COPY + DELETE), then sync destination to get correct UIDs.
+	// Use a timeout context so this goroutine doesn't persist through sleep/wake cycles
+	// holding pool connections indefinitely.
 	go func() {
+		moveCtx, moveCancel := context.WithTimeout(a.ctx, 5*time.Minute)
+		defer moveCancel()
+
 		for sourceFolderID, msgs := range byFolder {
 			if err := a.moveMessagesToIMAP(msgs, sourceFolderID, destFolder); err != nil {
 				log.Error().Err(err).
@@ -396,10 +402,10 @@ func (a *App) MoveToFolder(messageIDs []string, destFolderID string) error {
 			if acc, err := a.accountStore.Get(messages[0].AccountID); err == nil && acc != nil {
 				syncPeriodDays = acc.SyncPeriodDays
 			}
-			if err := a.syncEngine.SyncMessages(a.ctx, messages[0].AccountID, destFolderID, syncPeriodDays); err != nil {
+			if err := a.syncEngine.SyncMessages(moveCtx, messages[0].AccountID, destFolderID, syncPeriodDays); err != nil {
 				log.Warn().Err(err).Str("destFolderID", destFolderID).Msg("Failed to sync destination folder after move")
 			}
-			if err := a.syncEngine.FetchBodiesInBackground(a.ctx, messages[0].AccountID, destFolderID, syncPeriodDays); err != nil {
+			if err := a.syncEngine.FetchBodiesInBackground(moveCtx, messages[0].AccountID, destFolderID, syncPeriodDays); err != nil {
 				log.Warn().Err(err).Str("destFolderID", destFolderID).Msg("Failed to fetch bodies for destination folder after move")
 			}
 			wailsRuntime.EventsEmit(a.ctx, "folder:synced", map[string]interface{}{
