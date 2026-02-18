@@ -13,6 +13,8 @@ These shortcuts work anywhere in the application (unless in composer).
 | `Ctrl+Q` | Quit application |
 | `Ctrl+N` | Compose new message |
 | `Ctrl+S` | Focus search bar |
+| `Ctrl+Shift+A` | Sync all accounts |
+| `Ctrl+Shift+S` | Sync selected folder |
 
 ### Pane Navigation
 
@@ -56,8 +58,8 @@ These shortcuts depend on which pane is focused. They are disabled when typing i
 |----------|--------|
 | `Up` / `K` | Navigate to previous folder |
 | `Down` / `J` | Navigate to next folder |
-| `Enter` / `Space` | Expand/collapse account (when account header is focused) |
-| `Alt(R)` | Brings up context menu for the focused folder |
+| `Alt + Enter` / `Space` | Expand/collapse account (when account header is focused) |
+| `Alt(L) + Alt(R)` | Brings up context menu for the focused folder |
 
 ### Message List
 
@@ -112,6 +114,17 @@ These only work when the composer is open.
 
 ---
 
+### Text Formatting
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+B` | Bold |
+| `Ctrl+I` | Italic |
+| `Ctrl+U` | Underline |
+| `Alt+T`  | Toggle toolbar and follow hint to choose |
+
+---
+
 ## Quick Reference Card
 
 ```
@@ -131,6 +144,7 @@ COMPOSE & REPLY
   Ctrl + F            Forward
   Ctrl + Enter        Send (in composer)
   Ctrl + D            Detach composer
+  Alt  + T            Toggle format toolbar mode
   Alt + P             PGP mode (S/E to toggle sign/encrypt)
   Alt + S             S/MIME mode (S/E to toggle sign/encrypt)
 
@@ -148,6 +162,8 @@ MESSAGE ACTIONS
   Alt(R)              Context Menu
 
 OTHER
+  Ctrl + Shift + A    Sync all accounts
+  Ctrl + Shift + S    Sync selected folder
   Ctrl + S            Search
   Ctrl + L            Load images
   Ctrl + Q            Quit
