@@ -5,6 +5,7 @@
   import { getCached, setCache } from '../../stores/inlineAttachmentCache'
   import { setFocusedPane, focusPreviousPane, focusNextPane } from '$lib/stores/keyboard.svelte'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
+  import { _ } from '$lib/i18n'
 
   interface Props {
     messageId: string
@@ -580,7 +581,7 @@ ${processedHtml}
     {#if hasRemoteImages && imagesBlocked}
       <div class="flex items-center gap-2 px-3 py-2 mb-3 rounded-md bg-yellow-500/10 border border-yellow-500/30 text-sm">
         <Icon icon="mdi:image-off" class="w-4 h-4 text-yellow-600 flex-shrink-0" />
-        <span class="text-yellow-700 dark:text-yellow-400">Remote images are blocked for privacy.</span>
+        <span class="text-yellow-700 dark:text-yellow-400">{$_('viewer.remoteImagesBlocked')}</span>
 
         <div class="ml-auto flex items-center gap-1">
           <!-- Load Images button -->
@@ -588,7 +589,7 @@ ${processedHtml}
             class="px-2 py-1 text-xs font-medium rounded bg-yellow-600 text-white hover:bg-yellow-700 transition-colors"
             onclick={loadImages}
           >
-            Load Images
+            {$_('viewer.loadImages')}
           </button>
 
           <!-- Always Load dropdown -->
@@ -597,17 +598,17 @@ ${processedHtml}
               <DropdownMenu.Trigger
                 class="px-2 py-1 text-xs font-medium rounded bg-yellow-600 text-white hover:bg-yellow-700 transition-colors flex items-center gap-1"
               >
-                Always Load
+                {$_('viewer.alwaysLoad')}
                 <Icon icon="mdi:chevron-down" class="w-3 h-3" />
               </DropdownMenu.Trigger>
               <DropdownMenu.Content align="end">
                 <DropdownMenu.Item onSelect={handleAlwaysLoadDomain}>
                   <Icon icon="mdi:domain" class="w-4 h-4 mr-2" />
-                  For {extractDomain(fromEmail) || 'this domain'}
+                  {$_('viewer.forDomain', { values: { domain: extractDomain(fromEmail) || 'this domain' } })}
                 </DropdownMenu.Item>
                 <DropdownMenu.Item onSelect={handleAlwaysLoadSender}>
                   <Icon icon="mdi:account" class="w-4 h-4 mr-2" />
-                  For {fromEmail}
+                  {$_('viewer.forSender', { values: { email: fromEmail } })}
                 </DropdownMenu.Item>
               </DropdownMenu.Content>
             </DropdownMenu.Root>
@@ -618,7 +619,7 @@ ${processedHtml}
 
     <iframe
       bind:this={iframeElement}
-      title="Email content"
+      title={$_('aria.emailContent')}
       sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
       class="w-full border-0 rounded-md bg-white min-h-[100px]"
       style="height: 200px;"
@@ -628,7 +629,7 @@ ${processedHtml}
       {@html linkifyText(bodyText)}
     </div>
   {:else}
-    <p class="text-muted-foreground italic">No content available</p>
+    <p class="text-muted-foreground italic">{$_('viewer.noContent')}</p>
   {/if}
 
   <!-- Link hover tooltip -->
@@ -653,14 +654,14 @@ ${processedHtml}
         onclick={copyLinkToClipboard}
       >
         <Icon icon="mdi:content-copy" class="w-4 h-4" />
-        Copy Link
+        {$_('viewer.copyLink')}
       </button>
       <button
         class="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
         onclick={() => linkContextMenuVisible = false}
       >
         <Icon icon="mdi:close" class="w-4 h-4" />
-        Cancel
+        {$_('common.cancel')}
       </button>
     </div>
   {/if}
@@ -671,7 +672,7 @@ ${processedHtml}
   <button
     type="button"
     class="fixed inset-0 z-40 cursor-default"
-    aria-label="Close context menu"
+    aria-label={$_('aria.closeContextMenu')}
     onclick={() => linkContextMenuVisible = false}
     onkeydown={(e) => { if (e.key === 'Escape') linkContextMenuVisible = false }}
   ></button>

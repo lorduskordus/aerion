@@ -20,6 +20,10 @@ const (
 	KeyThemeMode                 = "theme_mode"
 	KeyShowTitleBar              = "show_title_bar"
 	KeyTermsAccepted             = "terms_accepted"
+	KeyRunBackground             = "run_background"
+	KeyStartHidden               = "start_hidden"
+	KeyAutostart                 = "autostart"
+	KeyLanguage                  = "language"
 )
 
 // Density values for message list
@@ -258,4 +262,69 @@ func (s *Store) SetTermsAccepted(accepted bool) error {
 		value = "true"
 	}
 	return s.Set(KeyTermsAccepted, value)
+}
+
+// GetRunBackground returns whether Aerion should keep running when the window is closed
+func (s *Store) GetRunBackground() (bool, error) {
+	value, err := s.Get(KeyRunBackground)
+	if err != nil {
+		return false, err
+	}
+	return value == "true", nil
+}
+
+// SetRunBackground sets whether Aerion should keep running when the window is closed
+func (s *Store) SetRunBackground(enabled bool) error {
+	value := "false"
+	if enabled {
+		value = "true"
+	}
+	return s.Set(KeyRunBackground, value)
+}
+
+// GetStartHidden returns whether Aerion should start with the window hidden
+func (s *Store) GetStartHidden() (bool, error) {
+	value, err := s.Get(KeyStartHidden)
+	if err != nil {
+		return false, err
+	}
+	return value == "true", nil
+}
+
+// SetStartHidden sets whether Aerion should start with the window hidden
+func (s *Store) SetStartHidden(enabled bool) error {
+	value := "false"
+	if enabled {
+		value = "true"
+	}
+	return s.Set(KeyStartHidden, value)
+}
+
+// GetAutostart returns whether Aerion should start on login
+func (s *Store) GetAutostart() (bool, error) {
+	value, err := s.Get(KeyAutostart)
+	if err != nil {
+		return false, err
+	}
+	return value == "true", nil
+}
+
+// SetAutostart sets whether Aerion should start on login
+func (s *Store) SetAutostart(enabled bool) error {
+	value := "false"
+	if enabled {
+		value = "true"
+	}
+	return s.Set(KeyAutostart, value)
+}
+
+// GetLanguage returns the saved language preference (locale code)
+// Returns empty string if not set (frontend uses system detection)
+func (s *Store) GetLanguage() (string, error) {
+	return s.Get(KeyLanguage)
+}
+
+// SetLanguage sets the language preference (locale code, e.g. "en", "zh-TW", "zh-CN")
+func (s *Store) SetLanguage(language string) error {
+	return s.Set(KeyLanguage, language)
 }

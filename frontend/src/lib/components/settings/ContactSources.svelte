@@ -7,6 +7,8 @@
   import { addToast } from '$lib/stores/toast'
   import ContactSourceDialog from './ContactSourceDialog.svelte'
   import { formatDistanceToNow } from 'date-fns'
+  import { _ } from '$lib/i18n'
+  import { getCurrentDateFnsLocale } from '$lib/stores/settings.svelte'
   // @ts-ignore - wailsjs path
   import type { carddav } from '../../../../wailsjs/go/models'
 
@@ -25,11 +27,11 @@
   })
 
   function formatLastSync(source: carddav.Source): string {
-    if (!source.last_synced_at) return 'Never synced'
+    if (!source.last_synced_at) return $_('contactSource.neverSynced')
     try {
-      return `Synced ${formatDistanceToNow(new Date(source.last_synced_at), { addSuffix: true })}`
+      return $_('contactSource.syncedAgo', { values: { time: formatDistanceToNow(new Date(source.last_synced_at), { addSuffix: true, locale: getCurrentDateFnsLocale() }) } })
     } catch {
-      return 'Never synced'
+      return $_('contactSource.neverSynced')
     }
   }
 
@@ -37,9 +39,9 @@
     syncingSourceId = sourceId
     try {
       await contactSourcesStore.syncSource(sourceId)
-      addToast({ type: 'success', message: 'Contact source synced' })
+      addToast({ type: 'success', message: $_('toast.contactSourceSynced') })
     } catch (err) {
-      addToast({ type: 'error', message: `Sync failed: ${err}` })
+      addToast({ type: 'error', message: $_('toast.syncFailed', { values: { error: err instanceof Error ? err.message : String(err) } }) })
     } finally {
       syncingSourceId = null
     }
@@ -55,11 +57,11 @@
     isDeleting = true
     try {
       await contactSourcesStore.deleteSource(deletingSource.id)
-      addToast({ type: 'success', message: 'Contact source deleted' })
+      addToast({ type: 'success', message: $_('toast.contactSourceDeleted') })
       showDeleteConfirm = false
       deletingSource = null
     } catch (err) {
-      addToast({ type: 'error', message: `Failed to delete: ${err}` })
+      addToast({ type: 'error', message: $_('toast.failedToDeleteContactSource', { values: { error: err instanceof Error ? err.message : String(err) } }) })
     } finally {
       isDeleting = false
     }
@@ -90,7 +92,7 @@
 <div class="space-y-4">
   <h3 class="text-sm font-medium flex items-center gap-2">
     <Icon icon="mdi:contacts-outline" class="w-4 h-4" />
-    Contact Sources
+    {$_('contactSource.title')}
   </h3>
 
   {#if contactSourcesStore.loading}
@@ -99,10 +101,10 @@
     </div>
   {:else if contactSourcesStore.sources.length === 0}
     <div class="text-sm text-muted-foreground py-4 text-center">
-      <p class="mb-3">No contact sources configured</p>
+      <p class="mb-3">{$_('contactSource.noSources')}</p>
       <Button size="sm" onclick={openAdd}>
         <Icon icon="mdi:plus" class="w-4 h-4 mr-1" />
-        Add Contact Source
+        {$_('contactSource.addSource')}
       </Button>
     </div>
   {:else}
@@ -122,7 +124,7 @@
                   <span class="capitalize">{source.type}</span>
                   {#if source.account_id}
                     <span class="text-muted-foreground/50">·</span>
-                    <span class="text-muted-foreground/80">linked</span>
+                    <span class="text-muted-foreground/80">{$_('contactSource.linked')}</span>
                   {/if}
                 </div>
               </div>
@@ -137,7 +139,7 @@
             <div class="flex items-start gap-2 p-2 bg-destructive/10 rounded text-sm">
               <Icon icon="mdi:alert-circle" class="w-4 h-4 text-destructive shrink-0 mt-0.5" />
               <div class="flex-1">
-                <div class="text-destructive font-medium">Sync failed</div>
+                <div class="text-destructive font-medium">{$_('contactSource.syncFailed')}</div>
                 <div class="text-xs text-muted-foreground">{source.last_error}</div>
               </div>
             </div>
@@ -156,15 +158,15 @@
               {:else}
                 <Icon icon="mdi:sync" class="w-4 h-4 mr-1" />
               {/if}
-              {source.last_error ? 'Retry' : 'Sync'}
+              {source.last_error ? $_('common.retry') : $_('common.sync')}
             </Button>
             <Button size="sm" variant="ghost" onclick={() => openEdit(source)}>
               <Icon icon="mdi:pencil" class="w-4 h-4 mr-1" />
-              Edit
+              {$_('common.edit')}
             </Button>
             <Button size="sm" variant="ghost" class="text-destructive hover:text-destructive" onclick={() => handleDelete(source)}>
               <Icon icon="mdi:delete" class="w-4 h-4 mr-1" />
-              Delete
+              {$_('common.delete')}
             </Button>
           </div>
         </div>
@@ -173,7 +175,7 @@
       <!-- Add button -->
       <Button size="sm" variant="outline" class="w-full" onclick={openAdd}>
         <Icon icon="mdi:plus" class="w-4 h-4 mr-1" />
-        Add Contact Source
+        {$_('contactSource.addSource')}
       </Button>
     </div>
   {/if}
@@ -189,10 +191,10 @@
 <!-- Delete Confirmation Dialog -->
 <ConfirmDialog
   bind:open={showDeleteConfirm}
-  title="Delete Contact Source"
-  description={`Delete "${deletingSource?.name}"? This will remove all synced contacts from this source.`}
-  confirmLabel="Delete"
-  cancelLabel="Cancel"
+  title={$_('contactSource.deleteTitle')}
+  description={$_('contactSource.deleteConfirmName', { values: { name: deletingSource?.name || '' } })}
+  confirmLabel={$_('common.delete')}
+  cancelLabel={$_('common.cancel')}
   variant="destructive"
   loading={isDeleting}
   onConfirm={confirmDelete}

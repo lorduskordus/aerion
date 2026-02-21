@@ -9,6 +9,7 @@
   import { EventsOn, EventsOff } from '../../../../wailsjs/runtime/runtime'
 import { onDestroy, tick } from 'svelte'
 import { fade } from 'svelte/transition'
+import { _ } from '$lib/i18n'
 
   interface Props {
     messageId?: string | null
@@ -189,7 +190,7 @@ import { fade } from 'svelte/transition'
     <!-- No message selected -->
     <div class="flex flex-col items-center justify-center h-full text-muted-foreground">
       <Icon icon="mdi:email-open-outline" class="w-16 h-16 mb-4" />
-      <p class="text-lg">Select a message to read</p>
+      <p class="text-lg">{$_('viewer.selectConversation')}</p>
     </div>
   {:else if loading}
     <!-- Loading -->
@@ -200,13 +201,13 @@ import { fade } from 'svelte/transition'
     <!-- Error -->
     <div class="flex flex-col items-center justify-center h-full text-center px-4">
       <Icon icon="mdi:alert-circle-outline" class="w-12 h-12 text-destructive mb-3" />
-      <p class="text-destructive mb-2">Failed to load message</p>
+      <p class="text-destructive mb-2">{$_('viewer.failedToLoadMessage')}</p>
       <p class="text-sm text-muted-foreground">{error}</p>
       <button
         class="mt-4 text-sm text-primary hover:underline"
         onclick={() => loadMessage(messageId!)}
       >
-        Try again
+        {$_('viewer.tryAgain')}
       </button>
     </div>
   {:else if message && readyToShow}
@@ -215,34 +216,34 @@ import { fade } from 'svelte/transition'
     <!-- Header with Actions -->
     <div class="flex items-center justify-between px-4 py-3 border-b border-border">
       <div class="flex items-center gap-2">
-        <button class="p-2 rounded-md hover:bg-muted transition-colors" title="Reply">
+        <button class="p-2 rounded-md hover:bg-muted transition-colors" title={$_('viewer.reply')}>
           <Icon icon="mdi:reply" class="w-5 h-5 text-muted-foreground" />
         </button>
-        <button class="p-2 rounded-md hover:bg-muted transition-colors" title="Reply All">
+        <button class="p-2 rounded-md hover:bg-muted transition-colors" title={$_('viewer.replyAll')}>
           <Icon icon="mdi:reply-all" class="w-5 h-5 text-muted-foreground" />
         </button>
-        <button class="p-2 rounded-md hover:bg-muted transition-colors" title="Forward">
+        <button class="p-2 rounded-md hover:bg-muted transition-colors" title={$_('viewer.forward')}>
           <Icon icon="mdi:share" class="w-5 h-5 text-muted-foreground" />
         </button>
 
         <div class="w-px h-5 bg-border mx-1"></div>
 
-        <button class="p-2 rounded-md hover:bg-muted transition-colors" title="Archive">
+        <button class="p-2 rounded-md hover:bg-muted transition-colors" title={$_('viewer.archive')}>
           <Icon icon="mdi:archive-outline" class="w-5 h-5 text-muted-foreground" />
         </button>
-        <button class="p-2 rounded-md hover:bg-muted transition-colors" title="Delete">
+        <button class="p-2 rounded-md hover:bg-muted transition-colors" title={$_('viewer.delete')}>
           <Icon icon="mdi:delete-outline" class="w-5 h-5 text-muted-foreground" />
         </button>
-        <button class="p-2 rounded-md hover:bg-muted transition-colors" title="Mark as Spam">
+        <button class="p-2 rounded-md hover:bg-muted transition-colors" title={$_('viewer.markAsSpam')}>
           <Icon icon="mdi:alert-octagon-outline" class="w-5 h-5 text-muted-foreground" />
         </button>
       </div>
 
       <div class="flex items-center gap-2">
-        <button class="p-2 rounded-md hover:bg-muted transition-colors" title="Mark Unread">
+        <button class="p-2 rounded-md hover:bg-muted transition-colors" title={$_('viewer.markAsUnread')}>
           <Icon icon="mdi:email-outline" class="w-5 h-5 text-muted-foreground" />
         </button>
-        <button class="p-2 rounded-md hover:bg-muted transition-colors" title="More">
+        <button class="p-2 rounded-md hover:bg-muted transition-colors" title={$_('viewer.more')}>
           <Icon icon="mdi:dots-vertical" class="w-5 h-5 text-muted-foreground" />
         </button>
       </div>
@@ -265,12 +266,12 @@ import { fade } from 'svelte/transition'
           </div>
           <div class="flex-1">
             <div class="flex items-center gap-2">
-              <span class="font-medium text-foreground">{message.fromName || 'Unknown'}</span>
+              <span class="font-medium text-foreground">{message.fromName || $_('viewer.unknown')}</span>
               <span class="text-sm text-muted-foreground">&lt;{message.fromEmail}&gt;</span>
             </div>
             {#if message.toList}
               <div class="text-sm text-muted-foreground">
-                to {parseRecipients(message.toList)
+                {$_('viewer.to')} {parseRecipients(message.toList)
                   .map((t) => t.name || t.email)
                   .join(', ')}
               </div>
@@ -288,7 +289,7 @@ import { fade } from 'svelte/transition'
             <div class="flex flex-col items-center justify-center py-8">
               <Icon icon="mdi:loading" class="w-6 h-6 animate-spin text-muted-foreground" />
               <span class="text-sm text-muted-foreground mt-2">
-                Loading message content...
+                {$_('common.loading')}
               </span>
             </div>
           {:else if message.bodyHtml}
@@ -296,7 +297,7 @@ import { fade } from 'svelte/transition'
           {:else if message.bodyText}
             <pre class="whitespace-pre-wrap font-sans">{message.bodyText}</pre>
           {:else}
-            <p class="text-muted-foreground italic">No content available</p>
+            <p class="text-muted-foreground italic">{$_('viewer.noContent')}</p>
           {/if}
         </div>
 
@@ -305,7 +306,7 @@ import { fade } from 'svelte/transition'
           <div class="border-t border-border pt-4">
             <h3 class="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
               <Icon icon="mdi:paperclip" class="w-4 h-4" />
-              Attachments
+              {$_('viewer.attachments')}
             </h3>
             <AttachmentList messageId={message.id} />
           </div>

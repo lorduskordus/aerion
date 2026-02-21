@@ -53,6 +53,10 @@ build:
 		echo "See .env.example for required variables."; \
 	fi
 	wails build -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS)
+ifeq ($(UNAME_S),Darwin)
+	@echo "Ad-hoc signing Aerion.app (required for macOS notifications)..."
+	codesign --force --deep --sign - build/bin/Aerion.app
+endif
 
 # Build for Linux specifically
 build-linux:
@@ -177,6 +181,8 @@ install-darwin: build
 		rm -rf "/Applications/Aerion.app"; \
 	fi
 	cp -R "build/bin/Aerion.app" "/Applications/"
+	@echo "Re-signing installed copy..."
+	codesign --force --deep --sign - "/Applications/Aerion.app"
 	@echo ""
 	@echo "Installation complete!"
 	@echo "Aerion is now available in /Applications."

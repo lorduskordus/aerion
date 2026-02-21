@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from '@iconify/svelte'
   import type { Toast } from '$lib/stores/toast'
+  import { _ } from '$lib/i18n'
 
   interface Props {
     toast: Toast
@@ -57,7 +58,7 @@
   <button
     class="p-1 rounded hover:bg-white/10 transition-colors flex-shrink-0"
     onclick={onClose}
-    aria-label="Dismiss"
+    aria-label={$_('aria.dismiss')}
   >
     <Icon icon="mdi:close" class="w-4 h-4 text-muted-foreground" />
   </button>

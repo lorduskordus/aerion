@@ -15,23 +15,23 @@
   import { addToast } from '$lib/stores/toast'
   import { loadSettings, getThemeMode, getShowTitleBar, type ThemeMode } from '$lib/stores/settings.svelte'
   import { loadUIState, saveUIState, paneConstraints } from '$lib/stores/uiState.svelte'
-  import { 
+  import {
     type FocusablePane,
-    getFocusedPane, 
-    setFocusedPane, 
-    focusPreviousPane, 
+    getFocusedPane,
+    setFocusedPane,
+    focusPreviousPane,
     focusNextPane,
     isPaneFlashing,
-    isInputElement 
+    isInputElement
   } from '$lib/stores/keyboard.svelte'
+  import { initLayout, getLayoutMode, getResponsiveView, showViewer, hideViewer, showSidebar, hideSidebar, isResponsive } from '$lib/stores/layout.svelte'
   // @ts-ignore - wailsjs path
-  import { PrepareReply, GetPendingMailto, GetDraft, MarkAsRead, MarkAsUnread, Star, Unstar, Archive, MarkAsSpam, MarkAsNotSpam, Undo, GetTermsAccepted, SetTermsAccepted, GetSystemTheme, RefreshWindowConstraints, AcceptCertificate } from '../wailsjs/go/app/App.js'
+  import { PrepareReply, GetPendingMailto, GetDraft, MarkAsRead, MarkAsUnread, Star, Unstar, Archive, MarkAsSpam, MarkAsNotSpam, Undo, GetTermsAccepted, SetTermsAccepted, GetSystemTheme, RefreshWindowConstraints, AcceptCertificate, GetStartHiddenActive, CloseWindow, QuitApp } from '../wailsjs/go/app/App.js'
   // @ts-ignore - wailsjs path
   import { smtp, folder, certificate } from '../wailsjs/go/models'
   // @ts-ignore - wailsjs runtime
   import { WindowShow, EventsOn } from '../wailsjs/runtime/runtime'
-  // @ts-ignore - wailsjs path
-  import { InitiateShutdown } from '../wailsjs/go/app/App.js'
+  import { _ } from '$lib/i18n'
 
   // Component refs for keyboard navigation
   let sidebarRef: Sidebar | null = null
@@ -82,10 +82,15 @@
   let pendingCertificate = $state<certificate.CertificateInfo | null>(null)
   let pendingCertAccountId = $state<string | null>(null)
 
-  // Handle graceful shutdown with overlay
-  function handleShutdown() {
+  // Handle window close button (title bar X) — hides if background mode, quits if not
+  function handleClose() {
+    CloseWindow()
+  }
+
+  // Handle forced quit (Ctrl+Q) — always quits regardless of background mode
+  function handleQuit() {
     isShuttingDown = true
-    setTimeout(() => InitiateShutdown(), 100)
+    setTimeout(() => QuitApp(), 100)
   }
 
   // Handle terms acceptance
@@ -192,6 +197,11 @@
       })
     })
 
+    // Listen for window show requests (from single-instance activation, notification clicks)
+    EventsOn('window:show', () => {
+      window.focus()
+    })
+
     // Listen for shutdown event from backend (triggered by OS close signal)
     EventsOn('app:shutting-down', () => {
       isShuttingDown = true
@@ -294,10 +304,17 @@
     })
 
     // Show window after UI is ready (prevents white flash on startup)
-    WindowShow()
+    // Skip if starting hidden in background mode
+    const shouldStartHidden = await GetStartHiddenActive()
+    if (!shouldStartHidden) {
+      WindowShow()
+    }
 
     // Remove GTK max size constraints that Wails v2 sets at startup
     RefreshWindowConstraints()
+
+    // Initialize responsive layout breakpoint listeners
+    initLayout()
 
     // Check for pending mailto: URL from command line
     try {
@@ -355,7 +372,8 @@
     selectedThreadId = null // Clear conversation selection when changing folders
     selectedConversationFolderId = null
     selectedConversationAccountId = null
-    
+    hideSidebar()
+
     // Persist state
     saveUIState({
       selectedAccountId: accountId,
@@ -384,7 +402,8 @@
     selectedThreadId = null
     selectedConversationFolderId = null
     selectedConversationAccountId = null
-    
+    hideSidebar()
+
     // Persist state
     saveUIState({
       selectedAccountId: accountId,
@@ -407,7 +426,8 @@
     selectedThreadId = null
     selectedConversationFolderId = null
     selectedConversationAccountId = null
-    
+    hideSidebar()
+
     // Persist state
     saveUIState({
       selectedAccountId: 'unified',
@@ -425,7 +445,8 @@
     selectedThreadId = threadId
     selectedConversationFolderId = folderId
     selectedConversationAccountId = accountId
-    
+    showViewer()
+
     // Persist state
     saveUIState({
       selectedThreadId: threadId,
@@ -464,7 +485,7 @@
       console.error('Failed to load draft:', err)
       addToast({
         type: 'error',
-        message: 'Failed to load draft',
+        message: $_('composer.failedToLoadDraft'),
       })
     }
   }
@@ -508,7 +529,7 @@
       // No accounts available, can't compose
       addToast({
         type: 'error',
-        message: 'No email account configured. Please add an account first.',
+        message: $_('toast.noAccountConfigured'),
       })
       return
     }
@@ -546,7 +567,7 @@
       console.error(`Failed to prepare ${mode}:`, err)
       addToast({
         type: 'error',
-        message: `Failed to prepare ${mode}: ${err}. Opening blank composer.`,
+        message: $_('toast.failedToPrepare', { values: { mode, error: String(err) } }),
       })
       // Fallback: open blank composer
       composerAccountId = accountId
@@ -572,11 +593,13 @@
   let isResizingList = $state(false)
 
   function startResizeSidebar(e: MouseEvent) {
+    if (isResponsive()) return
     isResizingSidebar = true
     e.preventDefault()
   }
 
   function startResizeList(e: MouseEvent) {
+    if (isResponsive()) return
     isResizingList = true
     e.preventDefault()
   }
@@ -654,7 +677,7 @@
       switch (e.key.toLowerCase()) {
         case 'q':
           e.preventDefault()
-          handleShutdown()
+          handleQuit()
           return
         case 'n':
           e.preventDefault()
@@ -694,7 +717,7 @@
             messageListRef?.toggleFolderSync()
           } else {
             // Ctrl-S: Focus search
-            messageListRef?.focusSearch()
+            messageListRef?.toggleSearchFocus()
             setFocusedPane('messageList')
           }
           return
@@ -816,11 +839,35 @@
         case 'ArrowLeft':
         case 'h':
           e.preventDefault()
+          if (isResponsive()) {
+            const view = getResponsiveView()
+            const mode = getLayoutMode()
+            if (view === 'viewer') {
+              hideViewer()
+              return
+            }
+            if (mode === 'narrow' && view === 'default') {
+              showSidebar()
+              return
+            }
+          }
           focusPreviousPane()
           return
         case 'ArrowRight':
         case 'l':
           e.preventDefault()
+          if (isResponsive()) {
+            const view = getResponsiveView()
+            const mode = getLayoutMode()
+            if (mode === 'narrow' && view === 'sidebar') {
+              hideSidebar()
+              return
+            }
+            if (view === 'default' && selectedThreadId) {
+              showViewer()
+              return
+            }
+          }
           focusNextPane()
           return
         case 'ArrowUp':
@@ -848,8 +895,16 @@
     if (inInput) return
 
     // Handle Escape (context-dependent, progressive)
-    // First Esc: clear checkboxes, Second Esc: close conversation
+    // Responsive overlays first, then checkboxes, then conversation
     if (e.key === 'Escape') {
+      if (isResponsive() && getResponsiveView() === 'viewer') {
+        hideViewer()
+        return
+      }
+      if (isResponsive() && getResponsiveView() === 'sidebar') {
+        hideSidebar()
+        return
+      }
       if (messageListRef?.hasCheckedMessages()) {
         // First: clear checkboxes
         messageListRef.clearChecked()
@@ -989,11 +1044,11 @@
   async function handleBulkArchive(messageIds: string[]) {
     try {
       await Archive(messageIds)
-      addToast({ type: 'success', message: 'Archived', actions: [{ label: 'Undo', onClick: handleUndo }] })
+      addToast({ type: 'success', message: $_('toast.archived'), actions: [{ label: $_('common.undo'), onClick: handleUndo }] })
       messageListRef?.clearChecked()
       messageListRef?.handleActionComplete(true)
     } catch (err) {
-      addToast({ type: 'error', message: `Failed to archive: ${err}` })
+      addToast({ type: 'error', message: $_('toast.failedToArchive', { values: { error: String(err) } }) })
     }
   }
 
@@ -1004,40 +1059,40 @@
       if (isSpamFolder) {
         // If we're in spam folder, mark as NOT spam
         await MarkAsNotSpam(messageIds)
-        addToast({ type: 'success', message: 'Marked as not spam', actions: [{ label: 'Undo', onClick: handleUndo }] })
+        addToast({ type: 'success', message: $_('toast.markedAsNotSpam'), actions: [{ label: $_('common.undo'), onClick: handleUndo }] })
       } else {
         // Otherwise, mark as spam
         await MarkAsSpam(messageIds)
-        addToast({ type: 'success', message: 'Marked as spam', actions: [{ label: 'Undo', onClick: handleUndo }] })
+        addToast({ type: 'success', message: $_('toast.markedAsSpam'), actions: [{ label: $_('common.undo'), onClick: handleUndo }] })
       }
 
       messageListRef?.clearChecked()
       messageListRef?.handleActionComplete(true)
     } catch (err) {
       const isSpamFolder = selectedFolderType === 'spam'
-      addToast({ type: 'error', message: `Failed to ${isSpamFolder ? 'mark as not spam' : 'mark as spam'}: ${err}` })
+      addToast({ type: 'error', message: $_(isSpamFolder ? 'toast.failedToMarkAsNotSpam' : 'toast.failedToMarkAsSpam', { values: { error: String(err) } }) })
     }
   }
 
   async function handleBulkMarkRead(messageIds: string[]) {
     try {
       await MarkAsRead(messageIds)
-      addToast({ type: 'success', message: 'Marked as read' })
+      addToast({ type: 'success', message: $_('toast.markedAsRead') })
       messageListRef?.clearChecked()
       messageListRef?.handleActionComplete()
     } catch (err) {
-      addToast({ type: 'error', message: `Failed to mark as read: ${err}` })
+      addToast({ type: 'error', message: $_('toast.failedToMarkAsRead', { values: { error: String(err) } }) })
     }
   }
 
   async function handleBulkMarkUnread(messageIds: string[]) {
     try {
       await MarkAsUnread(messageIds)
-      addToast({ type: 'success', message: 'Marked as unread' })
+      addToast({ type: 'success', message: $_('toast.markedAsUnread') })
       messageListRef?.clearChecked()
       messageListRef?.handleActionComplete()
     } catch (err) {
-      addToast({ type: 'error', message: `Failed to mark as unread: ${err}` })
+      addToast({ type: 'error', message: $_('toast.failedToMarkAsUnread', { values: { error: String(err) } }) })
     }
   }
 
@@ -1045,25 +1100,25 @@
     try {
       if (shouldStar) {
         await Star(messageIds)
-        addToast({ type: 'success', message: 'Starred' })
+        addToast({ type: 'success', message: $_('toast.starred') })
       } else {
         await Unstar(messageIds)
-        addToast({ type: 'success', message: 'Star removed' })
+        addToast({ type: 'success', message: $_('toast.starRemoved') })
       }
       messageListRef?.clearChecked()
       messageListRef?.handleActionComplete()
     } catch (err) {
-      addToast({ type: 'error', message: `Failed to update star: ${err}` })
+      addToast({ type: 'error', message: $_('toast.failedToUpdateStar', { values: { error: String(err) } }) })
     }
   }
 
   async function handleUndo() {
     try {
       const description = await Undo()
-      addToast({ type: 'success', message: `Undone: ${description}` })
+      addToast({ type: 'success', message: $_('toast.undone', { values: { description } }) })
       messageListRef?.handleActionComplete()
     } catch (err) {
-      addToast({ type: 'error', message: `Undo failed: ${err}` })
+      addToast({ type: 'error', message: $_('toast.undoFailed', { values: { error: String(err) } }) })
     }
   }
 </script>
@@ -1073,21 +1128,21 @@
 <div class="flex flex-col h-full w-full overflow-hidden bg-background">
   <!-- Custom Title Bar -->
   {#if getShowTitleBar()}
-    <TitleBar onClose={handleShutdown} />
+    <TitleBar onClose={handleClose} />
   {/if}
 
   <!-- Main Content -->
-  <div class="flex flex-1 min-h-0 overflow-hidden">
+  <div class="flex flex-1 min-h-0 overflow-hidden relative">
     <!-- Sidebar (Folder List) -->
     <aside
-      class="flex-shrink-0 border-r border-border bg-muted/30"
-      style="width: {sidebarWidth}px"
+      class="{getLayoutMode() === 'narrow' ? `responsive-sidebar-overlay w-72 border-r border-border bg-background ${getResponsiveView() === 'sidebar' ? 'responsive-sidebar-visible' : ''}` : 'flex-shrink-0 border-r border-border bg-muted/30'}"
+      style="{getLayoutMode() === 'full' ? `width: ${sidebarWidth}px` : ''}"
       role="presentation"
       onclick={() => handlePaneClick('sidebar')}
     >
-      <Sidebar 
+      <Sidebar
         bind:this={sidebarRef}
-        onFolderSelect={handleFolderSelect} 
+        onFolderSelect={handleFolderSelect}
         onUnifiedFolderSelect={handleUnifiedFolderSelect}
         onCompose={handleCompose}
         onUnifiedInboxSelect={handleUnifiedInboxSelect}
@@ -1096,24 +1151,40 @@
         selectionSource={selectionSource}
         isFocused={getFocusedPane() === 'sidebar'}
         isFlashing={isPaneFlashing('sidebar')}
+        showBackButton={getLayoutMode() === 'narrow'}
+        onBack={hideSidebar}
       />
     </aside>
 
+    <!-- Scrim for narrow sidebar overlay -->
+    {#if getLayoutMode() === 'narrow'}
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <div
+        role="button"
+        tabindex="-1"
+        class="responsive-scrim {getResponsiveView() === 'sidebar' ? 'responsive-scrim-visible' : ''}"
+        onclick={hideSidebar}
+        aria-label={$_('aria.closeSidebar')}
+      ></div>
+    {/if}
+
     <!-- Sidebar Resize Handle -->
+    {#if getLayoutMode() === 'full'}
     <button
       type="button"
       class="w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/40 transition-colors border-0 p-0 {isResizingSidebar
         ? 'bg-primary/40'
         : ''}"
       onmousedown={startResizeSidebar}
-      aria-label="Resize sidebar"
+      aria-label={$_('aria.resizeSidebar')}
     ></button>
+    {/if}
 
     <!-- Message List -->
     <section
       bind:this={messageListContainerRef}
-      class="flex-shrink-0 border-r border-border bg-background"
-      style="width: {listWidth}px"
+      class="{isResponsive() ? 'flex-1 min-w-0 border-r border-border bg-background' : 'flex-shrink-0 border-r border-border bg-background'}"
+      style="{getLayoutMode() === 'full' ? `width: ${listWidth}px` : ''}"
       role="presentation"
       data-pane="messageList"
       tabindex="-1"
@@ -1129,22 +1200,26 @@
         onReply={handleReply}
         isFocused={getFocusedPane() === 'messageList'}
         isFlashing={isPaneFlashing('messageList')}
+        showFolderToggle={getLayoutMode() === 'narrow'}
+        onToggleSidebar={showSidebar}
       />
     </section>
 
     <!-- List Resize Handle -->
+    {#if getLayoutMode() === 'full'}
     <button
       type="button"
       class="w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/40 transition-colors border-0 p-0 {isResizingList
         ? 'bg-primary/40'
         : ''}"
       onmousedown={startResizeList}
-      aria-label="Resize message list"
+      aria-label={$_('aria.resizeMessageList')}
     ></button>
+    {/if}
 
     <!-- Conversation Viewer -->
     <main
-      class="flex-1 min-w-0 bg-background"
+      class="{isResponsive() ? `responsive-viewer-overlay bg-background ${getResponsiveView() === 'viewer' ? 'responsive-viewer-visible' : ''}` : 'flex-1 min-w-0 bg-background'}"
       role="presentation"
       data-pane="viewer"
       onclick={() => handlePaneClick('viewer')}
@@ -1161,6 +1236,8 @@
         onActionComplete={(autoSelectNext) => messageListRef?.handleActionComplete(autoSelectNext)}
         isFocused={getFocusedPane() === 'viewer'}
         isFlashing={isPaneFlashing('viewer')}
+        showBackButton={isResponsive()}
+        onBack={hideViewer}
       />
     </main>
   </div>
@@ -1177,7 +1254,7 @@
 <!-- Composer Modal -->
 {#if showComposer && composerAccountId}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-    <div class="w-full max-w-3xl h-[80vh] bg-background rounded-lg shadow-xl overflow-hidden">
+    <div class="{getLayoutMode() === 'narrow' ? 'w-full h-full bg-background overflow-hidden' : 'w-full max-w-3xl h-[80vh] bg-background rounded-lg shadow-xl overflow-hidden'}">
       <Composer
         accountId={composerAccountId}
         initialMessage={composerInitialMessage}
@@ -1192,7 +1269,7 @@
 <!-- Shutdown Overlay -->
 {#if isShuttingDown}
   <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/80">
-    <p class="text-white/90 text-sm font-medium">Shutting down...</p>
+    <p class="text-white/90 text-sm font-medium">{$_('window.shuttingDown')}</p>
   </div>
 {/if}
 

@@ -29,6 +29,7 @@
   import { toasts } from '$lib/stores/toast'
   import { ConfirmDialog } from '$lib/components/ui/confirm-dialog'
   import type { Snippet } from 'svelte'
+  import { _ } from '$lib/i18n'
 
   interface Props {
     messageIds: string[]
@@ -127,9 +128,9 @@
   async function handleUndo() {
     try {
       const description = await Undo()
-      toasts.success(`Undone: ${description}`)
+      toasts.success($_('toast.undone', { values: { description } }))
     } catch (err) {
-      toasts.error(`Undo failed: ${err}`)
+      toasts.error($_('toast.undoFailed', { values: { error: String(err) } }))
     }
   }
 
@@ -155,10 +156,10 @@
   async function handleArchive() {
     try {
       await Archive(messageIds)
-      toasts.success('Archived', [{ label: 'Undo', onClick: handleUndo }])
+      toasts.success($_('toast.archived'), [{ label: $_('common.undo'), onClick: handleUndo }])
       onActionComplete?.(true)
     } catch (err) {
-      toasts.error(`Failed to archive: ${err}`)
+      toasts.error($_('toast.failedToArchive', { values: { error: String(err) } }))
     }
   }
 
@@ -168,10 +169,10 @@
     } else {
       try {
         await Trash(messageIds)
-        toasts.success('Moved to trash', [{ label: 'Undo', onClick: handleUndo }])
+        toasts.success($_('toast.movedToTrash'), [{ label: $_('common.undo'), onClick: handleUndo }])
         onActionComplete?.(true)
       } catch (err) {
-        toasts.error(`Failed to delete: ${err}`)
+        toasts.error($_('toast.failedToDelete', { values: { error: String(err) } }))
       }
     }
   }
@@ -179,11 +180,11 @@
   async function handleConfirmPermanentDelete() {
     try {
       await DeletePermanently(messageIds)
-      toasts.success('Permanently deleted')
+      toasts.success($_('toast.permanentlyDeleted'))
       showDeleteConfirm = false
       onActionComplete?.(true)
     } catch (err) {
-      toasts.error(`Failed to delete: ${err}`)
+      toasts.error($_('toast.failedToDelete', { values: { error: String(err) } }))
       showDeleteConfirm = false
     }
   }
@@ -193,15 +194,15 @@
       if (isSpamFolder) {
         // If we're in spam folder, mark as NOT spam
         await MarkAsNotSpam(messageIds)
-        toasts.success('Marked as not spam', [{ label: 'Undo', onClick: handleUndo }])
+        toasts.success($_('toast.markedAsNotSpam'), [{ label: $_('common.undo'), onClick: handleUndo }])
       } else {
         // Otherwise, mark as spam
         await MarkAsSpam(messageIds)
-        toasts.success('Marked as spam', [{ label: 'Undo', onClick: handleUndo }])
+        toasts.success($_('toast.markedAsSpam'), [{ label: $_('common.undo'), onClick: handleUndo }])
       }
       onActionComplete?.(true)
     } catch (err) {
-      toasts.error(`Failed to ${isSpamFolder ? 'mark as not spam' : 'mark as spam'}: ${err}`)
+      toasts.error($_(isSpamFolder ? 'toast.failedToMarkAsNotSpam' : 'toast.failedToMarkAsSpam', { values: { error: String(err) } }))
     }
   }
 
@@ -209,14 +210,14 @@
     try {
       if (isStarred) {
         await Unstar(messageIds)
-        toasts.success('Star removed')
+        toasts.success($_('toast.starRemoved'))
       } else {
         await Star(messageIds)
-        toasts.success('Starred')
+        toasts.success($_('toast.starred'))
       }
       onActionComplete?.()
     } catch (err) {
-      toasts.error(`Failed to update star: ${err}`)
+      toasts.error($_('toast.failedToUpdateStar', { values: { error: String(err) } }))
     }
   }
 
@@ -224,34 +225,34 @@
     try {
       if (isRead) {
         await MarkAsUnread(messageIds)
-        toasts.success('Marked as unread')
+        toasts.success($_('toast.markedAsUnread'))
       } else {
         await MarkAsRead(messageIds)
-        toasts.success('Marked as read')
+        toasts.success($_('toast.markedAsRead'))
       }
       onActionComplete?.()
     } catch (err) {
-      toasts.error(`Failed to update read status: ${err}`)
+      toasts.error($_('toast.failedToUpdateReadStatus', { values: { error: String(err) } }))
     }
   }
 
   async function handleMoveTo(destFolderId: string, folderName: string) {
     try {
       await MoveToFolder(messageIds, destFolderId)
-      toasts.success(`Moved to ${folderName}`, [{ label: 'Undo', onClick: handleUndo }])
+      toasts.success($_('toast.movedTo', { values: { folder: folderName } }), [{ label: $_('common.undo'), onClick: handleUndo }])
       onActionComplete?.(true)
     } catch (err) {
-      toasts.error(`Failed to move: ${err}`)
+      toasts.error($_('toast.failedToMove', { values: { error: String(err) } }))
     }
   }
 
   async function handleCopyTo(destFolderId: string, folderName: string) {
     try {
       await CopyToFolder(messageIds, destFolderId)
-      toasts.success(`Copying to ${folderName}...`)
+      toasts.success($_('toast.copyingTo', { values: { folder: folderName } }))
       // Note: CopyToFolder syncs in background and emits messages:copied event
     } catch (err) {
-      toasts.error(`Failed to copy: ${err}`)
+      toasts.error($_('toast.failedToCopy', { values: { error: String(err) } }))
     }
   }
 </script>
@@ -268,15 +269,15 @@
     {#if isSingleMessage}
       <ContextMenuItem onSelect={handleReply}>
         <Icon icon="mdi:reply" class="mr-2 h-4 w-4" />
-        Reply
+        {$_('contextMenu.reply')}
       </ContextMenuItem>
       <ContextMenuItem onSelect={handleReplyAll}>
         <Icon icon="mdi:reply-all" class="mr-2 h-4 w-4" />
-        Reply All
+        {$_('contextMenu.replyAll')}
       </ContextMenuItem>
       <ContextMenuItem onSelect={handleForward}>
         <Icon icon="mdi:share" class="mr-2 h-4 w-4" />
-        Forward
+        {$_('contextMenu.forward')}
       </ContextMenuItem>
       <ContextMenuSeparator />
     {/if}
@@ -284,15 +285,15 @@
     <!-- Move/Delete actions -->
     <ContextMenuItem onSelect={handleArchive}>
       <Icon icon="mdi:archive-outline" class="mr-2 h-4 w-4" />
-      Archive
+      {$_('contextMenu.archive')}
     </ContextMenuItem>
     <ContextMenuItem onSelect={handleDelete}>
       <Icon icon={isTrashFolder ? 'mdi:delete-forever' : 'mdi:delete-outline'} class="mr-2 h-4 w-4" />
-      {isTrashFolder ? 'Delete Permanently' : 'Delete'}
+      {$_(isTrashFolder ? 'contextMenu.deletePermanently' : 'contextMenu.delete')}
     </ContextMenuItem>
     <ContextMenuItem onSelect={handleSpam}>
       <Icon icon={isSpamFolder ? "mdi:email-check-outline" : "mdi:alert-octagon-outline"} class="mr-2 h-4 w-4" />
-      {isSpamFolder ? 'Mark as NOT Spam' : 'Mark as Spam'}
+      {$_(isSpamFolder ? 'contextMenu.markAsNotSpam' : 'contextMenu.markAsSpam')}
     </ContextMenuItem>
 
     <ContextMenuSeparator />
@@ -301,17 +302,17 @@
     <ContextMenuSub>
       <ContextMenuSubTrigger>
         <Icon icon="mdi:folder-move-outline" class="mr-2 h-4 w-4" />
-        Move to
+        {$_('contextMenu.moveTo')}
       </ContextMenuSubTrigger>
       <ContextMenuSubContent>
         {#if foldersLoading}
           <ContextMenuItem disabled>
             <Icon icon="mdi:loading" class="mr-2 h-4 w-4 animate-spin" />
-            Loading...
+            {$_('common.loading')}
           </ContextMenuItem>
         {:else if availableFolders.length === 0}
           <ContextMenuItem disabled>
-            No folders available
+            {$_('contextMenu.noFoldersAvailable')}
           </ContextMenuItem>
         {:else}
           <!-- Special folders -->
@@ -340,17 +341,17 @@
     <ContextMenuSub>
       <ContextMenuSubTrigger>
         <Icon icon="mdi:content-copy" class="mr-2 h-4 w-4" />
-        Copy to
+        {$_('contextMenu.copyTo')}
       </ContextMenuSubTrigger>
       <ContextMenuSubContent>
         {#if foldersLoading}
           <ContextMenuItem disabled>
             <Icon icon="mdi:loading" class="mr-2 h-4 w-4 animate-spin" />
-            Loading...
+            {$_('common.loading')}
           </ContextMenuItem>
         {:else if availableFolders.length === 0}
           <ContextMenuItem disabled>
-            No folders available
+            {$_('contextMenu.noFoldersAvailable')}
           </ContextMenuItem>
         {:else}
           <!-- Special folders -->
@@ -383,14 +384,14 @@
         icon={isStarred ? 'mdi:star' : 'mdi:star-outline'}
         class="mr-2 h-4 w-4 {isStarred ? 'text-yellow-500' : ''}"
       />
-      {isStarred ? 'Remove Star' : 'Star'}
+      {$_(isStarred ? 'contextMenu.removeStar' : 'contextMenu.star')}
     </ContextMenuItem>
     <ContextMenuItem onSelect={handleToggleRead}>
       <Icon
         icon={isRead ? 'mdi:email-outline' : 'mdi:email-open-outline'}
         class="mr-2 h-4 w-4"
       />
-      {isRead ? 'Mark as Unread' : 'Mark as Read'}
+      {$_(isRead ? 'contextMenu.markAsUnread' : 'contextMenu.markAsRead')}
     </ContextMenuItem>
   </ContextMenuContent>
 </ContextMenuPrimitive.Root>
@@ -398,9 +399,9 @@
 <!-- Permanent Delete Confirmation Dialog -->
 <ConfirmDialog
   bind:open={showDeleteConfirm}
-  title="Delete Permanently?"
-  description="This will permanently delete the selected message(s). This action cannot be undone."
-  confirmLabel="Delete Permanently"
+  title={$_('dialog.deletePermanently')}
+  description={$_('dialog.deleteDescription')}
+  confirmLabel={$_('dialog.confirmDeletePermanently')}
   variant="destructive"
   onConfirm={handleConfirmPermanentDelete}
   onCancel={() => (showDeleteConfirm = false)}

@@ -4,6 +4,7 @@
   // @ts-ignore - wailsjs path
   import { message as messageModels } from '../../../../wailsjs/go/models'
   import { toasts } from '$lib/stores/toast'
+  import { _ } from '$lib/i18n'
 
   // Decrypted attachment metadata (from encrypted messages, not in DB)
   interface DecryptedAttachment {
@@ -61,20 +62,20 @@
     try {
       const path = await SaveAttachmentAs(att.id)
       if (path) {
-        toasts.success(`Saved "${att.filename}"`, [
+        toasts.success($_('toast.attachmentSaved', { values: { filename: att.filename } }), [
           {
-            label: 'Open File',
+            label: $_('attachment.openFile'),
             onClick: () => OpenFile(path)
           },
           {
-            label: 'Show in Folder',
+            label: $_('attachment.showInFolder'),
             onClick: () => OpenFolder(path)
           }
         ])
       }
     } catch (err) {
       console.error('Failed to save attachment:', err)
-      toasts.error(`Failed to save "${att.filename}"`)
+      toasts.error($_('toast.failedToSaveAttachment', { values: { filename: att.filename } }))
     } finally {
       downloadingIds = new Set([...downloadingIds].filter(id => id !== att.id))
     }
@@ -86,7 +87,7 @@
       await OpenAttachment(att.id)
     } catch (err) {
       console.error('Failed to open attachment:', err)
-      toasts.error(`Failed to open "${att.filename}"`)
+      toasts.error($_('toast.failedToOpenAttachment', { values: { filename: att.filename } }))
     } finally {
       downloadingIds = new Set([...downloadingIds].filter(id => id !== att.id))
     }
@@ -98,20 +99,20 @@
     try {
       const path = await SaveEncryptedAttachmentAs(messageId, att.filename)
       if (path) {
-        toasts.success(`Saved "${att.filename}"`, [
+        toasts.success($_('toast.attachmentSaved', { values: { filename: att.filename } }), [
           {
-            label: 'Open File',
+            label: $_('attachment.openFile'),
             onClick: () => OpenFile(path)
           },
           {
-            label: 'Show in Folder',
+            label: $_('attachment.showInFolder'),
             onClick: () => OpenFolder(path)
           }
         ])
       }
     } catch (err) {
       console.error('Failed to save encrypted attachment:', err)
-      toasts.error(`Failed to save "${att.filename}"`)
+      toasts.error($_('toast.failedToSaveAttachment', { values: { filename: att.filename } }))
     } finally {
       downloadingIds = new Set([...downloadingIds].filter(id => id !== key))
     }
@@ -124,7 +125,7 @@
       await OpenEncryptedAttachment(messageId, att.filename)
     } catch (err) {
       console.error('Failed to open encrypted attachment:', err)
-      toasts.error(`Failed to open "${att.filename}"`)
+      toasts.error($_('toast.failedToOpenAttachment', { values: { filename: att.filename } }))
     } finally {
       downloadingIds = new Set([...downloadingIds].filter(id => id !== key))
     }
@@ -136,9 +137,9 @@
       if (isEncrypted) {
         const folder = await SaveAllEncryptedAttachments(messageId)
         if (folder) {
-          toasts.success(`Saved ${encryptedAttachments!.length} attachments`, [
+          toasts.success($_('toast.attachmentsSaved', { values: { count: encryptedAttachments!.length } }), [
             {
-              label: 'Open Folder',
+              label: $_('attachment.openFolder'),
               onClick: () => OpenFolder(folder)
             }
           ])
@@ -146,9 +147,9 @@
       } else {
         const folder = await SaveAllAttachments(messageId)
         if (folder) {
-          toasts.success(`Saved ${attachments.length} attachments`, [
+          toasts.success($_('toast.attachmentsSaved', { values: { count: attachments.length } }), [
             {
-              label: 'Open Folder',
+              label: $_('attachment.openFolder'),
               onClick: () => OpenFolder(folder)
             }
           ])
@@ -156,7 +157,7 @@
       }
     } catch (err) {
       console.error('Failed to save all attachments:', err)
-      toasts.error('Failed to save attachments')
+      toasts.error($_('toast.failedToSaveAttachments'))
     } finally {
       savingAll = false
     }
@@ -214,14 +215,14 @@
           {:else}
             <button
               class="p-2 rounded-md hover:bg-muted transition-colors opacity-0 group-hover:opacity-100"
-              title="Open"
+              title={$_('attachment.open')}
               onclick={() => handleEncryptedOpen(att)}
             >
               <Icon icon="mdi:open-in-new" class="w-4 h-4 text-muted-foreground" />
             </button>
             <button
               class="p-2 rounded-md hover:bg-muted transition-colors opacity-0 group-hover:opacity-100"
-              title="Download"
+              title={$_('attachment.download')}
               onclick={() => handleEncryptedDownload(att)}
             >
               <Icon icon="mdi:download" class="w-4 h-4 text-muted-foreground" />
@@ -239,10 +240,10 @@
       >
         {#if savingAll}
           <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-          Saving...
+          {$_('attachment.saving')}
         {:else}
           <Icon icon="mdi:download-multiple" class="w-4 h-4" />
-          Save All ({encryptedAttachments.length} files)
+          {$_('attachment.saveAll', { values: { count: encryptedAttachments.length } })}
         {/if}
       </button>
     {/if}
@@ -262,7 +263,7 @@
           <div class="text-xs text-muted-foreground">
             {formatSize(att.size)}
             {#if att.isInline}
-              <span class="ml-2 text-primary">(inline)</span>
+              <span class="ml-2 text-primary">{$_('attachment.inline')}</span>
             {/if}
           </div>
         </div>
@@ -274,14 +275,14 @@
           {:else}
             <button
               class="p-2 rounded-md hover:bg-muted transition-colors opacity-0 group-hover:opacity-100"
-              title="Open"
+              title={$_('attachment.open')}
               onclick={() => handleOpen(att)}
             >
               <Icon icon="mdi:open-in-new" class="w-4 h-4 text-muted-foreground" />
             </button>
             <button
               class="p-2 rounded-md hover:bg-muted transition-colors opacity-0 group-hover:opacity-100"
-              title="Download"
+              title={$_('attachment.download')}
               onclick={() => handleDownload(att)}
             >
               <Icon icon="mdi:download" class="w-4 h-4 text-muted-foreground" />
@@ -299,10 +300,10 @@
       >
         {#if savingAll}
           <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-          Saving...
+          {$_('attachment.saving')}
         {:else}
           <Icon icon="mdi:download-multiple" class="w-4 h-4" />
-          Save All ({attachments.length} files)
+          {$_('attachment.saveAll', { values: { count: attachments.length } })}
         {/if}
       </button>
     {/if}

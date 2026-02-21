@@ -15,6 +15,7 @@
   import TableCell from '@tiptap/extension-table-cell'
   import TableHeader from '@tiptap/extension-table-header'
   import FontSize from 'tiptap-extension-font-size'
+  import { _ } from '$lib/i18n'
 
   // Extended TextStyle to also handle legacy <font> tags
   const ExtendedTextStyle = TextStyle.extend({
@@ -396,7 +397,7 @@
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-<div class="border border-input rounded-md overflow-hidden bg-background" role="toolbar" aria-label="Signature editor" tabindex="-1" onclick={handleClickOutside}>
+<div class="border border-input rounded-md overflow-hidden bg-background" role="toolbar" aria-label={$_('aria.signatureEditor')} tabindex="-1" onclick={handleClickOutside}>
   <!-- Toolbar -->
   <div class="flex items-center gap-0.5 px-2 py-1.5 border-b border-border bg-muted/30">
     <button
@@ -404,7 +405,7 @@
       onclick={toggleBold}
       class="p-1.5 rounded hover:bg-muted transition-colors"
       class:bg-muted={activeStates.bold}
-      title="Bold"
+      title={$_('editor.bold')}
     >
       <Icon icon="mdi:format-bold" class="w-4 h-4" />
     </button>
@@ -413,7 +414,7 @@
       onclick={toggleItalic}
       class="p-1.5 rounded hover:bg-muted transition-colors"
       class:bg-muted={activeStates.italic}
-      title="Italic"
+      title={$_('editor.italic')}
     >
       <Icon icon="mdi:format-italic" class="w-4 h-4" />
     </button>
@@ -422,7 +423,7 @@
       onclick={toggleUnderline}
       class="p-1.5 rounded hover:bg-muted transition-colors"
       class:bg-muted={activeStates.underline}
-      title="Underline"
+      title={$_('editor.underline')}
     >
       <Icon icon="mdi:format-underline" class="w-4 h-4" />
     </button>
@@ -431,7 +432,7 @@
       onclick={toggleStrike}
       class="p-1.5 rounded hover:bg-muted transition-colors"
       class:bg-muted={activeStates.strike}
-      title="Strikethrough"
+      title={$_('editor.strikethrough')}
     >
       <Icon icon="mdi:format-strikethrough" class="w-4 h-4" />
     </button>
@@ -443,7 +444,7 @@
         onclick={toggleColorPicker}
         class="p-1.5 rounded hover:bg-muted transition-colors flex items-center gap-0.5"
         class:bg-muted={showColorPicker}
-        title="Text Color"
+        title={$_('editor.textColor')}
       >
         <Icon icon="mdi:format-color-text" class="w-4 h-4" />
         <div
@@ -471,14 +472,14 @@
               value={currentColor || '#000000'}
               onchange={handleCustomColor}
               class="w-6 h-6 rounded cursor-pointer"
-              title="Custom color"
+              title={$_('editor.customColor')}
             />
             <button
               type="button"
               onclick={removeColor}
               class="text-xs text-muted-foreground hover:text-foreground"
             >
-              Reset
+              {$_('editor.reset')}
             </button>
           </div>
         </div>
@@ -492,7 +493,7 @@
         onclick={toggleFontSizePicker}
         class="p-1.5 rounded hover:bg-muted transition-colors flex items-center gap-0.5 text-xs min-w-[40px] justify-center"
         class:bg-muted={showFontSizePicker}
-        title="Font Size"
+        title={$_('editor.fontSize')}
       >
         {currentFontSize || '14px'}
       </button>
@@ -521,7 +522,7 @@
       onclick={() => setAlign('left')}
       class="p-1.5 rounded hover:bg-muted transition-colors"
       class:bg-muted={currentAlign === 'left'}
-      title="Align Left"
+      title={$_('editor.alignLeft')}
     >
       <Icon icon="mdi:format-align-left" class="w-4 h-4" />
     </button>
@@ -530,7 +531,7 @@
       onclick={() => setAlign('center')}
       class="p-1.5 rounded hover:bg-muted transition-colors"
       class:bg-muted={currentAlign === 'center'}
-      title="Align Center"
+      title={$_('editor.alignCenter')}
     >
       <Icon icon="mdi:format-align-center" class="w-4 h-4" />
     </button>
@@ -539,7 +540,7 @@
       onclick={() => setAlign('right')}
       class="p-1.5 rounded hover:bg-muted transition-colors"
       class:bg-muted={currentAlign === 'right'}
-      title="Align Right"
+      title={$_('editor.alignRight')}
     >
       <Icon icon="mdi:format-align-right" class="w-4 h-4" />
     </button>
@@ -551,7 +552,7 @@
       onclick={insertLink}
       class="p-1.5 rounded hover:bg-muted transition-colors"
       class:bg-muted={activeStates.link}
-      title="Insert Link"
+      title={$_('editor.insertLink')}
     >
       <Icon icon="mdi:link" class="w-4 h-4" />
     </button>
@@ -560,7 +561,7 @@
         type="button"
         onclick={removeLink}
         class="p-1.5 rounded hover:bg-muted transition-colors text-destructive"
-        title="Remove Link"
+        title={$_('editor.removeLink')}
       >
         <Icon icon="mdi:link-off" class="w-4 h-4" />
       </button>
@@ -572,7 +573,7 @@
       type="button"
       onclick={insertImageUrl}
       class="p-1.5 rounded hover:bg-muted transition-colors"
-      title="Insert Image from URL"
+      title={$_('editor.insertImageUrl')}
     >
       <Icon icon="mdi:image-outline" class="w-4 h-4" />
     </button>
@@ -580,7 +581,7 @@
       type="button"
       onclick={insertImageFile}
       class="p-1.5 rounded hover:bg-muted transition-colors"
-      title="Insert Image from File"
+      title={$_('editor.insertImageFile')}
     >
       <Icon icon="mdi:image-plus" class="w-4 h-4" />
     </button>

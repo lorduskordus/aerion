@@ -5,6 +5,7 @@
   import { GetAppInfo } from '../../../../wailsjs/go/app/App.js'
   import { BrowserOpenURL } from '../../../../wailsjs/runtime/runtime'
   import logo from '../../../assets/images/logo-universal.png'
+  import { _ } from '$lib/i18n'
 
   interface AppInfo {
     name: string
@@ -54,7 +55,7 @@
       <img src={logo} alt="{appInfo.name} Logo" class="w-24 h-24" />
       <div class="text-center space-y-1">
         <h2 class="text-2xl font-bold text-foreground">{appInfo.name}</h2>
-        <p class="text-sm text-muted-foreground">Version {appInfo.version}</p>
+        <p class="text-sm text-muted-foreground">{$_('settingsAbout.version', { values: { version: appInfo.version } })}</p>
       </div>
     </div>
 
@@ -70,25 +71,25 @@
         class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors"
       >
         <Icon icon="mdi:github" class="w-5 h-5" />
-        <span>GitHub</span>
+        <span>{$_('settingsAbout.github')}</span>
       </button>
       <button
         onclick={openPrivacyPolicy}
         class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors"
       >
         <Icon icon="mdi:shield-account" class="w-5 h-5" />
-        <span>Privacy Policy</span>
+        <span>{$_('settingsAbout.privacyPolicy')}</span>
       </button>
       <button
         onclick={openTermsOfService}
         class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors"
       >
         <Icon icon="mdi:file-document" class="w-5 h-5" />
-        <span>Terms of Use</span>
+        <span>{$_('settingsAbout.termsOfUse')}</span>
       </button>
     </div>
 
   {:else}
-    <p class="text-muted-foreground">Failed to load app information</p>
+    <p class="text-muted-foreground">{$_('settingsAbout.failedToLoad')}</p>
   {/if}
 </div>

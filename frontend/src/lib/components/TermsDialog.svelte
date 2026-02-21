@@ -5,6 +5,7 @@
   import Switch from '$lib/components/ui/switch/Switch.svelte'
   // @ts-ignore - wailsjs path
   import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
+  import { _ } from '$lib/i18n'
 
   interface Props {
     open: boolean
@@ -54,18 +55,17 @@
       <!-- Header -->
       <div class="flex flex-col space-y-1.5 text-center sm:text-left">
         <h2 class="text-lg font-semibold leading-none tracking-tight">
-          Terms of Use & Privacy Policy
+          {$_('terms.title')}
         </h2>
         <p class="text-sm text-muted-foreground">
-          Please review and accept our terms to continue using Aerion.
+          {$_('terms.description')}
         </p>
       </div>
 
       <!-- Content -->
       <div class="space-y-4">
         <p class="text-sm text-muted-foreground">
-          These documents explain how the application handles your data and the terms
-          under which you may use this software.
+          {$_('terms.content')}
         </p>
 
         <div class="flex flex-col gap-2">
@@ -79,7 +79,7 @@
               <polyline points="15 3 21 3 21 9"/>
               <line x1="10" y1="14" x2="21" y2="3"/>
             </svg>
-            Privacy Policy
+            {$_('terms.privacyPolicy')}
           </button>
           <button
             type="button"
@@ -91,7 +91,7 @@
               <polyline points="15 3 21 3 21 9"/>
               <line x1="10" y1="14" x2="21" y2="3"/>
             </svg>
-            Terms of Use
+            {$_('terms.termsOfUse')}
           </button>
         </div>
 
@@ -102,7 +102,7 @@
             id="agree-terms"
           />
           <label for="agree-terms" class="text-sm cursor-pointer">
-            I have read and agree to the Terms of Use and Privacy Policy
+            {$_('terms.agreeLabel')}
           </label>
         </div>
       </div>
@@ -110,7 +110,7 @@
       <!-- Footer -->
       <div class="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
         <Button onclick={handleAccept} disabled={!agreed}>
-          Accept & Continue
+          {$_('terms.accept')}
         </Button>
       </div>
     </DialogPrimitive.Content>

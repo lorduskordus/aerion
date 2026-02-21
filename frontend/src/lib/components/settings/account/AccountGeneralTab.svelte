@@ -8,6 +8,7 @@
   import {
     syncPeriodOptions,
   } from '$lib/config/providers'
+  import { _ } from '$lib/i18n'
   // @ts-ignore - wailsjs path
   import { account } from '../../../../../wailsjs/go/models'
 
@@ -73,24 +74,24 @@
   <div class="space-y-4">
     <h3 class="text-sm font-medium flex items-center gap-2">
       <Icon icon="mdi:account-circle-outline" class="w-4 h-4" />
-      Account Identification
+      {$_('account.accountIdentification')}
     </h3>
 
     <div class="space-y-2">
-      <Label for="name">Account Name</Label>
+      <Label for="name">{$_('account.accountName')}</Label>
       <div class="flex items-center gap-3">
         <ColorPicker value={color} onchange={(c) => { color = c; onColorChange(c) }} />
         <Input
           id="name"
           type="text"
-          placeholder="e.g., Personal, Work"
+          placeholder={$_('account.accountNamePlaceholder')}
           bind:value={name}
           oninput={(e) => onNameChange((e.target as HTMLInputElement).value)}
           class={errors.name ? 'border-destructive' : ''}
         />
       </div>
       <p class="text-xs text-muted-foreground">
-        Color is used to identify this account in unified inbox
+        {$_('account.colorHelp')}
       </p>
       {#if errors.name}
         <p class="text-sm text-destructive">{errors.name}</p>
@@ -98,17 +99,17 @@
     </div>
 
     <div class="space-y-2">
-      <Label for="displayName">Default Display Name</Label>
+      <Label for="displayName">{$_('account.displayName')}</Label>
       <Input
         id="displayName"
         type="text"
-        placeholder="e.g., John Smith"
+        placeholder={$_('account.displayNamePlaceholder')}
         bind:value={displayName}
         oninput={(e) => onDisplayNameChange((e.target as HTMLInputElement).value)}
         class={errors.displayName ? 'border-destructive' : ''}
       />
       <p class="text-xs text-muted-foreground">
-        Name shown to email recipients (can be customized per email address in Identity tab)
+        {$_('account.displayNameHelp')}
       </p>
       {#if errors.displayName}
         <p class="text-sm text-destructive">{errors.displayName}</p>
@@ -123,11 +124,11 @@
   <div class="space-y-4">
     <h3 class="text-sm font-medium flex items-center gap-2">
       <Icon icon="mdi:key-outline" class="w-4 h-4" />
-      Credentials
+      {$_('account.credentials')}
     </h3>
 
     <div class="space-y-2">
-      <Label for="email">Email Address</Label>
+      <Label for="email">{$_('account.emailAddress')}</Label>
       <Input
         id="email"
         type="email"
@@ -136,28 +137,28 @@
         class="bg-muted"
       />
       <p class="text-xs text-muted-foreground">
-        Primary email address (cannot be changed)
+        {$_('account.emailReadOnly')}
       </p>
     </div>
 
     <div class="space-y-2">
-      <Label for="username">Username</Label>
+      <Label for="username">{$_('account.username')}</Label>
       <Input
         id="username"
         type="text"
-        placeholder="Usually your email address"
+        placeholder={$_('account.usernamePlaceholder')}
         bind:value={username}
         oninput={(e) => onUsernameChange((e.target as HTMLInputElement).value)}
       />
       <p class="text-xs text-muted-foreground">
-        Leave empty to use email address
+        {$_('account.usernameHelp')}
       </p>
     </div>
 
     {#if authType === 'oauth2'}
       <!-- OAuth account -->
       <div class="space-y-2">
-        <Label>Authentication</Label>
+        <Label>{$_('account.authentication')}</Label>
         <div class="rounded-lg border {reauthorizeSuccess ? 'border-green-500 bg-green-500/5' : 'border-border'} p-4 transition-colors">
           <div class="flex items-center gap-3">
             <div class="flex-shrink-0 w-10 h-10 rounded-full {reauthorizeSuccess ? 'bg-green-500/20' : 'bg-primary/10'} flex items-center justify-center transition-colors">
@@ -169,14 +170,14 @@
             </div>
             <div class="flex-1">
               {#if reauthorizeSuccess}
-                <p class="text-sm font-medium text-green-600 dark:text-green-400">Re-authorized successfully!</p>
+                <p class="text-sm font-medium text-green-600 dark:text-green-400">{$_('account.oauthReauthorized')}</p>
                 <p class="text-xs text-muted-foreground">
-                  Your account has a fresh OAuth token
+                  {$_('account.oauthFreshToken')}
                 </p>
               {:else}
-                <p class="text-sm font-medium">Connected via OAuth</p>
+                <p class="text-sm font-medium">{$_('account.oauthConnected')}</p>
                 <p class="text-xs text-muted-foreground">
-                  Your account is securely connected
+                  {$_('account.oauthSecurelyConnected')}
                 </p>
               {/if}
             </div>
@@ -189,10 +190,10 @@
               >
                 {#if reauthorizing}
                   <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
-                  Authorizing...
+                  {$_('account.authorizing')}
                 {:else}
                   <Icon icon="mdi:refresh" class="w-4 h-4 mr-2" />
-                  Re-authorize
+                  {$_('account.reauthorize')}
                 {/if}
               </Button>
             {/if}
@@ -200,18 +201,18 @@
         </div>
         {#if !reauthorizeSuccess}
           <p class="text-xs text-muted-foreground">
-            If you're having sync issues, try re-authorizing to get a fresh token
+            {$_('account.reauthorizeHelp')}
           </p>
         {/if}
       </div>
     {:else}
       <!-- Password account -->
       <div class="space-y-2">
-        <Label for="password">Password</Label>
+        <Label for="password">{$_('account.password')}</Label>
         <Input
           id="password"
           type="password"
-          placeholder="Leave empty to keep current"
+          placeholder={$_('account.leaveEmptyToKeep')}
           bind:value={password}
           oninput={(e) => onPasswordChange((e.target as HTMLInputElement).value)}
           class={errors.password ? 'border-destructive' : ''}
@@ -230,11 +231,11 @@
   <div class="space-y-4">
     <h3 class="text-sm font-medium flex items-center gap-2">
       <Icon icon="mdi:sync" class="w-4 h-4" />
-      Sync Settings
+      {$_('account.syncSettings')}
     </h3>
 
     <div class="space-y-2">
-      <Label>Sync Period</Label>
+      <Label>{$_('account.syncPeriod')}</Label>
       <Select.Root 
         value={syncPeriodDays} 
         onValueChange={(v) => { syncPeriodDays = v; onSyncPeriodChange(v) }}
@@ -251,7 +252,7 @@
         </Select.Content>
       </Select.Root>
       <p class="text-xs text-muted-foreground">
-        How far back to sync messages
+        {$_('account.syncPeriodHelp')}
       </p>
     </div>
   </div>

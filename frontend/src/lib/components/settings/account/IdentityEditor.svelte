@@ -4,6 +4,7 @@
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import { Label } from '$lib/components/ui/label'
+  import { _ } from '$lib/i18n'
   import SignatureEditor from './SignatureEditor.svelte'
   // @ts-ignore - wailsjs path
   import { account } from '../../../../../wailsjs/go/models'
@@ -80,13 +81,13 @@
     errors = {}
     
     if (!email.trim()) {
-      errors.email = 'Email address is required'
+      errors.email = $_('identity.emailRequired')
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errors.email = 'Invalid email format'
+      errors.email = $_('identity.invalidEmailFormat')
     }
     
     if (!name.trim()) {
-      errors.name = 'Display name is required'
+      errors.name = $_('identity.displayNameRequired')
     }
     
     return Object.keys(errors).length === 0
@@ -163,12 +164,12 @@
   <Dialog.Content class="max-w-lg max-h-[90vh] overflow-y-auto">
     <Dialog.Header>
       <Dialog.Title>
-        {identity ? 'Edit Email Address' : 'Add Email Address'}
+        {identity ? $_('identity.editEmailTitle') : $_('identity.addEmailTitle')}
       </Dialog.Title>
       <Dialog.Description>
-        {identity 
-          ? 'Update this email address and its signature settings.'
-          : 'Add a new email address you can send from.'}
+        {identity
+          ? $_('identity.editEmailDescription')
+          : $_('identity.addEmailDescription')}
       </Dialog.Description>
     </Dialog.Header>
 
@@ -176,7 +177,7 @@
       <!-- Email & Name -->
       <div class="space-y-4">
         <div class="space-y-2">
-          <Label for="email">Email Address</Label>
+          <Label for="email">{$_('identity.emailAddressLabel')}</Label>
           <Input
             id="email"
             type="email"
@@ -190,7 +191,7 @@
         </div>
 
         <div class="space-y-2">
-          <Label for="name">Display Name</Label>
+          <Label for="name">{$_('identity.displayNameLabel')}</Label>
           <Input
             id="name"
             type="text"
@@ -199,7 +200,7 @@
             class={errors.name ? 'border-destructive' : ''}
           />
           <p class="text-xs text-muted-foreground">
-            Name shown to email recipients
+            {$_('identity.displayNameHelp')}
           </p>
           {#if errors.name}
             <p class="text-sm text-destructive">{errors.name}</p>
@@ -220,28 +221,28 @@
             class="w-4 h-4 rounded border-input accent-primary"
           />
           <Label for="signatureEnabled" class="cursor-pointer font-medium">
-            Use signature
+            {$_('identity.useSignature')}
           </Label>
         </div>
 
         {#if signatureEnabled}
           <!-- HTML Signature Editor -->
           <div class="space-y-2">
-            <Label>HTML Signature</Label>
+            <Label>{$_('identity.htmlSignature')}</Label>
             <SignatureEditor
               value={signatureHtml}
               placeholder="Enter your signature..."
               onchange={(html) => signatureHtml = html}
             />
             <p class="text-xs text-muted-foreground">
-              You can paste HTML content or add images via URL or file upload
+              {$_('identity.signatureHelp')}
             </p>
           </div>
 
           <!-- Plain Text Signature -->
           <div class="space-y-2">
             <div class="flex items-center justify-between">
-              <Label for="signatureText">Plain Text Signature (optional)</Label>
+              <Label for="signatureText">{$_('identity.plainTextSignature')}</Label>
               <Button
                 type="button"
                 variant="ghost"
@@ -250,7 +251,7 @@
                 disabled={!signatureHtml}
                 class="text-xs h-7"
               >
-                Generate from HTML
+                {$_('identity.generateFromHtml')}
               </Button>
             </div>
             <textarea
@@ -260,7 +261,7 @@
               class="w-full min-h-[80px] p-3 text-sm bg-background border border-input rounded-md resize-y focus:outline-none focus:ring-2 focus:ring-ring font-mono"
             ></textarea>
             <p class="text-xs text-muted-foreground">
-              Used when sending plain text emails
+              {$_('identity.plainTextHelp')}
             </p>
           </div>
 
@@ -269,7 +270,7 @@
 
           <!-- Signature Behavior -->
           <div class="space-y-4">
-            <Label class="font-medium">Append signature to:</Label>
+            <Label class="font-medium">{$_('identity.appendSignatureTo')}</Label>
             <div class="flex flex-wrap gap-4">
               <label class="flex items-center gap-2 cursor-pointer">
                 <input
@@ -277,7 +278,7 @@
                   bind:checked={signatureForNew}
                   class="w-4 h-4 rounded border-input accent-primary"
                 />
-                <span class="text-sm">New messages</span>
+                <span class="text-sm">{$_('identity.newMessages')}</span>
               </label>
               <label class="flex items-center gap-2 cursor-pointer">
                 <input
@@ -285,7 +286,7 @@
                   bind:checked={signatureForReply}
                   class="w-4 h-4 rounded border-input accent-primary"
                 />
-                <span class="text-sm">Replies</span>
+                <span class="text-sm">{$_('identity.replies')}</span>
               </label>
               <label class="flex items-center gap-2 cursor-pointer">
                 <input
@@ -293,14 +294,14 @@
                   bind:checked={signatureForForward}
                   class="w-4 h-4 rounded border-input accent-primary"
                 />
-                <span class="text-sm">Forwards</span>
+                <span class="text-sm">{$_('identity.forwards')}</span>
               </label>
             </div>
           </div>
 
           <!-- Signature Placement -->
           <div class="space-y-3">
-            <Label class="font-medium">Signature placement in replies/forwards:</Label>
+            <Label class="font-medium">{$_('identity.signaturePlacementLabel')}</Label>
             <div class="flex gap-4">
               <label class="flex items-center gap-2 cursor-pointer">
                 <input
@@ -310,7 +311,7 @@
                   bind:group={signaturePlacement}
                   class="w-4 h-4 accent-primary"
                 />
-                <span class="text-sm">Above quoted text</span>
+                <span class="text-sm">{$_('identity.aboveQuotedText')}</span>
               </label>
               <label class="flex items-center gap-2 cursor-pointer">
                 <input
@@ -320,7 +321,7 @@
                   bind:group={signaturePlacement}
                   class="w-4 h-4 accent-primary"
                 />
-                <span class="text-sm">Below quoted text</span>
+                <span class="text-sm">{$_('identity.belowQuotedText')}</span>
               </label>
             </div>
           </div>
@@ -334,7 +335,7 @@
               class="w-4 h-4 rounded border-input accent-primary"
             />
             <Label for="signatureSeparator" class="cursor-pointer text-sm">
-              Add separator line before signature (<code class="text-xs bg-muted px-1 rounded">-- </code>)
+              {$_('identity.addSeparator')} (<code class="text-xs bg-muted px-1 rounded">-- </code>)
             </Label>
           </div>
         {/if}
@@ -351,13 +352,13 @@
       <!-- Actions -->
       <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="ghost" onclick={handleCancel} disabled={saving}>
-          Cancel
+          {$_('common.cancel')}
         </Button>
         <Button type="submit" disabled={saving}>
           {#if saving}
             <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
           {/if}
-          {identity ? 'Save Changes' : 'Add Email Address'}
+          {identity ? $_('identity.saveIdentityChanges') : $_('identity.addEmailAddressButton')}
         </Button>
       </div>
     </form>

@@ -474,7 +474,7 @@ func determineFolderType(name string, attrs []imap.MailboxAttr) FolderType {
 		return FolderTypeSent
 	case containsIgnoreCase(name, "draft"):
 		return FolderTypeDrafts
-	case containsIgnoreCase(name, "trash") || containsIgnoreCase(name, "deleted"):
+	case containsIgnoreCase(name, "trash") || containsIgnoreCase(name, "deleted") || containsIgnoreCase(name, "bin"):
 		return FolderTypeTrash
 	case containsIgnoreCase(name, "spam") || containsIgnoreCase(name, "junk"):
 		return FolderTypeSpam

@@ -319,3 +319,44 @@ mark {
   max-width: 100%;
   height: auto;
 }
+
+/* Responsive layout overlays */
+.responsive-sidebar-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 30;
+  transform: translateX(-100%);
+  transition: transform 0.25s ease-out;
+}
+
+.responsive-sidebar-visible {
+  transform: translateX(0);
+}
+
+.responsive-viewer-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  transform: translateX(100%);
+  transition: transform 0.25s ease-out;
+}
+
+.responsive-viewer-visible {
+  transform: translateX(0);
+}
+
+.responsive-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 29;
+  background: rgba(0, 0, 0, 0);
+  pointer-events: none;
+  transition: background 0.25s ease-out;
+}
+
+.responsive-scrim-visible {
+  background: rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+}

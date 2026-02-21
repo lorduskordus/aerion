@@ -1,5 +1,6 @@
 <script lang="ts">
   import { fly } from 'svelte/transition'
+  import { _ } from '$lib/i18n'
 
   interface Props {
     value: string
@@ -89,7 +90,7 @@
     class="w-8 h-8 rounded-md border border-border shadow-sm cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
     style="background-color: {displayColor}"
     onclick={togglePopover}
-    aria-label="Select color"
+    aria-label={$_('aria.selectColor')}
   ></button>
 
   <!-- Popover -->
@@ -106,7 +107,7 @@
             class="w-10 h-10 rounded-md border-2 cursor-pointer hover:scale-110 transition-transform {preset === value ? 'border-primary ring-2 ring-primary/50' : 'border-transparent'}"
             style="background-color: {preset}"
             onclick={() => selectPreset(preset)}
-            aria-label="Select {preset}"
+            aria-label={$_('aria.selectPresetColor', { values: { color: preset } })}
           ></button>
         {/each}
       </div>

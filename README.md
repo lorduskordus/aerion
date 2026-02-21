@@ -42,8 +42,6 @@ Although Linux is a first-class citizen here, it should also work on:
 - MacOS
 - Windows
 
-Some of the system level features (clickable notifications & auto-sync on wake) are not yet implemented on MacOS and Windows.
-
 
 ### 🪶 Features
 ---
@@ -131,7 +129,7 @@ For more information, check the [Installation Section](https://aerion.3df.io/doc
 ### ⚗️ Tech Stack
 ---
 
-This application was built with [Wails](https://wails.io) + [Svelte](https://svelte.dev/) and largely implemented by various versions of Claude Opus & Sonnet models with lots of prompted refactors and manual edits.
+This application was built with [Wails](https://wails.io) + [Svelte](https://svelte.dev/) and implemented by various versions of Claude Opus & Sonnet models with lots of prompted refactors and manual edits.
 
 
 ### 🧑🏻‍💻 Roadmap
@@ -139,12 +137,11 @@ This application was built with [Wails](https://wails.io) + [Svelte](https://sve
 
 Potential features in the future:
 
-- Responsive layout (For tiled windows, Linux Phones, and Tablets)
 - Customizable shortcut keys?
 - Advance Search
 - Explore the possibility of supporting [Age](https://github.com/FiloSottile/age) as an encryption method
 - Integrated Calendar?
-- AI Assisted Composition
+- AI Assisted Composition (Ollama)
 
 
 ### 💰 Sponsorship

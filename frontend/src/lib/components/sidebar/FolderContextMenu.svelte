@@ -12,6 +12,7 @@
   } from '../../../../wailsjs/go/app/App'
   import { toasts } from '$lib/stores/toast'
   import type { Snippet } from 'svelte'
+  import { _ } from '$lib/i18n'
 
   interface Props {
     folderId: string
@@ -26,27 +27,27 @@
   async function handleUndo() {
     try {
       const description = await Undo()
-      toasts.success(`Undone: ${description}`)
+      toasts.success($_('toast.undone', { values: { description } }))
     } catch (err) {
-      toasts.error(`Undo failed: ${err}`)
+      toasts.error($_('toast.undoFailed', { values: { error: String(err) } }))
     }
   }
 
   async function handleMarkAllRead() {
     try {
       await MarkAllFolderMessagesAsRead(folderId)
-      toasts.success('Marked all as read', [{ label: 'Undo', onClick: handleUndo }])
+      toasts.success($_('toast.markedAllAsRead'), [{ label: $_('common.undo'), onClick: handleUndo }])
     } catch (err) {
-      toasts.error(`Failed to mark all as read: ${err}`)
+      toasts.error($_('toast.failedToMarkAllAsRead', { values: { error: String(err) } }))
     }
   }
 
   async function handleMarkAllUnread() {
     try {
       await MarkAllFolderMessagesAsUnread(folderId)
-      toasts.success('Marked all as unread', [{ label: 'Undo', onClick: handleUndo }])
+      toasts.success($_('toast.markedAllAsUnread'), [{ label: $_('common.undo'), onClick: handleUndo }])
     } catch (err) {
-      toasts.error(`Failed to mark all as unread: ${err}`)
+      toasts.error($_('toast.failedToMarkAllAsUnread', { values: { error: String(err) } }))
     }
   }
 </script>
@@ -61,11 +62,11 @@
   <ContextMenuContent>
     <ContextMenuItem onSelect={handleMarkAllRead}>
       <Icon icon="mdi:email-check-outline" class="mr-2 h-4 w-4" />
-      Mark All as Read
+      {$_('contextMenu.markAllAsRead')}
     </ContextMenuItem>
     <ContextMenuItem onSelect={handleMarkAllUnread}>
       <Icon icon="mdi:email-outline" class="mr-2 h-4 w-4" />
-      Mark All as Unread
+      {$_('contextMenu.markAllAsUnread')}
     </ContextMenuItem>
   </ContextMenuContent>
 </ContextMenuPrimitive.Root>

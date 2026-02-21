@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from '@iconify/svelte'
   import { formatRelativeDate } from '$lib/utils/date'
+  import { _ } from '$lib/i18n'
   // @ts-ignore - wailsjs path
   import { message } from '../../../../wailsjs/go/models'
   import MessageContextMenu from '$lib/components/common/MessageContextMenu.svelte'
@@ -24,6 +25,7 @@
     highlightedFromName?: string    // From name with <mark> tags for search highlighting
     searchFolderName?: string       // Folder name to display in search results
     searchFolderType?: string       // Folder type for icon in search results
+    isNonLocal?: boolean            // Show cloud icon for non-local server search results
     onSelect: (e?: MouseEvent) => void
     onCheck: (checked: boolean) => void
     onClearSelection: () => void  // Clear multi-select when right-clicking unchecked row
@@ -50,6 +52,7 @@
     highlightedFromName = '',
     searchFolderName = '',
     searchFolderType = '',
+    isNonLocal = false,
     onSelect,
     onCheck,
     onClearSelection,
@@ -134,7 +137,7 @@
   // Get display name for participants
   function getParticipantNames(): string {
     if (!conversation.participants || conversation.participants.length === 0) {
-      return 'Unknown'
+      return $_('viewer.unknown')
     }
 
     const names = conversation.participants.map((p) => p.name || p.email.split('@')[0])
@@ -316,7 +319,7 @@
         {#if isSearchResult && searchFolderName}
           <span
             class="flex-shrink-0 {densityClasses.badge[density]} rounded bg-muted/50 text-muted-foreground flex items-center gap-1"
-            title="Found in {searchFolderName}"
+            title={$_('messageList.foundIn', { values: { folder: searchFolderName } })}
           >
             <Icon icon="mdi:folder-outline" class="w-3 h-3" />
             {searchFolderName}
@@ -325,6 +328,11 @@
 
         <!-- Indicators -->
         <div class="flex items-center gap-1 flex-shrink-0">
+          {#if isNonLocal}
+            <span title={$_('search.notSyncedLocally')}>
+              <Icon icon="mdi:cloud-outline" class="{densityClasses.icon[density]} text-muted-foreground" />
+            </span>
+          {/if}
           {#if conversation.hasAttachments}
             <Icon icon="mdi:paperclip" class="{densityClasses.icon[density]} text-muted-foreground" />
           {/if}
@@ -347,7 +355,7 @@
         <p
           class="truncate {densityClasses.text[density]} {hasUnread ? 'font-medium text-foreground' : 'text-muted-foreground'}"
         >
-          {conversation.subject || '(No subject)'}
+          {conversation.subject || $_('viewer.noSubject')}
         </p>
       {/if}
 

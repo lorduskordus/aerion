@@ -12,6 +12,7 @@
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { oauthStore } from '$lib/stores/oauth.svelte'
   import { addToast } from '$lib/stores/toast'
+  import { _ } from '$lib/i18n'
   // @ts-ignore - wailsjs path
   import { account } from '../../../../wailsjs/go/models'
   // @ts-ignore - wailsjs path
@@ -131,12 +132,12 @@
   function validate(): boolean {
     errors = {}
 
-    if (!name.trim()) errors.name = 'Account name is required'
-    if (!displayName.trim()) errors.displayName = 'Display name is required'
-    if (!imapHost.trim()) errors.imapHost = 'IMAP host is required'
-    if (!smtpHost.trim()) errors.smtpHost = 'SMTP host is required'
-    if (imapPort < 1 || imapPort > 65535) errors.imapPort = 'Invalid port'
-    if (smtpPort < 1 || smtpPort > 65535) errors.smtpPort = 'Invalid port'
+    if (!name.trim()) errors.name = $_('account.accountNameRequired')
+    if (!displayName.trim()) errors.displayName = $_('account.displayNameRequired')
+    if (!imapHost.trim()) errors.imapHost = $_('account.imapHostRequired')
+    if (!smtpHost.trim()) errors.smtpHost = $_('account.smtpHostRequired')
+    if (imapPort < 1 || imapPort > 65535) errors.imapPort = $_('account.invalidPort')
+    if (smtpPort < 1 || smtpPort > 65535) errors.smtpPort = $_('account.invalidPort')
 
     return Object.keys(errors).length === 0
   }
@@ -176,7 +177,7 @@
       
       addToast({
         type: 'success',
-        message: 'Account settings saved',
+        message: $_('toast.accountSaved'),
       })
 
       onSuccess?.(result)
@@ -186,7 +187,7 @@
       console.error('Failed to save account:', err)
       addToast({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Failed to save account',
+        message: $_('toast.failedToSaveAccount', { values: { error: err instanceof Error ? err.message : String(err) } }),
       })
     } finally {
       saving = false
@@ -249,14 +250,14 @@
       reauthorizeSuccess = true
       addToast({
         type: 'success',
-        message: `${accountName} re-authorized successfully! Syncing...`,
+        message: $_('toast.reauthorized', { values: { name: accountName } }),
         duration: 5000,
       })
       // Trigger a sync to verify the new token works
       await accountStore.syncAccount(accountId)
       addToast({
         type: 'success',
-        message: `${accountName} sync completed`,
+        message: $_('toast.syncCompleted', { values: { name: accountName } }),
         duration: 3000,
       })
     } catch (err) {
@@ -264,7 +265,7 @@
       reauthorizeSuccess = false
       addToast({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Failed to re-authorize account',
+        message: $_('toast.failedToReauthorize', { values: { error: err instanceof Error ? err.message : String(err) } }),
         duration: 8000,
       })
     } finally {
@@ -277,12 +278,12 @@
   <Dialog.Content class="max-w-xl max-h-[90vh] overflow-hidden flex flex-col" preventCloseAutoFocus>
     <Dialog.Header>
       <Dialog.Title>
-        {editAccount ? 'Edit Account' : 'Add Email Account'}
+        {editAccount ? $_('account.editTitle') : $_('account.addTitle')}
       </Dialog.Title>
       <Dialog.Description>
         {editAccount
-          ? 'Manage your email account settings, identities, and signatures.'
-          : 'Connect your email account to start receiving messages.'}
+          ? $_('account.editDescription')
+          : $_('account.addDescription')}
       </Dialog.Description>
     </Dialog.Header>
 
@@ -292,19 +293,19 @@
         <Tabs.List class="grid w-full grid-cols-4">
           <Tabs.Trigger value="general" class="flex items-center gap-2">
             <Icon icon="mdi:cog" class="w-4 h-4" />
-            General
+            {$_('account.general')}
           </Tabs.Trigger>
           <Tabs.Trigger value="identity" class="flex items-center gap-2">
             <Icon icon="mdi:account-multiple" class="w-4 h-4" />
-            Identity
+            {$_('account.identity')}
           </Tabs.Trigger>
           <Tabs.Trigger value="server" class="flex items-center gap-2">
             <Icon icon="mdi:server" class="w-4 h-4" />
-            Server
+            {$_('account.server')}
           </Tabs.Trigger>
           <Tabs.Trigger value="security" class="flex items-center gap-2">
             <Icon icon="mdi:shield-lock-outline" class="w-4 h-4" />
-            Security
+            {$_('account.security')}
           </Tabs.Trigger>
         </Tabs.List>
 
@@ -387,19 +388,19 @@
         {#if activeTab === 'identity' || activeTab === 'security'}
           <div class="flex items-center justify-end gap-2 pt-4 border-t border-border mt-4">
             <Button variant="ghost" onclick={handleCancel}>
-              Close
+              {$_('common.close')}
             </Button>
           </div>
         {:else}
           <div class="flex items-center justify-end gap-2 pt-4 border-t border-border mt-4">
             <Button variant="ghost" onclick={handleCancel} disabled={saving}>
-              Cancel
+              {$_('common.cancel')}
             </Button>
             <Button onclick={handleSaveEdit} disabled={saving}>
               {#if saving}
                 <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
               {/if}
-              Save Changes
+              {$_('common.saveChanges')}
             </Button>
           </div>
         {/if}

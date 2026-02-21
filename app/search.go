@@ -1,7 +1,11 @@
 package app
 
 import (
+	"context"
+	"time"
+
 	"github.com/hkdb/aerion/internal/message"
+	"github.com/hkdb/aerion/internal/sync"
 )
 
 // ============================================================================
@@ -56,4 +60,21 @@ func (a *App) IsFTSIndexing() bool {
 // RebuildFTSIndex forces a rebuild of the FTS index for a folder
 func (a *App) RebuildFTSIndex(folderID string) error {
 	return a.ftsIndexer.RebuildIndex(a.ctx, folderID)
+}
+
+// IMAPSearchFolder performs a server-side IMAP SEARCH query on a specific folder.
+// Returns results with local message data where available, envelope data for non-local messages.
+// When limit > 0, only the newest `limit` results are returned but totalCount reflects all matches.
+func (a *App) IMAPSearchFolder(accountID, folderID, query string, limit int) (*sync.IMAPSearchResponse, error) {
+	ctx, cancel := context.WithTimeout(a.ctx, 60*time.Second)
+	defer cancel()
+	return a.syncEngine.IMAPSearch(ctx, accountID, folderID, query, limit)
+}
+
+// FetchServerMessage fetches a full message by UID from the IMAP server, saves it locally,
+// and returns it. Used when interacting with non-local server search results.
+func (a *App) FetchServerMessage(accountID, folderID string, uid int) (*message.Message, error) {
+	ctx, cancel := context.WithTimeout(a.ctx, 30*time.Second)
+	defer cancel()
+	return a.syncEngine.FetchServerMessage(ctx, accountID, folderID, uint32(uid))
 }

@@ -359,9 +359,8 @@ func (a *App) initNotifications(ctx context.Context) {
 			Str("threadId", data.ThreadID).
 			Msg("Notification clicked, navigating to message")
 
-		// Bring window to foreground and unminimise if needed
-		wailsRuntime.WindowUnminimise(a.ctx)
-		wailsRuntime.WindowShow(a.ctx)
+		// Bring window to foreground
+		a.ShowWindow()
 
 		// Emit event to frontend to navigate to the message
 		wailsRuntime.EventsEmit(a.ctx, "notification:clicked", map[string]interface{}{

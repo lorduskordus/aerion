@@ -4,6 +4,7 @@
   import type { account, folder } from '../../../../wailsjs/go/models'
   import { isUnifiedInboxExpanded, setUnifiedInboxExpanded } from '$lib/stores/uiState.svelte'
   import FolderContextMenu from './FolderContextMenu.svelte'
+  import { _ } from '$lib/i18n'
 
   interface AccountWithInbox {
     account: account.Account
@@ -93,7 +94,7 @@
       <Icon icon="mdi:inbox-multiple" class="w-4 h-4 flex-shrink-0" />
 
       <!-- Label -->
-      <span class="flex-1 text-left text-sm font-medium truncate">All Inboxes</span>
+      <span class="flex-1 text-left text-sm font-medium truncate">{$_('sidebar.allInboxes')}</span>
 
       <!-- Unread Badge -->
       {#if unifiedUnreadCount > 0}

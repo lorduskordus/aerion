@@ -15,6 +15,7 @@
   import { setFocusedPane } from '$lib/stores/keyboard.svelte'
   import { ConfirmDialog } from '$lib/components/ui/confirm-dialog'
   import MessageContextMenu from '$lib/components/common/MessageContextMenu.svelte'
+  import { _ } from '$lib/i18n'
 
   interface Props {
     threadId?: string | null
@@ -27,6 +28,8 @@
     onActionComplete?: (autoSelectNext?: boolean) => void
     isFocused?: boolean
     isFlashing?: boolean
+    showBackButton?: boolean
+    onBack?: () => void
   }
 
   let {
@@ -40,6 +43,8 @@
     onActionComplete,
     isFocused = false,
     isFlashing = false,
+    showBackButton = false,
+    onBack,
   }: Props = $props()
 
   // Decrypted attachment metadata
@@ -613,12 +618,12 @@
     
     try {
       await Archive(messageIds)
-      toasts.success('Conversation archived', [
-        { label: 'Undo', onClick: handleUndo }
+      toasts.success($_('toast.conversationArchived'), [
+        { label: $_('common.undo'), onClick: handleUndo }
       ])
       onActionComplete?.(true)
     } catch (err) {
-      toasts.error(`Failed to archive: ${err}`)
+      toasts.error($_('toast.failedToArchive', { values: { error: String(err) } }))
     }
   }
 
@@ -633,12 +638,12 @@
       const messageIds = conversation.messages.map(m => m.id)
       try {
         await Trash(messageIds)
-        toasts.success('Moved to trash', [
-          { label: 'Undo', onClick: handleUndo }
+        toasts.success($_('toast.movedToTrash'), [
+          { label: $_('common.undo'), onClick: handleUndo }
         ])
         onActionComplete?.(true)
       } catch (err) {
-        toasts.error(`Failed to delete: ${err}`)
+        toasts.error($_('toast.failedToDelete', { values: { error: String(err) } }))
       }
     }
   }
@@ -649,11 +654,11 @@
 
     try {
       await DeletePermanently(messageIds)
-      toasts.success('Permanently deleted')
+      toasts.success($_('toast.permanentlyDeleted'))
       showDeleteConfirm = false
       onActionComplete?.(true)
     } catch (err) {
-      toasts.error(`Failed to delete: ${err}`)
+      toasts.error($_('toast.failedToDelete', { values: { error: String(err) } }))
       showDeleteConfirm = false
     }
   }
@@ -666,23 +671,23 @@
       // Permanent delete from trash
       try {
         await DeletePermanently([focusedMessageId])
-        toasts.success('Permanently deleted')
+        toasts.success($_('toast.permanentlyDeleted'))
         focusedMessageId = null
         // Will auto-reload via messages:deleted event
       } catch (err) {
-        toasts.error(`Failed to delete: ${err}`)
+        toasts.error($_('toast.failedToDelete', { values: { error: String(err) } }))
       }
     } else {
       // Move to trash (undoable)
       try {
         await Trash([focusedMessageId])
-        toasts.success('Moved to trash', [
-          { label: 'Undo', onClick: handleUndo }
+        toasts.success($_('toast.movedToTrash'), [
+          { label: $_('common.undo'), onClick: handleUndo }
         ])
         focusedMessageId = null
         // Will auto-reload via messages:deleted event
       } catch (err) {
-        toasts.error(`Failed to delete: ${err}`)
+        toasts.error($_('toast.failedToDelete', { values: { error: String(err) } }))
       }
     }
   }
@@ -695,19 +700,19 @@
       if (isSpamFolder) {
         // If we're in spam folder, mark as NOT spam
         await MarkAsNotSpam(messageIds)
-        toasts.success('Marked as not spam', [
-          { label: 'Undo', onClick: handleUndo }
+        toasts.success($_('toast.markedAsNotSpam'), [
+          { label: $_('common.undo'), onClick: handleUndo }
         ])
       } else {
         // Otherwise, mark as spam
         await MarkAsSpam(messageIds)
-        toasts.success('Marked as spam', [
-          { label: 'Undo', onClick: handleUndo }
+        toasts.success($_('toast.markedAsSpam'), [
+          { label: $_('common.undo'), onClick: handleUndo }
         ])
       }
       onActionComplete?.(true)
     } catch (err) {
-      toasts.error(`Failed to ${isSpamFolder ? 'mark as not spam' : 'mark as spam'}: ${err}`)
+      toasts.error($_(isSpamFolder ? 'toast.failedToMarkAsNotSpam' : 'toast.failedToMarkAsSpam', { values: { error: String(err) } }))
     }
   }
 
@@ -721,13 +726,13 @@
     try {
       if (allStarred) {
         await Unstar(messageIds)
-        toasts.success('Removed star')
+        toasts.success($_('toast.removedStar'))
       } else {
         await Star(messageIds)
-        toasts.success('Starred')
+        toasts.success($_('toast.starred'))
       }
     } catch (err) {
-      toasts.error(`Failed to update star: ${err}`)
+      toasts.error($_('toast.failedToUpdateStar', { values: { error: String(err) } }))
     }
   }
 
@@ -741,27 +746,27 @@
     try {
       if (allRead) {
         await MarkAsUnread(messageIds)
-        toasts.success('Marked as unread')
+        toasts.success($_('toast.markedAsUnread'))
       } else {
         await MarkAsRead(messageIds)
-        toasts.success('Marked as read')
+        toasts.success($_('toast.markedAsRead'))
       }
     } catch (err) {
-      toasts.error(`Failed to update read status: ${err}`)
+      toasts.error($_('toast.failedToUpdateReadStatus', { values: { error: String(err) } }))
     }
   }
 
   async function handleUndo() {
     try {
       const description = await Undo()
-      toasts.success(`Undone: ${description}`)
+      toasts.success($_('toast.undone', { values: { description } }))
       // Reload conversation to show updated state
       if (threadId && folderId) {
         await loadConversation(threadId, folderId)
       }
       onActionComplete?.()
     } catch (err) {
-      toasts.error(`Undo failed: ${err}`)
+      toasts.error($_('toast.undoFailed', { values: { error: String(err) } }))
     }
   }
 
@@ -778,10 +783,10 @@
     try {
       await SendReadReceipt(accountId, messageId)
       handledReadReceipts = new Set([...handledReadReceipts, messageId])
-      toasts.success('Read receipt sent')
+      toasts.success($_('viewer.readReceiptSent'))
     } catch (err) {
       console.error('Failed to send read receipt:', err)
-      toasts.error('Failed to send read receipt')
+      toasts.error($_('viewer.failedToSendReceipt'))
     } finally {
       const newSet = new Set(sendingReadReceipt)
       newSet.delete(messageId)
@@ -958,9 +963,9 @@
   async function copyToClipboard(text: string, label: string = 'Text') {
     try {
       await navigator.clipboard.writeText(text)
-      toasts.success(`${label} copied to clipboard`)
+      toasts.success($_('viewer.copiedToClipboard', { values: { label } }))
     } catch (err) {
-      toasts.error('Failed to copy to clipboard')
+      toasts.error($_('viewer.failedToCopy'))
     }
   }
 
@@ -994,7 +999,7 @@
       const source = await GetMessageSource(msgId)
       messageSource = source
     } catch (err) {
-      toasts.error('Failed to load message source')
+      toasts.error($_('viewer.failedToLoadSource'))
       viewingSourceMessageId = null
     } finally {
       loadingSource = false
@@ -1008,7 +1013,7 @@
     <!-- No conversation selected -->
     <div class="flex flex-col items-center justify-center h-full text-muted-foreground">
       <Icon icon="mdi:email-open-outline" class="w-16 h-16 mb-4" />
-      <p class="text-lg">Select a conversation to read</p>
+      <p class="text-lg">{$_('viewer.selectConversation')}</p>
     </div>
   {:else if loading}
     <!-- Loading -->
@@ -1019,13 +1024,13 @@
     <!-- Error -->
     <div class="flex flex-col items-center justify-center h-full text-center px-4">
       <Icon icon="mdi:alert-circle-outline" class="w-12 h-12 text-destructive mb-3" />
-      <p class="text-destructive mb-2">Failed to load conversation</p>
+      <p class="text-destructive mb-2">{$_('viewer.failedToLoad')}</p>
       <p class="text-sm text-muted-foreground">{error}</p>
       <button
         class="mt-4 text-sm text-primary hover:underline"
         onclick={() => loadConversation(threadId!, folderId!)}
       >
-        Try again
+        {$_('viewer.tryAgain')}
       </button>
     </div>
   {:else if conversation}
@@ -1033,23 +1038,34 @@
     <!-- Header with Actions -->
     <div class="flex items-center justify-between px-4 py-3 border-b border-border">
       <div class="flex items-center gap-2">
+        {#if showBackButton}
+          <button
+            class="p-2 rounded-md hover:bg-muted transition-colors mr-1"
+            title={$_('responsive.back')}
+            aria-label={$_('aria.backToList')}
+            onclick={onBack}
+          >
+            <Icon icon="mdi:arrow-left" class="w-5 h-5 text-muted-foreground" />
+          </button>
+          <div class="w-px h-5 bg-border mx-1"></div>
+        {/if}
         <button
           class="p-2 rounded-md hover:bg-muted transition-colors"
-          title="Reply"
+          title={$_('viewer.reply')}
           onclick={handleReply}
         >
           <Icon icon="mdi:reply" class="w-5 h-5 text-muted-foreground" />
         </button>
         <button
           class="p-2 rounded-md hover:bg-muted transition-colors"
-          title="Reply All"
+          title={$_('viewer.replyAll')}
           onclick={handleReplyAll}
         >
           <Icon icon="mdi:reply-all" class="w-5 h-5 text-muted-foreground" />
         </button>
         <button
           class="p-2 rounded-md hover:bg-muted transition-colors"
-          title="Forward"
+          title={$_('viewer.forward')}
           onclick={handleForward}
         >
           <Icon icon="mdi:share" class="w-5 h-5 text-muted-foreground" />
@@ -1059,21 +1075,21 @@
 
         <button 
           class="p-2 rounded-md hover:bg-muted transition-colors" 
-          title="Archive"
+          title={$_('viewer.archive')}
           onclick={handleArchive}
         >
           <Icon icon="mdi:archive-outline" class="w-5 h-5 text-muted-foreground" />
         </button>
         <button 
           class="p-2 rounded-md hover:bg-muted transition-colors" 
-          title={isTrashFolder ? "Delete Permanently" : "Delete"}
+          title={$_(isTrashFolder ? 'viewer.deletePermanently' : 'viewer.delete')}
           onclick={handleDelete}
         >
           <Icon icon={isTrashFolder ? "mdi:delete-forever" : "mdi:delete-outline"} class="w-5 h-5 text-muted-foreground" />
         </button>
         <button
           class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={isSpamFolder ? "Mark as NOT Spam" : "Mark as Spam"}
+          title={$_(isSpamFolder ? 'viewer.markAsNotSpam' : 'viewer.markAsSpam')}
           onclick={handleSpam}
         >
           <Icon icon={isSpamFolder ? "mdi:email-check-outline" : "mdi:alert-octagon-outline"} class="w-5 h-5 text-muted-foreground" />
@@ -1083,14 +1099,14 @@
 
         <button 
           class="p-2 rounded-md hover:bg-muted transition-colors" 
-          title={allStarred ? 'Remove star' : 'Star'}
+          title={$_(allStarred ? 'viewer.removeStar' : 'viewer.star')}
           onclick={handleStar}
         >
           <Icon icon={allStarred ? "mdi:star" : "mdi:star-outline"} class="w-5 h-5 {allStarred ? 'text-yellow-500' : 'text-muted-foreground'}" />
         </button>
         <button 
           class="p-2 rounded-md hover:bg-muted transition-colors" 
-          title={allRead ? 'Mark as unread' : 'Mark as read'}
+          title={$_(allRead ? 'viewer.markAsUnread' : 'viewer.markAsRead')}
           onclick={handleMarkRead}
         >
           <Icon icon={allRead ? "mdi:email-open-outline" : "mdi:email-outline"} class="w-5 h-5 text-muted-foreground" />
@@ -1101,14 +1117,14 @@
         {#if conversation.messages && conversation.messages.length > 1}
           <button 
             class="p-2 rounded-md hover:bg-muted transition-colors" 
-            title="Expand All"
+            title={$_('viewer.expandAll')}
             onclick={expandAll}
           >
             <Icon icon="mdi:unfold-more-horizontal" class="w-5 h-5 text-muted-foreground" />
           </button>
           <button 
             class="p-2 rounded-md hover:bg-muted transition-colors" 
-            title="Collapse All"
+            title={$_('viewer.collapseAll')}
             onclick={collapseAll}
           >
             <Icon icon="mdi:unfold-less-horizontal" class="w-5 h-5 text-muted-foreground" />
@@ -1116,7 +1132,7 @@
         {/if}
         <button 
           class="p-2 rounded-md hover:bg-muted transition-colors" 
-          title="Print"
+          title={$_('viewer.print')}
           onclick={handlePrint}
         >
           <Icon icon="mdi:printer-outline" class="w-5 h-5 text-muted-foreground" />
@@ -1129,13 +1145,13 @@
       <div class="p-6">
         <!-- Subject -->
         <h1 class="text-xl font-semibold text-foreground mb-4">
-          {conversation.subject || '(No subject)'}
+          {conversation.subject || $_('viewer.noSubject')}
         </h1>
 
         <!-- Message Count Badge -->
         {#if conversation.messages && conversation.messages.length > 1}
           <div class="mb-4 text-sm text-muted-foreground">
-            {conversation.messages.length} messages in this conversation
+            {$_('viewer.messagesInConversation', { values: { count: conversation.messages.length } })}
           </div>
         {/if}
 
@@ -1183,14 +1199,14 @@
                   <!-- Header Info -->
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 flex-wrap">
-                      <span class="font-medium text-foreground">{msg.fromName || 'Unknown'}</span>
+                      <span class="font-medium text-foreground">{msg.fromName || $_('viewer.unknown')}</span>
                       <span
                         role="button"
                         tabindex="0"
                         class="text-sm text-muted-foreground hover:text-primary hover:underline cursor-pointer"
-                        title="Click to copy email address"
-                        onclick={(e) => { e.stopPropagation(); copyToClipboard(formatEmailForCopy(msg.fromName, msg.fromEmail), 'Email') }}
-                        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); copyToClipboard(formatEmailForCopy(msg.fromName, msg.fromEmail), 'Email') }}}
+                        title={$_('viewer.copyEmail')}
+                        onclick={(e) => { e.stopPropagation(); copyToClipboard(formatEmailForCopy(msg.fromName, msg.fromEmail), $_('viewer.from')) }}
+                        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); copyToClipboard(formatEmailForCopy(msg.fromName, msg.fromEmail), $_('viewer.from')) }}}
                       >&lt;{msg.fromEmail}&gt;</span>
 
                       <!-- Unread indicator -->
@@ -1202,15 +1218,15 @@
                     {#if msg.toList}
                       {@const recipients = parseRecipients(msg.toList)}
                       <div class="text-sm text-muted-foreground flex flex-wrap items-center gap-1">
-                        <span>to</span>
+                        <span>{$_('viewer.to')}</span>
                         {#each recipients as recipient, i}
                           <span
                             role="button"
                             tabindex="0"
                             class="hover:text-primary hover:underline cursor-pointer text-muted-foreground"
-                            title="Click to copy email address"
-                            onclick={(e) => { e.stopPropagation(); copyToClipboard(formatEmailForCopy(recipient.name, recipient.email), 'Email') }}
-                            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); copyToClipboard(formatEmailForCopy(recipient.name, recipient.email), 'Email') }}}
+                            title={$_('viewer.copyEmail')}
+                            onclick={(e) => { e.stopPropagation(); copyToClipboard(formatEmailForCopy(recipient.name, recipient.email), $_('viewer.from')) }}
+                            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); copyToClipboard(formatEmailForCopy(recipient.name, recipient.email), $_('viewer.from')) }}}
                           >{recipient.name || recipient.email}{i < recipients.length - 1 ? ',' : ''}</span>
                         {/each}
                       </div>
@@ -1232,7 +1248,7 @@
                     {#if isDraftsFolder}
                       <button
                         class="p-1 rounded hover:bg-muted transition-colors"
-                        title="Edit Draft"
+                        title={$_('viewer.editDraft')}
                         onclick={(e) => { e.stopPropagation(); onEditDraft?.(msg.id) }}
                       >
                         <Icon icon="mdi:pencil" class="w-4 h-4 text-muted-foreground" />
@@ -1254,7 +1270,7 @@
                         <div class="flex items-center justify-between gap-3 px-3 py-2 mb-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md">
                           <div class="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
                             <Icon icon="mdi:email-check-outline" class="w-4 h-4 flex-shrink-0" />
-                            <span>The sender requested a read receipt.</span>
+                            <span>{$_('viewer.readReceiptRequested')}</span>
                           </div>
                           <div class="flex items-center gap-2">
                             <button
@@ -1265,21 +1281,21 @@
                               {#if sendingReadReceipt.has(msg.id)}
                                 <Icon icon="mdi:loading" class="w-3 h-3 animate-spin" />
                               {:else}
-                                Send Receipt
+                                {$_('viewer.sendReceipt')}
                               {/if}
                             </button>
                             <button
                               onclick={() => handleIgnoreReadReceipt(msg.id, msg.accountId)}
                               class="px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded transition-colors"
                             >
-                              Ignore
+                              {$_('viewer.ignoreReceipt')}
                             </button>
                           </div>
                         </div>
                       {:else if shouldShowReadReceiptBanner(msg) && readReceiptPolicy === 'always' && sendingReadReceipt.has(msg.id)}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-md text-sm text-green-700 dark:text-green-300">
                           <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-                          <span>Sending read receipt...</span>
+                          <span>{$_('viewer.sendingReadReceipt')}</span>
                         </div>
                       {/if}
 
@@ -1287,7 +1303,7 @@
                       {#if smimeLoading.has(msg.id)}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-muted/50 border border-border rounded-md text-sm text-muted-foreground">
                           <Icon icon="mdi:loading" class="w-4 h-4 animate-spin flex-shrink-0" />
-                          <span>Processing S/MIME message...</span>
+                          <span>{$_('viewer.processingSMIME')}</span>
                         </div>
                       {/if}
 
@@ -1295,7 +1311,7 @@
                       {#if smimeResults[msg.id]?.smimeEncrypted}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md text-sm text-blue-700 dark:text-blue-300">
                           <Icon icon="mdi:lock-check" class="w-4 h-4 flex-shrink-0" />
-                          <span>This message was encrypted with S/MIME</span>
+                          <span>{$_('viewer.smimeEncryptedWith')}</span>
                         </div>
                       {/if}
 
@@ -1303,32 +1319,32 @@
                       {#if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'signed'}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-md text-sm text-green-700 dark:text-green-300">
                           <Icon icon="mdi:shield-check" class="w-4 h-4 flex-shrink-0" />
-                          <span>Signed by {(msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || 'unknown'} with S/MIME</span>
+                          <span>{$_('viewer.smimeSignedBy', { values: { email: (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || $_('viewer.unknown').toLowerCase() } })}</span>
                         </div>
                       {:else if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'unknown_signer'}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-700 dark:text-amber-300">
                           <Icon icon="mdi:shield-alert" class="w-4 h-4 flex-shrink-0" />
-                          <span>Signed with S/MIME — Unknown signer ({(msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || 'unknown'})</span>
+                          <span>{$_('viewer.smimeUnknownSigner', { values: { email: (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || $_('viewer.unknown').toLowerCase() } })}</span>
                         </div>
                       {:else if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'self_signed'}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-700 dark:text-amber-300">
                           <Icon icon="mdi:shield-alert" class="w-4 h-4 flex-shrink-0" />
-                          <span>Signed by {(msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || 'unknown'} with S/MIME — Self-signed certificate</span>
+                          <span>{$_('viewer.smimeSelfSigned', { values: { email: (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || $_('viewer.unknown').toLowerCase() } })}</span>
                         </div>
                       {:else if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'expired_cert'}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
                           <Icon icon="mdi:shield-off" class="w-4 h-4 flex-shrink-0" />
-                          <span>Signed by {(msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || 'unknown'} with S/MIME — Certificate expired</span>
+                          <span>{$_('viewer.smimeExpiredCert', { values: { email: (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || $_('viewer.unknown').toLowerCase() } })}</span>
                         </div>
                       {:else if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'invalid'}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
                           <Icon icon="mdi:shield-off" class="w-4 h-4 flex-shrink-0" />
-                          <span>S/MIME signature invalid</span>
+                          <span>{$_('viewer.smimeInvalid')}</span>
                         </div>
                       {:else if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'decrypt_failed'}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
                           <Icon icon="mdi:lock-off" class="w-4 h-4 flex-shrink-0" />
-                          <span>S/MIME decryption failed</span>
+                          <span>{$_('viewer.smimeDecryptFailed')}</span>
                         </div>
                       {/if}
 
@@ -1336,7 +1352,7 @@
                       {#if pgpLoading.has(msg.id)}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-muted/50 border border-border rounded-md text-sm text-muted-foreground">
                           <Icon icon="mdi:loading" class="w-4 h-4 animate-spin flex-shrink-0" />
-                          <span>Processing PGP message...</span>
+                          <span>{$_('viewer.processingPGP')}</span>
                         </div>
                       {/if}
 
@@ -1344,7 +1360,7 @@
                       {#if pgpResults[msg.id]?.pgpEncrypted}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md text-sm text-blue-700 dark:text-blue-300">
                           <Icon icon="mdi:lock-check" class="w-4 h-4 flex-shrink-0" />
-                          <span>This message was encrypted with PGP</span>
+                          <span>{$_('viewer.pgpEncryptedWith')}</span>
                         </div>
                       {/if}
 
@@ -1352,32 +1368,32 @@
                       {#if pgpResults[msg.id]?.pgpStatus === 'signed'}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-md text-sm text-green-700 dark:text-green-300">
                           <Icon icon="mdi:key-check" class="w-4 h-4 flex-shrink-0" />
-                          <span>Signed by {pgpResults[msg.id]?.pgpSignerEmail || 'unknown'} with PGP</span>
+                          <span>{$_('viewer.pgpSignedBy', { values: { email: pgpResults[msg.id]?.pgpSignerEmail || $_('viewer.unknown').toLowerCase() } })}</span>
                         </div>
                       {:else if pgpResults[msg.id]?.pgpStatus === 'unknown_key'}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-700 dark:text-amber-300">
                           <Icon icon="mdi:key-alert" class="w-4 h-4 flex-shrink-0" />
-                          <span>Signed with PGP — Unknown key {pgpResults[msg.id]?.pgpSignerKeyId || ''}</span>
+                          <span>{$_('viewer.pgpUnknownKey', { values: { keyId: pgpResults[msg.id]?.pgpSignerKeyId || '' } })}</span>
                         </div>
                       {:else if pgpResults[msg.id]?.pgpStatus === 'expired_key'}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-700 dark:text-amber-300">
                           <Icon icon="mdi:key-alert" class="w-4 h-4 flex-shrink-0" />
-                          <span>Signed by {pgpResults[msg.id]?.pgpSignerEmail || 'unknown'} with PGP — Key expired</span>
+                          <span>{$_('viewer.pgpExpiredKey', { values: { email: pgpResults[msg.id]?.pgpSignerEmail || $_('viewer.unknown').toLowerCase() } })}</span>
                         </div>
                       {:else if pgpResults[msg.id]?.pgpStatus === 'revoked_key'}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
                           <Icon icon="mdi:key-remove" class="w-4 h-4 flex-shrink-0" />
-                          <span>Signed by {pgpResults[msg.id]?.pgpSignerEmail || 'unknown'} with PGP — Key revoked</span>
+                          <span>{$_('viewer.pgpRevokedKey', { values: { email: pgpResults[msg.id]?.pgpSignerEmail || $_('viewer.unknown').toLowerCase() } })}</span>
                         </div>
                       {:else if pgpResults[msg.id]?.pgpStatus === 'invalid'}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
                           <Icon icon="mdi:key-remove" class="w-4 h-4 flex-shrink-0" />
-                          <span>PGP signature invalid</span>
+                          <span>{$_('viewer.pgpInvalid')}</span>
                         </div>
                       {:else if pgpResults[msg.id]?.pgpStatus === 'decrypt_failed'}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
                           <Icon icon="mdi:lock-off" class="w-4 h-4 flex-shrink-0" />
-                          <span>PGP decryption failed</span>
+                          <span>{$_('viewer.pgpDecryptFailed')}</span>
                         </div>
                       {/if}
 
@@ -1385,7 +1401,7 @@
                       <div class="mb-4">
                         {#if (msg.hasSMIME && !smimeResults[msg.id] && smimeLoading.has(msg.id)) || (msg.hasPGP && !pgpResults[msg.id] && pgpLoading.has(msg.id))}
                           <!-- Show placeholder while processing -->
-                          <div class="text-muted-foreground text-sm italic py-4">Decrypting message...</div>
+                          <div class="text-muted-foreground text-sm italic py-4">{$_('viewer.decryptingMessage')}</div>
                         {:else}
                           <EmailBody
                             messageId={msg.id}
@@ -1404,7 +1420,7 @@
                         <div class="border-t border-border pt-4 mt-4">
                           <h3 class="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
                             <Icon icon="mdi:paperclip" class="w-4 h-4" />
-                            Attachments
+                            {$_('viewer.attachments')}
                           </h3>
                           <AttachmentList
                             messageId={msg.id}
@@ -1420,7 +1436,7 @@
                           class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                         >
                           <Icon icon={viewingSourceMessageId === msg.id ? 'mdi:code-tags' : 'mdi:code-tags'} class="w-4 h-4" />
-                          {viewingSourceMessageId === msg.id ? 'Hide Source' : 'View Source'}
+                          {viewingSourceMessageId === msg.id ? $_('viewer.hideSource') : $_('viewer.viewSource')}
                         </button>
 
                         {#if viewingSourceMessageId === msg.id}
@@ -1428,14 +1444,14 @@
                             {#if loadingSource}
                               <div class="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-                                Loading message source...
+                                {$_('viewer.loadingSource')}
                               </div>
                             {:else if messageSource}
                               <div class="relative">
                                 <button
-                                  onclick={() => copyToClipboard(messageSource || '', 'Message source')}
+                                  onclick={() => copyToClipboard(messageSource || '', $_('viewer.viewSource'))}
                                   class="absolute top-2 right-2 p-1.5 rounded bg-muted hover:bg-muted/80 transition-colors"
-                                  title="Copy source"
+                                  title={$_('viewer.copySource')}
                                 >
                                   <Icon icon="mdi:content-copy" class="w-4 h-4" />
                                 </button>
@@ -1462,9 +1478,9 @@
 <!-- Permanent Delete Confirmation Dialog -->
 <ConfirmDialog
   bind:open={showDeleteConfirm}
-  title="Delete Permanently?"
-  description="This conversation will be permanently deleted. This action cannot be undone."
-  confirmLabel="Delete Permanently"
+  title={$_('viewer.deleteConversationTitle')}
+  description={$_('viewer.deleteConversationDescription')}
+  confirmLabel={$_('viewer.deletePermanently')}
   variant="destructive"
   onConfirm={handleConfirmPermanentDelete}
   onCancel={() => showDeleteConfirm = false}

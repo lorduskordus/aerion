@@ -1,6 +1,12 @@
 # al.essio.dev/pkg/shellescape v1.5.1
 ## explicit; go 1.18
 al.essio.dev/pkg/shellescape
+# git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3
+## explicit; go 1.20
+git.sr.ht/~jackmordaunt/go-toast/v2/internal/winrt/data/xml/dom
+git.sr.ht/~jackmordaunt/go-toast/v2/internal/winrt/ui/notifications
+git.sr.ht/~jackmordaunt/go-toast/v2/tmpl
+git.sr.ht/~jackmordaunt/go-toast/v2/wintoast
 # github.com/ProtonMail/go-crypto v1.1.5
 ## explicit; go 1.17
 github.com/ProtonMail/go-crypto/bitcurves

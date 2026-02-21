@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte'
   import Icon from '@iconify/svelte'
   import type { Editor } from '@tiptap/core'
+  import { _ } from '$lib/i18n'
 
   interface Props {
     editor: Editor | null
@@ -234,7 +235,7 @@
   bind:this={toolbarRef}
   class="flex items-center gap-1 px-4 py-2 border-b border-border relative"
   role="toolbar"
-  aria-label="Text formatting"
+  aria-label={$_('aria.textFormatting')}
   tabindex="-1"
   onclick={handleClickOutside}
 >
@@ -251,7 +252,7 @@
       class:opacity-50={isPlainTextMode}
       disabled={isPlainTextMode}
       tabindex="-1"
-      title="Bold (Ctrl+B)"
+      title={$_('editor.bold')}
     >
       <Icon icon="mdi:format-bold" class="w-5 h-5" />
     </button>
@@ -267,7 +268,7 @@
       class:opacity-50={isPlainTextMode}
       disabled={isPlainTextMode}
       tabindex="-1"
-      title="Italic (Ctrl+I)"
+      title={$_('editor.italic')}
     >
       <Icon icon="mdi:format-italic" class="w-5 h-5" />
     </button>
@@ -283,7 +284,7 @@
       class:opacity-50={isPlainTextMode}
       disabled={isPlainTextMode}
       tabindex="-1"
-      title="Underline (Ctrl+U)"
+      title={$_('editor.underline')}
     >
       <Icon icon="mdi:format-underline" class="w-5 h-5" />
     </button>
@@ -299,7 +300,7 @@
       class:opacity-50={isPlainTextMode}
       disabled={isPlainTextMode}
       tabindex="-1"
-      title="Strikethrough"
+      title={$_('editor.strikethrough')}
     >
       <Icon icon="mdi:format-strikethrough" class="w-5 h-5" />
     </button>
@@ -319,7 +320,7 @@
       class:opacity-50={isPlainTextMode}
       disabled={isPlainTextMode}
       tabindex="-1"
-      title="Text Color"
+      title={$_('editor.textColor')}
     >
       <Icon icon="mdi:format-color-text" class="w-5 h-5" />
       <div
@@ -349,13 +350,13 @@
             value={currentColor || '#000000'}
             onchange={handleCustomColor}
             class="w-6 h-6 rounded cursor-pointer"
-            title="Custom color"
+            title={$_('editor.customColor')}
           />
           <button
             onclick={removeColor}
             class="text-xs text-muted-foreground hover:text-foreground"
           >
-            Reset
+            {$_('editor.reset')}
           </button>
         </div>
       </div>
@@ -371,7 +372,7 @@
       class:opacity-50={isPlainTextMode}
       disabled={isPlainTextMode}
       tabindex="-1"
-      title="Font Size"
+      title={$_('editor.fontSize')}
     >
       {currentFontSize || '14px'}
     </button>
@@ -405,7 +406,7 @@
       class:opacity-50={isPlainTextMode}
       disabled={isPlainTextMode}
       tabindex="-1"
-      title="Align Left"
+      title={$_('editor.alignLeft')}
     >
       <Icon icon="mdi:format-align-left" class="w-5 h-5" />
     </button>
@@ -421,7 +422,7 @@
       class:opacity-50={isPlainTextMode}
       disabled={isPlainTextMode}
       tabindex="-1"
-      title="Align Center"
+      title={$_('editor.alignCenter')}
     >
       <Icon icon="mdi:format-align-center" class="w-5 h-5" />
     </button>
@@ -437,7 +438,7 @@
       class:opacity-50={isPlainTextMode}
       disabled={isPlainTextMode}
       tabindex="-1"
-      title="Align Right"
+      title={$_('editor.alignRight')}
     >
       <Icon icon="mdi:format-align-right" class="w-5 h-5" />
     </button>
@@ -456,7 +457,7 @@
       class:opacity-50={isPlainTextMode}
       disabled={isPlainTextMode}
       tabindex="-1"
-      title="Bullet List"
+      title={$_('editor.bulletList')}
     >
       <Icon icon="mdi:format-list-bulleted" class="w-5 h-5" />
     </button>
@@ -472,7 +473,7 @@
       class:opacity-50={isPlainTextMode}
       disabled={isPlainTextMode}
       tabindex="-1"
-      title="Numbered List"
+      title={$_('editor.numberedList')}
     >
       <Icon icon="mdi:format-list-numbered" class="w-5 h-5" />
     </button>
@@ -489,7 +490,7 @@
       class:opacity-50={isPlainTextMode}
       disabled={isPlainTextMode}
       tabindex="-1"
-      title="Quote"
+      title={$_('editor.quote')}
     >
       <Icon icon="mdi:format-quote-close" class="w-5 h-5" />
     </button>
@@ -502,7 +503,7 @@
       onclick={insertLink}
       class="p-1.5 rounded hover:bg-muted transition-colors"
       class:bg-muted={activeStates.link}
-      title="Insert Link"
+      title={$_('editor.insertLink')}
       disabled={isPlainTextMode}
       class:opacity-50={isPlainTextMode}
       tabindex="-1"
@@ -517,7 +518,7 @@
     <button
       onclick={onInsertImage}
       class="p-1.5 rounded hover:bg-muted transition-colors"
-      title="Insert Image"
+      title={$_('editor.insertImage')}
       disabled={isPlainTextMode}
       class:opacity-50={isPlainTextMode}
       tabindex="-1"
@@ -539,10 +540,10 @@
       class="p-1.5 rounded hover:bg-muted transition-colors flex items-center gap-1.5 text-xs"
       class:bg-muted={isPlainTextMode}
       tabindex="-1"
-      title={isPlainTextMode ? 'Switch to rich text' : 'Switch to plain text'}
+      title={isPlainTextMode ? $_('editor.switchToRichText') : $_('editor.switchToPlainText')}
     >
       <Icon icon={isPlainTextMode ? 'mdi:format-text' : 'mdi:text'} class="w-5 h-5" />
-      <span class="hidden sm:inline">{isPlainTextMode ? 'Rich text' : 'Plain text'}</span>
+      <span class="hidden sm:inline">{isPlainTextMode ? $_('editor.richText') : $_('editor.plainText')}</span>
     </button>
     {#if hintMode}
       <span class="absolute -top-1 -left-1 bg-primary text-primary-foreground text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded z-20">f</span>

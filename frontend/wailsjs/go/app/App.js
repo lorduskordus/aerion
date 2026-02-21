@@ -78,6 +78,10 @@ export function ClearContactSourceError(arg1) {
   return window['go']['app']['App']['ClearContactSourceError'](arg1);
 }
 
+export function CloseWindow() {
+  return window['go']['app']['App']['CloseWindow']();
+}
+
 export function CompleteContactSourceOAuthSetup(arg1, arg2) {
   return window['go']['app']['App']['CompleteContactSourceOAuthSetup'](arg1, arg2);
 }
@@ -146,8 +150,16 @@ export function DownloadEncryptedAttachment(arg1, arg2, arg3) {
   return window['go']['app']['App']['DownloadEncryptedAttachment'](arg1, arg2, arg3);
 }
 
+export function EmptyTrash(arg1, arg2) {
+  return window['go']['app']['App']['EmptyTrash'](arg1, arg2);
+}
+
 export function FetchMessageBody(arg1) {
   return window['go']['app']['App']['FetchMessageBody'](arg1);
+}
+
+export function FetchServerMessage(arg1, arg2, arg3) {
+  return window['go']['app']['App']['FetchServerMessage'](arg1, arg2, arg3);
 }
 
 export function ForceSyncFolder(arg1, arg2) {
@@ -180,6 +192,10 @@ export function GetAttachments(arg1) {
 
 export function GetAutoDetectedFolders(arg1) {
   return window['go']['app']['App']['GetAutoDetectedFolders'](arg1);
+}
+
+export function GetAutostart() {
+  return window['go']['app']['App']['GetAutostart']();
 }
 
 export function GetConfiguredOAuthProviders() {
@@ -270,6 +286,10 @@ export function GetInlineAttachments(arg1) {
   return window['go']['app']['App']['GetInlineAttachments'](arg1);
 }
 
+export function GetLanguage() {
+  return window['go']['app']['App']['GetLanguage']();
+}
+
 export function GetLinkedAccountsForContactSync() {
   return window['go']['app']['App']['GetLinkedAccountsForContactSync']();
 }
@@ -326,6 +346,10 @@ export function GetReadReceiptResponsePolicy() {
   return window['go']['app']['App']['GetReadReceiptResponsePolicy']();
 }
 
+export function GetRunBackground() {
+  return window['go']['app']['App']['GetRunBackground']();
+}
+
 export function GetSMIMEEncryptPolicy(arg1) {
   return window['go']['app']['App']['GetSMIMEEncryptPolicy'](arg1);
 }
@@ -352,6 +376,14 @@ export function GetSourceAddressbooks(arg1) {
 
 export function GetSpecialFolder(arg1, arg2) {
   return window['go']['app']['App']['GetSpecialFolder'](arg1, arg2);
+}
+
+export function GetStartHidden() {
+  return window['go']['app']['App']['GetStartHidden']();
+}
+
+export function GetStartHiddenActive() {
+  return window['go']['app']['App']['GetStartHiddenActive']();
 }
 
 export function GetSystemTheme() {
@@ -396,6 +428,10 @@ export function HasPGPKey(arg1) {
 
 export function HasSMIMECertificate(arg1) {
   return window['go']['app']['App']['HasSMIMECertificate'](arg1);
+}
+
+export function IMAPSearchFolder(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['IMAPSearchFolder'](arg1, arg2, arg3, arg4);
 }
 
 export function IgnoreReadReceipt(arg1, arg2) {
@@ -566,6 +602,10 @@ export function ProcessSMIMEMessage(arg1) {
   return window['go']['app']['App']['ProcessSMIMEMessage'](arg1);
 }
 
+export function QuitApp() {
+  return window['go']['app']['App']['QuitApp']();
+}
+
 export function ReadFileAsAttachment(arg1) {
   return window['go']['app']['App']['ReadFileAsAttachment'](arg1);
 }
@@ -662,6 +702,10 @@ export function SetAddressbookEnabled(arg1, arg2) {
   return window['go']['app']['App']['SetAddressbookEnabled'](arg1, arg2);
 }
 
+export function SetAutostart(arg1) {
+  return window['go']['app']['App']['SetAutostart'](arg1);
+}
+
 export function SetDefaultIdentity(arg1, arg2) {
   return window['go']['app']['App']['SetDefaultIdentity'](arg1, arg2);
 }
@@ -672,6 +716,10 @@ export function SetDefaultPGPKey(arg1, arg2) {
 
 export function SetDefaultSMIMECertificate(arg1, arg2) {
   return window['go']['app']['App']['SetDefaultSMIMECertificate'](arg1, arg2);
+}
+
+export function SetLanguage(arg1) {
+  return window['go']['app']['App']['SetLanguage'](arg1);
 }
 
 export function SetMarkAsReadDelay(arg1) {
@@ -698,6 +746,10 @@ export function SetReadReceiptResponsePolicy(arg1) {
   return window['go']['app']['App']['SetReadReceiptResponsePolicy'](arg1);
 }
 
+export function SetRunBackground(arg1) {
+  return window['go']['app']['App']['SetRunBackground'](arg1);
+}
+
 export function SetSMIMEEncryptPolicy(arg1, arg2) {
   return window['go']['app']['App']['SetSMIMEEncryptPolicy'](arg1, arg2);
 }
@@ -710,12 +762,20 @@ export function SetShowTitleBar(arg1) {
   return window['go']['app']['App']['SetShowTitleBar'](arg1);
 }
 
+export function SetStartHidden(arg1) {
+  return window['go']['app']['App']['SetStartHidden'](arg1);
+}
+
 export function SetTermsAccepted(arg1) {
   return window['go']['app']['App']['SetTermsAccepted'](arg1);
 }
 
 export function SetThemeMode(arg1) {
   return window['go']['app']['App']['SetThemeMode'](arg1);
+}
+
+export function ShowWindow() {
+  return window['go']['app']['App']['ShowWindow']();
 }
 
 export function Star(arg1) {

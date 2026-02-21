@@ -7,6 +7,7 @@
   import Composer from './lib/components/composer/Composer.svelte'
   import ToastContainer from './lib/components/ui/toast/ToastContainer.svelte'
   import { addToast } from '$lib/stores/toast'
+  import { _ } from '$lib/i18n'
   import { createComposerWindowApi } from '$lib/composerApi'
   import { getShowTitleBar, type ThemeMode } from '$lib/stores/settings.svelte'
   // @ts-ignore - wailsjs imports
@@ -34,12 +35,12 @@
   
   // Window title based on mode
   let windowTitle = $derived(() => {
-    if (!composeMode) return 'Compose'
+    if (!composeMode) return $_('sidebar.compose')
     switch (composeMode.mode) {
-      case 'reply': return 'Reply'
-      case 'reply-all': return 'Reply All'
-      case 'forward': return 'Forward'
-      default: return composeMode.draftId ? 'Edit Draft' : 'New Message'
+      case 'reply': return $_('composer.reply')
+      case 'reply-all': return $_('composer.replyAll')
+      case 'forward': return $_('composer.forward')
+      default: return composeMode.draftId ? $_('composer.editDraft') : $_('composer.newMessage')
     }
   })
 
@@ -105,7 +106,7 @@
     EventsOn('app:shutdown', (reason: string) => {
       addToast({
         type: 'info',
-        message: 'Main window is closing. Your draft will be saved.',
+        message: $_('toast.mainWindowClosing'),
       })
       // Give user a moment to see the toast, then close
       setTimeout(() => {
@@ -140,7 +141,7 @@
       }
     } catch (err) {
       console.error('Failed to initialize composer:', err)
-      error = `Failed to initialize: ${err}`
+      error = String(err)
     } finally {
       loading = false
     }
@@ -211,7 +212,7 @@
       <div
         class="flex items-center gap-2 px-3 h-full"
         role="group"
-        aria-label="Window controls"
+        aria-label={$_('aria.windowControls')}
         onmouseenter={() => isHovering = true}
         onmouseleave={() => isHovering = false}
       >
@@ -219,8 +220,8 @@
         <button
           class="w-3 h-3 rounded-full flex items-center justify-center transition-all bg-[#FEBC2E] hover:brightness-90 active:brightness-75"
           onclick={minimize}
-          title="Minimize"
-          aria-label="Minimize window"
+          title={$_('window.minimize')}
+          aria-label={$_('aria.minimizeWindow')}
         >
           {#if isHovering}
             <span class="text-[10px] font-bold text-black/60 leading-none">−</span>
@@ -231,8 +232,8 @@
         <button
           class="w-3 h-3 rounded-full flex items-center justify-center transition-all bg-[#28C840] hover:brightness-90 active:brightness-75"
           onclick={toggleMaximize}
-          title={isMaximized ? "Restore" : "Maximize"}
-          aria-label={isMaximized ? "Restore window" : "Maximize window"}
+          title={isMaximized ? $_('window.restore') : $_('window.maximize')}
+          aria-label={isMaximized ? $_('aria.restoreWindow') : $_('aria.maximizeWindow')}
         >
           {#if isHovering}
             <span class="text-[10px] font-bold text-black/60 leading-none">+</span>
@@ -243,8 +244,8 @@
         <button
           class="w-3 h-3 rounded-full flex items-center justify-center transition-all bg-[#FF5F57] hover:brightness-90 active:brightness-75"
           onclick={requestClose}
-          title="Close"
-          aria-label="Close window"
+          title={$_('window.close')}
+          aria-label={$_('aria.closeWindow')}
         >
           {#if isHovering}
             <span class="text-[10px] font-bold text-black/60 leading-none">×</span>
@@ -260,7 +261,7 @@
       <div class="h-full flex items-center justify-center">
         <div class="flex flex-col items-center gap-3">
           <Icon icon="mdi:loading" class="w-8 h-8 animate-spin text-primary" />
-          <span class="text-sm text-muted-foreground">Loading...</span>
+          <span class="text-sm text-muted-foreground">{$_('common.loading')}</span>
         </div>
       </div>
     {:else if error}
@@ -272,7 +273,7 @@
             onclick={() => CloseWindow()}
             class="px-4 py-2 text-sm bg-muted hover:bg-muted/80 rounded-md transition-colors"
           >
-            Close Window
+            {$_('window.closeWindow')}
           </button>
         </div>
       </div>

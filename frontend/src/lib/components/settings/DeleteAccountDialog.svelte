@@ -2,6 +2,7 @@
   import Icon from '@iconify/svelte'
   import * as AlertDialog from '$lib/components/ui/alert-dialog'
   import { accountStore } from '$lib/stores/accounts.svelte'
+  import { _ } from '$lib/i18n'
   // @ts-ignore - wailsjs path
   import { account } from '../../../../wailsjs/go/models'
 
@@ -61,12 +62,11 @@
 <AlertDialog.Root bind:open onOpenChange={handleOpenChange}>
   <AlertDialog.Content preventCloseAutoFocus>
     <AlertDialog.Header>
-      <AlertDialog.Title>Delete Account</AlertDialog.Title>
+      <AlertDialog.Title>{$_('account.deleteTitle')}</AlertDialog.Title>
       <AlertDialog.Description>
-        Are you sure you want to delete <strong>{accountToDelete?.name}</strong> ({accountToDelete?.email})?
+        {$_('account.deleteConfirm', { values: { name: accountToDelete?.name ?? '', email: accountToDelete?.email ?? '' } })}
         <br /><br />
-        This will permanently remove all local messages, folders, and settings for this account.
-        Your emails on the server will not be affected.
+        {$_('account.deleteWarning')}
       </AlertDialog.Description>
     </AlertDialog.Header>
 
@@ -79,7 +79,7 @@
 
     <AlertDialog.Footer>
       <AlertDialog.Cancel onclick={handleCancel} disabled={deleting}>
-        Cancel
+        {$_('common.cancel')}
       </AlertDialog.Cancel>
       <AlertDialog.Action
         onclick={handleDelete}
@@ -89,7 +89,7 @@
         {#if deleting}
           <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
         {/if}
-        Delete Account
+        {$_('account.deleteAccount')}
       </AlertDialog.Action>
     </AlertDialog.Footer>
   </AlertDialog.Content>

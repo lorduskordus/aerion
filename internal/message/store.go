@@ -310,6 +310,25 @@ func (s *Store) GetReadMessageIDsByFolder(folderID string) ([]string, error) {
 	return ids, nil
 }
 
+// GetAllIDsByFolder returns the IDs of all messages in a folder
+func (s *Store) GetAllIDsByFolder(folderID string) ([]string, error) {
+	rows, err := s.db.Query("SELECT id FROM messages WHERE folder_id = ?", folderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query messages: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan message id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
 // Get returns a full message by ID
 func (s *Store) Get(id string) (*Message, error) {
 	query := `

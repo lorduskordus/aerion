@@ -12,6 +12,7 @@
   // @ts-ignore - wailsjs path
   import { GetAccountFoldersForMapping, GetAutoDetectedFolders, GetTrustedCertificates, RemoveTrustedCertificate } from '../../../../../wailsjs/go/app/App'
   import { Button } from '$lib/components/ui/button'
+  import { _ } from '$lib/i18n'
   import ConfirmDialog from '$lib/components/ui/confirm-dialog/ConfirmDialog.svelte'
 
   interface Props {
@@ -92,9 +93,9 @@
 
   // Read receipt request policy options
   const readReceiptRequestOptions = [
-    { value: 'never', label: 'Never request' },
-    { value: 'ask', label: 'Ask each time' },
-    { value: 'always', label: 'Always request' },
+    { value: 'never', labelKey: 'account.neverRequest' },
+    { value: 'ask', labelKey: 'account.askEachTime' },
+    { value: 'always', labelKey: 'account.alwaysRequest' },
   ]
 
   // Helper functions
@@ -108,7 +109,12 @@
   }
 
   function getReadReceiptLabel(value: string): string {
-    return readReceiptRequestOptions.find(opt => opt.value === value)?.label || value
+    switch (value) {
+      case 'never': return $_('account.neverRequest')
+      case 'ask': return $_('account.askEachTime')
+      case 'always': return $_('account.alwaysRequest')
+      default: return value
+    }
   }
 
   // Load folders for mapping UI
@@ -192,13 +198,13 @@
   // Folder mapping types configuration
   // get() returns saved mapping or falls back to auto-detected folder
   const folderMappingTypes = [
-    { key: 'sent', label: 'Sent', get: () => sentFolderPath || autoDetectedFolders['sent'] || '', set: (v: string) => { sentFolderPath = v; onFolderMappingChange('sent', v) }},
-    { key: 'drafts', label: 'Drafts', get: () => draftsFolderPath || autoDetectedFolders['drafts'] || '', set: (v: string) => { draftsFolderPath = v; onFolderMappingChange('drafts', v) }},
-    { key: 'trash', label: 'Trash', get: () => trashFolderPath || autoDetectedFolders['trash'] || '', set: (v: string) => { trashFolderPath = v; onFolderMappingChange('trash', v) }},
-    { key: 'spam', label: 'Spam/Junk', get: () => spamFolderPath || autoDetectedFolders['spam'] || '', set: (v: string) => { spamFolderPath = v; onFolderMappingChange('spam', v) }},
-    { key: 'archive', label: 'Archive', get: () => archiveFolderPath || autoDetectedFolders['archive'] || '', set: (v: string) => { archiveFolderPath = v; onFolderMappingChange('archive', v) }},
-    { key: 'all', label: 'All Mail', get: () => allMailFolderPath || autoDetectedFolders['all'] || '', set: (v: string) => { allMailFolderPath = v; onFolderMappingChange('all', v) }},
-    { key: 'starred', label: 'Starred', get: () => starredFolderPath || autoDetectedFolders['starred'] || '', set: (v: string) => { starredFolderPath = v; onFolderMappingChange('starred', v) }},
+    { key: 'sent', labelKey: 'account.folderSent', get: () => sentFolderPath || autoDetectedFolders['sent'] || '', set: (v: string) => { sentFolderPath = v; onFolderMappingChange('sent', v) }},
+    { key: 'drafts', labelKey: 'account.folderDrafts', get: () => draftsFolderPath || autoDetectedFolders['drafts'] || '', set: (v: string) => { draftsFolderPath = v; onFolderMappingChange('drafts', v) }},
+    { key: 'trash', labelKey: 'account.folderTrash', get: () => trashFolderPath || autoDetectedFolders['trash'] || '', set: (v: string) => { trashFolderPath = v; onFolderMappingChange('trash', v) }},
+    { key: 'spam', labelKey: 'account.folderSpam', get: () => spamFolderPath || autoDetectedFolders['spam'] || '', set: (v: string) => { spamFolderPath = v; onFolderMappingChange('spam', v) }},
+    { key: 'archive', labelKey: 'account.folderArchive', get: () => archiveFolderPath || autoDetectedFolders['archive'] || '', set: (v: string) => { archiveFolderPath = v; onFolderMappingChange('archive', v) }},
+    { key: 'all', labelKey: 'account.folderAllMail', get: () => allMailFolderPath || autoDetectedFolders['all'] || '', set: (v: string) => { allMailFolderPath = v; onFolderMappingChange('all', v) }},
+    { key: 'starred', labelKey: 'account.folderStarred', get: () => starredFolderPath || autoDetectedFolders['starred'] || '', set: (v: string) => { starredFolderPath = v; onFolderMappingChange('starred', v) }},
   ]
 </script>
 
@@ -207,12 +213,12 @@
   <div class="space-y-4">
     <h3 class="text-sm font-medium flex items-center gap-2">
       <Icon icon="mdi:email-receive-outline" class="w-4 h-4" />
-      Incoming Mail (IMAP)
+      {$_('account.incomingMail')}
     </h3>
 
     <div class="grid grid-cols-2 gap-3">
       <div class="space-y-2">
-        <Label for="imapHost">Server</Label>
+        <Label for="imapHost">{$_('account.server')}</Label>
         <Input
           id="imapHost"
           type="text"
@@ -227,7 +233,7 @@
       </div>
       <div class="grid grid-cols-2 gap-2">
         <div class="space-y-2">
-          <Label for="imapPort">Port</Label>
+          <Label for="imapPort">{$_('account.port')}</Label>
           <Input
             id="imapPort"
             type="number"
@@ -237,9 +243,9 @@
           />
         </div>
         <div class="space-y-2">
-          <Label>Security</Label>
-          <Select.Root 
-            value={imapSecurity} 
+          <Label>{$_('account.security')}</Label>
+          <Select.Root
+            value={imapSecurity}
             onValueChange={(v) => { imapSecurity = v; onImapSecurityChange(v) }}
           >
             <Select.Trigger class="h-10">
@@ -265,12 +271,12 @@
   <div class="space-y-4">
     <h3 class="text-sm font-medium flex items-center gap-2">
       <Icon icon="mdi:email-send-outline" class="w-4 h-4" />
-      Outgoing Mail (SMTP)
+      {$_('account.outgoingMail')}
     </h3>
 
     <div class="grid grid-cols-2 gap-3">
       <div class="space-y-2">
-        <Label for="smtpHost">Server</Label>
+        <Label for="smtpHost">{$_('account.server')}</Label>
         <Input
           id="smtpHost"
           type="text"
@@ -285,7 +291,7 @@
       </div>
       <div class="grid grid-cols-2 gap-2">
         <div class="space-y-2">
-          <Label for="smtpPort">Port</Label>
+          <Label for="smtpPort">{$_('account.port')}</Label>
           <Input
             id="smtpPort"
             type="number"
@@ -295,9 +301,9 @@
           />
         </div>
         <div class="space-y-2">
-          <Label>Security</Label>
-          <Select.Root 
-            value={smtpSecurity} 
+          <Label>{$_('account.security')}</Label>
+          <Select.Root
+            value={smtpSecurity}
             onValueChange={(v) => { smtpSecurity = v; onSmtpSecurityChange(v) }}
           >
             <Select.Trigger class="h-10">
@@ -323,11 +329,11 @@
   <div class="space-y-4">
     <h3 class="text-sm font-medium flex items-center gap-2">
       <Icon icon="mdi:refresh" class="w-4 h-4" />
-      Sync Options
+      {$_('account.syncOptions')}
     </h3>
 
     <div class="space-y-2">
-      <Label>Check for New Mail</Label>
+      <Label>{$_('account.checkNewMail')}</Label>
       <Select.Root 
         value={syncInterval} 
         onValueChange={(v) => { syncInterval = v; onSyncIntervalChange(v) }}
@@ -344,12 +350,12 @@
         </Select.Content>
       </Select.Root>
       <p class="text-xs text-muted-foreground">
-        How often to check for new messages (IDLE push is also used when available)
+        {$_('account.checkNewMailHelp')}
       </p>
     </div>
 
     <div class="space-y-2">
-      <Label>Request Read Receipts</Label>
+      <Label>{$_('account.requestReadReceipts')}</Label>
       <Select.Root 
         value={readReceiptRequestPolicy} 
         onValueChange={(v) => { readReceiptRequestPolicy = v; onReadReceiptPolicyChange(v) }}
@@ -361,12 +367,12 @@
         </Select.Trigger>
         <Select.Content>
           {#each readReceiptRequestOptions as opt (opt.value)}
-            <Select.Item value={opt.value} label={opt.label} />
+            <Select.Item value={opt.value} label={$_(opt.labelKey)} />
           {/each}
         </Select.Content>
       </Select.Root>
       <p class="text-xs text-muted-foreground">
-        When to request read receipts for outgoing messages
+        {$_('account.requestReadReceiptsHelp')}
       </p>
     </div>
   </div>
@@ -386,39 +392,39 @@
         class="w-4 h-4"
       />
       <Icon icon="mdi:folder-cog-outline" class="w-4 h-4" />
-      Folder Mapping
+      {$_('account.folderMapping')}
     </button>
 
     {#if showFolderMapping}
       <div class="space-y-3 pl-6 pt-2 border-l border-border ml-2">
         <p class="text-xs text-muted-foreground">
-          Map folder types to specific IMAP folders on your server.
+          {$_('account.folderMappingHelp2')}
         </p>
 
         {#if loadingFolders}
           <div class="flex items-center gap-2 text-sm text-muted-foreground">
             <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-            Loading folders...
+            {$_('account.loadingFolders')}
           </div>
         {:else if availableFolders.length === 0}
-          <p class="text-sm text-muted-foreground">No folders available.</p>
+          <p class="text-sm text-muted-foreground">{$_('account.noFoldersAvailable')}</p>
         {:else}
           <div class="grid gap-3">
             {#each folderMappingTypes as mapping (mapping.key)}
               <div class="grid grid-cols-[100px_1fr] items-center gap-2">
-                <Label class="text-sm">{mapping.label}:</Label>
+                <Label class="text-sm">{$_(mapping.labelKey)}:</Label>
                 <Select.Root value={mapping.get()} onValueChange={mapping.set}>
                   <Select.Trigger class="h-9">
-                    <Select.Value placeholder="None">
-                      {mapping.get() || 'None'}
+                    <Select.Value placeholder={$_('account.none')}>
+                      {mapping.get() || $_('account.none')}
                     </Select.Value>
                   </Select.Trigger>
                   <Select.Content>
-                    <Select.Item value="" label="None" />
+                    <Select.Item value="" label={$_('account.none')} />
                     {#each availableFolders as f (f.path)}
                       <Select.Item
                         value={f.path}
-                        label={f.path + (autoDetectedFolders[mapping.key] === f.path ? ' (detected)' : '')}
+                        label={f.path + (autoDetectedFolders[mapping.key] === f.path ? ' ' + $_('account.detected') : '')}
                       />
                     {/each}
                   </Select.Content>
@@ -443,23 +449,23 @@
         class="w-4 h-4"
       />
       <Icon icon="mdi:shield-lock-outline" class="w-4 h-4" />
-      Trusted Certificates
+      {$_('account.trustedCertificates')}
     </button>
 
     {#if showTrustedCerts}
       <div class="space-y-3 pl-6 pt-2 border-l border-border ml-2">
         <p class="text-xs text-muted-foreground">
-          Manually trusted TLS certificates for this account's servers.
+          {$_('account.trustedCertsHelp')}
         </p>
 
         {#if loadingCerts}
           <div class="flex items-center gap-2 text-sm text-muted-foreground">
             <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-            Loading certificates...
+            {$_('account.loadingCerts')}
           </div>
         {:else if trustedCerts.length === 0}
           <p class="text-sm text-muted-foreground">
-            No manually trusted certificates for this account's servers.
+            {$_('account.noTrustedCerts')}
           </p>
         {:else}
           <div class="space-y-3">
@@ -471,8 +477,8 @@
                     <span class="text-sm font-medium truncate">{cert.subject}</span>
                   </div>
                   <div class="text-xs text-muted-foreground space-y-0.5 pl-6">
-                    <p>Fingerprint: <span class="font-mono">{formatFingerprint(cert.fingerprint)}</span></p>
-                    <p>Expires: {formatCertDate(cert.notAfter)}</p>
+                    <p>{$_('account.certFingerprint')} <span class="font-mono">{formatFingerprint(cert.fingerprint)}</span></p>
+                    <p>{$_('account.certExpires')} {formatCertDate(cert.notAfter)}</p>
                   </div>
                 </div>
                 <Button
@@ -481,7 +487,7 @@
                   class="shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                   onclick={() => handleRemoveCert(cert.fingerprint)}
                 >
-                  Remove
+                  {$_('common.remove')}
                 </Button>
               </div>
             {/each}
@@ -494,8 +500,8 @@
 
 <ConfirmDialog
   bind:open={showRemoveConfirm}
-  title="Remove Trusted Certificate"
-  description="This certificate will no longer be trusted. Future connections to this server may require you to accept the certificate again."
-  confirmLabel="Remove"
+  title={$_('account.removeTrustedCert')}
+  description={$_('account.removeTrustedCertDescription')}
+  confirmLabel={$_('common.remove')}
   onConfirm={confirmRemoveCert}
 />

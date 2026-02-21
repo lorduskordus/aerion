@@ -98,6 +98,71 @@ func (a *App) SetTermsAccepted(accepted bool) error {
 	return a.settingsStore.SetTermsAccepted(accepted)
 }
 
+// GetRunBackground returns whether Aerion keeps running when the window is closed
+func (a *App) GetRunBackground() (bool, error) {
+	return a.settingsStore.GetRunBackground()
+}
+
+// SetRunBackground sets whether Aerion keeps running when the window is closed.
+// Disabling also force-disables start_hidden.
+func (a *App) SetRunBackground(enabled bool) error {
+	if err := a.settingsStore.SetRunBackground(enabled); err != nil {
+		return err
+	}
+	if !enabled {
+		return a.settingsStore.SetStartHidden(false)
+	}
+	return nil
+}
+
+// GetStartHidden returns whether Aerion starts with the window hidden
+func (a *App) GetStartHidden() (bool, error) {
+	return a.settingsStore.GetStartHidden()
+}
+
+// SetStartHidden sets whether Aerion starts with the window hidden.
+// Enabling also force-enables run_background (start hidden requires background mode).
+func (a *App) SetStartHidden(enabled bool) error {
+	if enabled {
+		if err := a.settingsStore.SetRunBackground(true); err != nil {
+			return err
+		}
+	}
+	return a.settingsStore.SetStartHidden(enabled)
+}
+
+// GetAutostart returns whether Aerion starts on login
+func (a *App) GetAutostart() (bool, error) {
+	return a.settingsStore.GetAutostart()
+}
+
+// SetAutostart sets whether Aerion starts on login.
+// Manages the XDG autostart .desktop file or Flatpak Background portal.
+func (a *App) SetAutostart(enabled bool) error {
+	if err := a.settingsStore.SetAutostart(enabled); err != nil {
+		return err
+	}
+	if a.autostartMgr == nil {
+		return nil
+	}
+	if enabled {
+		return a.autostartMgr.Enable()
+	}
+	return a.autostartMgr.Disable()
+}
+
+// GetLanguage returns the saved language preference (locale code)
+// Returns empty string if not set (frontend uses system locale detection)
+func (a *App) GetLanguage() (string, error) {
+	return a.settingsStore.GetLanguage()
+}
+
+// SetLanguage sets the language preference
+// Valid values: "en", "zh-TW", "zh-HK", "zh-CN"
+func (a *App) SetLanguage(language string) error {
+	return a.settingsStore.SetLanguage(language)
+}
+
 // AddImageAllowlist adds a domain or sender to the image allowlist
 // entryType: "domain" or "sender"
 // value: the domain (e.g., "company.com") or email (e.g., "newsletter@company.com")

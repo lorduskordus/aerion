@@ -2,6 +2,11 @@
 - dest: vendor
   path: modules.txt
   type: file
+- dest: vendor/git.sr.ht/~jackmordaunt/go-toast/v2
+  sha256: 9bb5ce85169e70d3fd58934f471c41ec8d63968e241050fb59a96035f065245f
+  strip-components: 4
+  type: archive
+  url: https://proxy.golang.org/git.sr.ht/~jackmordaunt/go-toast/v2/@v/v2.0.3.zip
 - dest: vendor/github.com/Microsoft/go-winio
   sha256: cd007bdb877a578efde2780bf5dd2f57dd557b5b08c3614597b820d0369ebb0f
   strip-components: 3

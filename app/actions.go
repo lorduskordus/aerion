@@ -404,12 +404,11 @@ func (a *App) MoveToFolder(messageIDs []string, destFolderID string) error {
 	}()
 
 	// Sync to IMAP in background (COPY + DELETE), then sync destination to get correct UIDs.
-	// Use a timeout context so this goroutine doesn't persist through sleep/wake cycles
-	// holding pool connections indefinitely.
+	// Use SyncFolder instead of calling SyncMessages/FetchBodiesInBackground directly
+	// so that back-to-back moves to the same folder are serialized — the second call
+	// cancels the first and starts fresh, preventing the first sync from deleting
+	// locally-moved messages whose IMAP COPY hasn't completed yet.
 	go func() {
-		moveCtx, moveCancel := context.WithTimeout(a.ctx, 5*time.Minute)
-		defer moveCancel()
-
 		for sourceFolderID, msgs := range byFolder {
 			if err := a.moveMessagesToIMAP(msgs, sourceFolderID, destFolder); err != nil {
 				log.Error().Err(err).
@@ -420,22 +419,18 @@ func (a *App) MoveToFolder(messageIDs []string, destFolderID string) error {
 			}
 		}
 
-		// Sync destination folder so moved messages get correct UIDs (headers + bodies)
+		// Sync destination folder so moved messages get correct UIDs (headers + bodies).
+		// Clear the debounce timestamp so this request isn't silently dropped.
 		if len(messages) > 0 {
-			syncPeriodDays := 30
-			if acc, err := a.accountStore.Get(messages[0].AccountID); err == nil && acc != nil {
-				syncPeriodDays = acc.SyncPeriodDays
-			}
-			if err := a.syncEngine.SyncMessages(moveCtx, messages[0].AccountID, destFolderID, syncPeriodDays); err != nil {
+			accountID := messages[0].AccountID
+			syncKey := accountID + ":" + destFolderID
+			a.syncMu.Lock()
+			delete(a.syncLastRequest, syncKey)
+			a.syncMu.Unlock()
+
+			if err := a.SyncFolder(accountID, destFolderID); err != nil && err != context.Canceled {
 				log.Warn().Err(err).Str("destFolderID", destFolderID).Msg("Failed to sync destination folder after move")
 			}
-			if err := a.syncEngine.FetchBodiesInBackground(moveCtx, messages[0].AccountID, destFolderID, syncPeriodDays); err != nil {
-				log.Warn().Err(err).Str("destFolderID", destFolderID).Msg("Failed to fetch bodies for destination folder after move")
-			}
-			wailsRuntime.EventsEmit(a.ctx, "folder:synced", map[string]interface{}{
-				"accountId": messages[0].AccountID,
-				"folderId":  destFolderID,
-			})
 		}
 	}()
 
@@ -715,6 +710,18 @@ func (a *App) MarkAsNotSpam(messageIDs []string) error {
 	}
 
 	return a.MoveToFolder(messageIDs, inboxFolder.ID)
+}
+
+// EmptyTrash permanently deletes all messages in a trash folder
+func (a *App) EmptyTrash(accountID, folderID string) error {
+	ids, err := a.messageStore.GetAllIDsByFolder(folderID)
+	if err != nil {
+		return fmt.Errorf("failed to get messages in trash: %w", err)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	return a.DeletePermanently(ids)
 }
 
 // DeletePermanently permanently deletes messages

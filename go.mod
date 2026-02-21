@@ -3,6 +3,7 @@ module github.com/hkdb/aerion
 go 1.24.0
 
 require (
+	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/ProtonMail/go-crypto v1.1.5
 	github.com/emersion/go-imap/v2 v2.0.0-beta.7
@@ -20,6 +21,7 @@ require (
 	go.mozilla.org/pkcs7 v0.9.0
 	golang.org/x/crypto v0.46.0
 	golang.org/x/net v0.48.0
+	golang.org/x/sys v0.39.0
 	golang.org/x/text v0.32.0
 	modernc.org/sqlite v1.42.2
 	software.sslmate.com/src/go-pkcs12 v0.7.0
@@ -58,7 +60,6 @@ require (
 	github.com/wailsapp/go-webview2 v1.0.22 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
-	golang.org/x/sys v0.39.0 // indirect
 	modernc.org/libc v1.66.10 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect

@@ -13,6 +13,7 @@ import {imap} from '../models';
 import {settings} from '../models';
 import {pgp} from '../models';
 import {appstate} from '../models';
+import {sync} from '../models';
 import {smime} from '../models';
 import {draft} from '../models';
 
@@ -54,6 +55,8 @@ export function CheckRecipientPGPKeys(arg1:Array<string>):Promise<Record<string,
 
 export function ClearContactSourceError(arg1:string):Promise<void>;
 
+export function CloseWindow():Promise<void>;
+
 export function CompleteContactSourceOAuthSetup(arg1:string,arg2:number):Promise<carddav.Source>;
 
 export function CompleteOAuthAccountSetup(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<account.Account>;
@@ -88,7 +91,11 @@ export function DownloadAttachment(arg1:string,arg2:string):Promise<string>;
 
 export function DownloadEncryptedAttachment(arg1:string,arg2:string,arg3:string):Promise<string>;
 
+export function EmptyTrash(arg1:string,arg2:string):Promise<void>;
+
 export function FetchMessageBody(arg1:string):Promise<message.Message>;
+
+export function FetchServerMessage(arg1:string,arg2:string,arg3:number):Promise<message.Message>;
 
 export function ForceSyncFolder(arg1:string,arg2:string):Promise<void>;
 
@@ -105,6 +112,8 @@ export function GetAttachment(arg1:string):Promise<message.Attachment>;
 export function GetAttachments(arg1:string):Promise<Array<message.Attachment>>;
 
 export function GetAutoDetectedFolders(arg1:string):Promise<Record<string, string>>;
+
+export function GetAutostart():Promise<boolean>;
 
 export function GetConfiguredOAuthProviders():Promise<Array<string>>;
 
@@ -150,6 +159,8 @@ export function GetImageAllowlist():Promise<Array<settings.AllowlistEntry>>;
 
 export function GetInlineAttachments(arg1:string):Promise<Record<string, string>>;
 
+export function GetLanguage():Promise<string>;
+
 export function GetLinkedAccountsForContactSync():Promise<Array<app.LinkedAccountInfo>>;
 
 export function GetMarkAsReadDelay():Promise<number>;
@@ -178,6 +189,8 @@ export function GetPendingMailto():Promise<app.MailtoData>;
 
 export function GetReadReceiptResponsePolicy():Promise<string>;
 
+export function GetRunBackground():Promise<boolean>;
+
 export function GetSMIMEEncryptPolicy(arg1:string):Promise<string>;
 
 export function GetSMIMESignPolicy(arg1:string):Promise<string>;
@@ -191,6 +204,10 @@ export function GetShowTitleBar():Promise<boolean>;
 export function GetSourceAddressbooks(arg1:string):Promise<Array<carddav.Addressbook>>;
 
 export function GetSpecialFolder(arg1:string,arg2:folder.Type):Promise<folder.Folder>;
+
+export function GetStartHidden():Promise<boolean>;
+
+export function GetStartHiddenActive():Promise<boolean>;
 
 export function GetSystemTheme():Promise<string>;
 
@@ -213,6 +230,8 @@ export function GetUnifiedInboxUnreadCount():Promise<number>;
 export function HasPGPKey(arg1:string):Promise<boolean>;
 
 export function HasSMIMECertificate(arg1:string):Promise<boolean>;
+
+export function IMAPSearchFolder(arg1:string,arg2:string,arg3:string,arg4:number):Promise<sync.IMAPSearchResponse>;
 
 export function IgnoreReadReceipt(arg1:string,arg2:string):Promise<void>;
 
@@ -298,6 +317,8 @@ export function ProcessPGPMessage(arg1:string):Promise<app.PGPViewResult>;
 
 export function ProcessSMIMEMessage(arg1:string):Promise<app.SMIMEViewResult>;
 
+export function QuitApp():Promise<void>;
+
 export function ReadFileAsAttachment(arg1:string):Promise<app.ComposerAttachment>;
 
 export function ReauthorizeAccount(arg1:string):Promise<void>;
@@ -346,11 +367,15 @@ export function SetAccountEnabled(arg1:string,arg2:boolean):Promise<void>;
 
 export function SetAddressbookEnabled(arg1:string,arg2:boolean):Promise<void>;
 
+export function SetAutostart(arg1:boolean):Promise<void>;
+
 export function SetDefaultIdentity(arg1:string,arg2:string):Promise<void>;
 
 export function SetDefaultPGPKey(arg1:string,arg2:string):Promise<void>;
 
 export function SetDefaultSMIMECertificate(arg1:string,arg2:string):Promise<void>;
+
+export function SetLanguage(arg1:string):Promise<void>;
 
 export function SetMarkAsReadDelay(arg1:number):Promise<void>;
 
@@ -364,15 +389,21 @@ export function SetPGPSignPolicy(arg1:string,arg2:string):Promise<void>;
 
 export function SetReadReceiptResponsePolicy(arg1:string):Promise<void>;
 
+export function SetRunBackground(arg1:boolean):Promise<void>;
+
 export function SetSMIMEEncryptPolicy(arg1:string,arg2:string):Promise<void>;
 
 export function SetSMIMESignPolicy(arg1:string,arg2:string):Promise<void>;
 
 export function SetShowTitleBar(arg1:boolean):Promise<void>;
 
+export function SetStartHidden(arg1:boolean):Promise<void>;
+
 export function SetTermsAccepted(arg1:boolean):Promise<void>;
 
 export function SetThemeMode(arg1:string):Promise<void>;
+
+export function ShowWindow():Promise<void>;
 
 export function Star(arg1:Array<string>):Promise<void>;
 

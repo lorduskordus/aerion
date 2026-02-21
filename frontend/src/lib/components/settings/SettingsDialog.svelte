@@ -5,9 +5,10 @@
   import * as Tabs from '$lib/components/ui/tabs'
   import { Button } from '$lib/components/ui/button'
   // @ts-ignore - wailsjs path
-  import { GetReadReceiptResponsePolicy, SetReadReceiptResponsePolicy, GetMarkAsReadDelay, SetMarkAsReadDelay, GetMessageListDensity, SetMessageListDensity, GetThemeMode, SetThemeMode, GetShowTitleBar, SetShowTitleBar } from '../../../../wailsjs/go/app/App.js'
+  import { GetReadReceiptResponsePolicy, SetReadReceiptResponsePolicy, GetMarkAsReadDelay, SetMarkAsReadDelay, GetMessageListDensity, SetMessageListDensity, GetThemeMode, SetThemeMode, GetShowTitleBar, SetShowTitleBar, GetRunBackground, SetRunBackground, GetStartHidden, SetStartHidden, GetAutostart, SetAutostart, GetLanguage, SetLanguage } from '../../../../wailsjs/go/app/App.js'
   import { addToast } from '$lib/stores/toast'
-  import { setMessageListDensity as updateDensityStore, setThemeMode as updateThemeStore, setShowTitleBar as updateShowTitleBarStore, type MessageListDensity, type ThemeMode } from '$lib/stores/settings.svelte'
+  import { setMessageListDensity as updateDensityStore, setThemeMode as updateThemeStore, setShowTitleBar as updateShowTitleBarStore, setRunBackground as updateRunBackgroundStore, setStartHidden as updateStartHiddenStore, setAutostart as updateAutostartStore, setLanguage as updateLanguageStore, type MessageListDensity, type ThemeMode } from '$lib/stores/settings.svelte'
+  import { _ } from '$lib/i18n'
   import GeneralTab from './GeneralTab.svelte'
   import AccountsTab from './AccountsTab.svelte'
   import ContactsTab from './ContactsTab.svelte'
@@ -31,6 +32,10 @@
   let messageListDensity = $state<string>('standard')
   let themeMode = $state<string>('system')
   let showTitleBar = $state<boolean>(true)
+  let runBackground = $state<boolean>(false)
+  let startHidden = $state<boolean>(false)
+  let autostart = $state<boolean>(false)
+  let language = $state<string>('')
   let loading = $state(true)
   let saving = $state(false)
   let activeTab = $state('general')
@@ -50,12 +55,16 @@
   async function loadSettings() {
     loading = true
     try {
-      const [policy, delayMs, density, theme, titleBar] = await Promise.all([
+      const [policy, delayMs, density, theme, titleBar, runBg, startHid, autoSt, lang] = await Promise.all([
         GetReadReceiptResponsePolicy(),
         GetMarkAsReadDelay(),
         GetMessageListDensity(),
         GetThemeMode(),
         GetShowTitleBar(),
+        GetRunBackground(),
+        GetStartHidden(),
+        GetAutostart(),
+        GetLanguage(),
       ])
       readReceiptResponsePolicy = policy
       // Convert ms to seconds for display
@@ -63,6 +72,10 @@
       messageListDensity = density
       themeMode = theme
       showTitleBar = titleBar
+      runBackground = runBg
+      startHidden = startHid
+      autostart = autoSt
+      language = lang
     } catch (err) {
       console.error('Failed to load settings:', err)
     } finally {
@@ -82,13 +95,25 @@
       await SetMessageListDensity(messageListDensity)
       await SetThemeMode(themeMode)
       await SetShowTitleBar(showTitleBar)
+      await SetRunBackground(runBackground)
+      await SetStartHidden(startHidden)
+      await SetAutostart(autostart)
+      if (language) {
+        await SetLanguage(language)
+      }
       // Update the reactive stores so UI updates immediately
       updateDensityStore(messageListDensity as MessageListDensity)
       updateThemeStore(themeMode as ThemeMode)
       updateShowTitleBarStore(showTitleBar)
+      updateRunBackgroundStore(runBackground)
+      updateStartHiddenStore(startHidden)
+      updateAutostartStore(autostart)
+      if (language) {
+        updateLanguageStore(language)
+      }
       addToast({
         type: 'success',
-        message: 'Settings saved',
+        message: $_('toast.settingsSaved'),
       })
       open = false
       onClose?.()
@@ -96,7 +121,7 @@
       console.error('Failed to save settings:', err)
       addToast({
         type: 'error',
-        message: `Failed to save settings: ${err}`,
+        message: $_('toast.failedToSaveSettings', { values: { error: String(err) } }),
       })
     } finally {
       saving = false
@@ -119,9 +144,9 @@
 <Dialog.Root bind:open onOpenChange={handleOpenChange}>
   <Dialog.Content class="max-w-lg" preventCloseAutoFocus>
     <Dialog.Header>
-      <Dialog.Title>Settings</Dialog.Title>
+      <Dialog.Title>{$_('settings.title')}</Dialog.Title>
       <Dialog.Description>
-        Configure application preferences
+        {$_('settings.description')}
       </Dialog.Description>
     </Dialog.Header>
 
@@ -134,19 +159,19 @@
         <Tabs.List class="grid w-full grid-cols-4">
           <Tabs.Trigger value="general" class="flex items-center gap-2">
             <Icon icon="mdi:cog" class="w-4 h-4" />
-            General
+            {$_('settings.general')}
           </Tabs.Trigger>
           <Tabs.Trigger value="accounts" class="flex items-center gap-2">
             <Icon icon="mdi:email-multiple" class="w-4 h-4" />
-            Accounts
+            {$_('settings.accounts')}
           </Tabs.Trigger>
           <Tabs.Trigger value="contacts" class="flex items-center gap-2">
             <Icon icon="mdi:contacts" class="w-4 h-4" />
-            Contacts
+            {$_('settings.contacts')}
           </Tabs.Trigger>
           <Tabs.Trigger value="about" class="flex items-center gap-2">
             <Icon icon="mdi:information-outline" class="w-4 h-4" />
-            About
+            {$_('settings.about')}
           </Tabs.Trigger>
         </Tabs.List>
 
@@ -158,11 +183,19 @@
               bind:messageListDensity
               bind:themeMode
               bind:showTitleBar
+              bind:runBackground
+              bind:startHidden
+              bind:autostart
+              bind:language
               onPolicyChange={(v) => readReceiptResponsePolicy = v}
               onDelayChange={(v) => markAsReadDelaySeconds = v}
               onDensityChange={(v) => messageListDensity = v}
               onThemeChange={(v) => themeMode = v}
               onShowTitleBarChange={(v) => showTitleBar = v}
+              onRunBackgroundChange={(v) => { runBackground = v; if (!v) startHidden = false }}
+              onStartHiddenChange={(v) => { startHidden = v; if (v) runBackground = true }}
+              onAutostartChange={(v) => autostart = v}
+              onLanguageChange={(v) => language = v}
             />
           </Tabs.Content>
 
@@ -184,19 +217,19 @@
       {#if activeTab === 'general'}
         <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
           <Button variant="ghost" onclick={handleCancel} disabled={saving}>
-            Cancel
+            {$_('common.cancel')}
           </Button>
           <Button onclick={handleSave} disabled={saving}>
             {#if saving}
               <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
             {/if}
-            Save
+            {$_('common.save')}
           </Button>
         </div>
       {:else}
         <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
           <Button variant="ghost" onclick={handleCancel}>
-            Close
+            {$_('common.close')}
           </Button>
         </div>
       {/if}

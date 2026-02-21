@@ -51,6 +51,7 @@
   import Switch from '$lib/components/ui/switch/Switch.svelte'
   import { ConfirmDialog, ThreeOptionDialog } from '$lib/components/ui/confirm-dialog'
   import { addToast } from '$lib/stores/toast'
+  import { _ } from '$lib/i18n'
 
   // Props
   interface Props {
@@ -227,7 +228,7 @@
       // Import for the first missing recipient
       if (missingCertRecipients.length > 0) {
         await api.importRecipientCert(missingCertRecipients[0], filePath)
-        addToast({ type: 'success', message: `Certificate imported for ${missingCertRecipients[0]}` })
+        addToast({ type: 'success', message: $_('composer.certImported', { values: { email: missingCertRecipients[0] } }) })
         // Re-check certs
         const allEmails = [...toRecipients, ...ccRecipients, ...bccRecipients]
           .map(r => r.address).filter(Boolean)
@@ -236,7 +237,7 @@
     } catch (err) {
       addToast({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Failed to import certificate',
+        message: err instanceof Error ? err.message : $_('composer.failedToImportCert'),
       })
     }
   }
@@ -247,7 +248,7 @@
       if (!filePath) return
       if (missingPGPKeyRecipients.length > 0) {
         await api.importRecipientPGPKey(missingPGPKeyRecipients[0], filePath)
-        addToast({ type: 'success', message: `PGP key imported for ${missingPGPKeyRecipients[0]}` })
+        addToast({ type: 'success', message: $_('composer.pgpKeyImported', { values: { email: missingPGPKeyRecipients[0] } }) })
         const allEmails = [...toRecipients, ...ccRecipients, ...bccRecipients]
           .map(r => r.address).filter(Boolean)
         recipientPGPKeyStatus = await api.checkRecipientPGPKeys(allEmails)
@@ -255,7 +256,7 @@
     } catch (err) {
       addToast({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Failed to import PGP key',
+        message: err instanceof Error ? err.message : $_('composer.failedToImportPGPKey'),
       })
     }
   }
@@ -292,21 +293,21 @@
     }
   })
   let draftStatusLabel = $derived.by(() => {
-    if (saveStatus === 'saving') return (encryptMessage || pgpEncryptMessage) ? 'Encrypting...' : 'Saving...'
-    if (saveStatus === 'error') return 'Save failed'
+    if (saveStatus === 'saving') return (encryptMessage || pgpEncryptMessage) ? $_('composer.encrypting') : $_('composer.saving')
+    if (saveStatus === 'error') return $_('composer.saveFailed')
     if (saveStatus !== 'saved' || !lastSavedAt) return ''
     if (encryptMessage || pgpEncryptMessage) {
       switch (syncStatus) {
-        case 'synced': return 'Encrypted & synced'
-        case 'pending': return 'Encrypted draft'
-        case 'failed': return 'Encrypted (offline)'
+        case 'synced': return $_('composer.encryptedSynced')
+        case 'pending': return $_('composer.encryptedDraft')
+        case 'failed': return $_('composer.encryptedOffline')
         default: return ''
       }
     }
     switch (syncStatus) {
-      case 'synced': return 'Synced'
-      case 'pending': return 'Saved locally'
-      case 'failed': return 'Saved locally (offline)'
+      case 'synced': return $_('composer.synced')
+      case 'pending': return $_('composer.savedLocally')
+      case 'failed': return $_('composer.savedLocallyOffline')
       default: return ''
     }
   })
@@ -800,7 +801,7 @@
     if (encryptMessage && missingCertRecipients.length > 0) {
       addToast({
         type: 'error',
-        message: `Cannot encrypt: missing S/MIME certificate for ${missingCertRecipients.join(', ')}`,
+        message: $_('composer.cannotEncryptMissingCert', { values: { emails: missingCertRecipients.join(', ') } }),
       })
       return false
     }
@@ -809,7 +810,7 @@
     if (pgpEncryptMessage && missingPGPKeyRecipients.length > 0) {
       addToast({
         type: 'error',
-        message: `Cannot encrypt: missing PGP key for ${missingPGPKeyRecipients.join(', ')}`,
+        message: $_('composer.cannotEncryptMissingPGPKey', { values: { emails: missingPGPKeyRecipients.join(', ') } }),
       })
       return false
     }
@@ -833,7 +834,7 @@
     if (toRecipients.length === 0) {
       addToast({
         type: 'error',
-        message: 'Please add at least one recipient',
+        message: $_('composer.noRecipients'),
       })
       return
     }
@@ -842,7 +843,7 @@
     if (!selectedIdentity) {
       addToast({
         type: 'error',
-        message: 'Please select a sender identity',
+        message: $_('composer.selectSenderIdentity'),
       })
       return
     }
@@ -876,7 +877,7 @@
 
       addToast({
         type: 'success',
-        message: 'Message sent successfully',
+        message: $_('composer.messageSent'),
       })
 
       onSent?.()
@@ -885,7 +886,7 @@
       console.error('Failed to send message:', err)
       addToast({
         type: 'error',
-        message: `Failed to send message: ${err}`,
+        message: $_('composer.failedToSend', { values: { error: String(err) } }),
       })
     } finally {
       sending = false
@@ -988,7 +989,7 @@
       console.error('Failed to pop out composer:', err)
       addToast({
         type: 'error',
-        message: 'Failed to open composer window',
+        message: $_('composer.failedToOpenComposer'),
       })
       poppingOut = false
     }
@@ -1140,7 +1141,7 @@
       console.error('Failed to process inline image:', err)
       addToast({
         type: 'error',
-        message: 'Failed to insert image',
+        message: $_('composer.failedToInsertImage'),
       })
     }
   }
@@ -1182,7 +1183,7 @@
         console.error('Failed to attach files:', err)
         addToast({
           type: 'error',
-          message: 'Failed to attach files',
+          message: $_('composer.failedToAttachFiles'),
         })
       }
     }
@@ -1253,20 +1254,20 @@
   ondragleave={handleDragLeave}
   ondrop={handleDrop}
   role="region"
-  aria-label="Email composer"
+  aria-label={$_('aria.emailComposer')}
 >
   <!-- Header -->
   <div class="flex items-center justify-between px-4 py-3 border-b border-border">
     <div class="flex items-center gap-3">
       <h2 class="text-lg font-semibold">
         {#if getDisplayMode() === 'new'}
-          New Message
+          {$_('composer.newMessage')}
         {:else if getDisplayMode() === 'reply'}
-          Reply
+          {$_('composer.reply')}
         {:else if getDisplayMode() === 'reply-all'}
-          Reply All
+          {$_('composer.replyAll')}
         {:else if getDisplayMode() === 'forward'}
-          Forward
+          {$_('composer.forward')}
         {/if}
       </h2>
       <!-- Draft status indicator -->
@@ -1284,7 +1285,7 @@
           onclick={handlePopOut}
           disabled={poppingOut || sending}
           class="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Open in new window"
+          title={$_('composer.openInNewWindow')}
         >
           {#if poppingOut}
             <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
@@ -1298,7 +1299,7 @@
         disabled={poppingOut}
         class="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors disabled:opacity-50"
       >
-        Close
+        {$_('composer.close')}
       </button>
       <button
         onclick={handleSend}
@@ -1307,13 +1308,13 @@
       >
         {#if sending}
           <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-          Sending...
+          {$_('composer.sending')}
         {:else if poppingOut}
           <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-          Opening...
+          {$_('composer.opening')}
         {:else}
           <Icon icon="mdi:send" class="w-4 h-4" />
-          Send
+          {$_('composer.send')}
         {/if}
       </button>
     </div>
@@ -1323,11 +1324,11 @@
   <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
     <!-- From -->
     <div class="flex items-center gap-2 px-4 py-2 border-b border-border">
-      <span class="text-sm text-muted-foreground w-16">From:</span>
+      <span class="text-sm text-muted-foreground w-16">{$_('composer.from')}:</span>
       <div class="flex-1">
         <Select.Root value={selectedIdentityId} onValueChange={handleIdentityChange}>
           <Select.Trigger class="h-8 border-0 bg-transparent shadow-none focus:ring-0">
-            <Select.Value placeholder="Select identity">
+            <Select.Value placeholder={$_('composer.selectIdentity')}>
               {#if selectedIdentityId}
                 {@const identity = identities.find(i => i.id === selectedIdentityId)}
                 {#if identity}
@@ -1347,21 +1348,21 @@
 
     <!-- To -->
     <div class="flex items-start gap-2 px-4 py-2 border-b border-border">
-      <span class="text-sm text-muted-foreground w-16 pt-1">To:</span>
+      <span class="text-sm text-muted-foreground w-16 pt-1">{$_('composer.to')}:</span>
       <div class="flex-1">
         <RecipientInput
           bind:this={toInputRef}
           bind:recipients={toRecipients}
-          placeholder="Add recipients..."
+          placeholder={$_('composer.addRecipients')}
         />
       </div>
       {#if !showCc || !showBcc}
         <div class="flex items-center gap-1 text-sm text-muted-foreground">
           {#if !showCc}
-            <button onclick={() => showCc = true} class="hover:text-foreground">Cc</button>
+            <button onclick={() => showCc = true} class="hover:text-foreground">{$_('composer.cc')}</button>
           {/if}
           {#if !showBcc}
-            <button onclick={() => showBcc = true} class="hover:text-foreground">Bcc</button>
+            <button onclick={() => showBcc = true} class="hover:text-foreground">{$_('composer.bcc')}</button>
           {/if}
         </div>
       {/if}
@@ -1370,11 +1371,11 @@
     <!-- Cc -->
     {#if showCc}
       <div class="flex items-start gap-2 px-4 py-2 border-b border-border">
-        <span class="text-sm text-muted-foreground w-16 pt-1">Cc:</span>
+        <span class="text-sm text-muted-foreground w-16 pt-1">{$_('composer.cc')}:</span>
         <div class="flex-1">
           <RecipientInput
             bind:recipients={ccRecipients}
-            placeholder="Add Cc recipients..."
+            placeholder={$_('composer.addCcRecipients')}
           />
         </div>
       </div>
@@ -1383,11 +1384,11 @@
     <!-- Bcc -->
     {#if showBcc}
       <div class="flex items-start gap-2 px-4 py-2 border-b border-border">
-        <span class="text-sm text-muted-foreground w-16 pt-1">Bcc:</span>
+        <span class="text-sm text-muted-foreground w-16 pt-1">{$_('composer.bcc')}:</span>
         <div class="flex-1">
           <RecipientInput
             bind:recipients={bccRecipients}
-            placeholder="Add Bcc recipients..."
+            placeholder={$_('composer.addBccRecipients')}
           />
         </div>
       </div>
@@ -1395,12 +1396,12 @@
 
     <!-- Subject -->
     <div class="flex items-center gap-2 px-4 py-2 border-b border-border">
-      <label for="composer-subject" class="text-sm text-muted-foreground w-16">Subject:</label>
+      <label for="composer-subject" class="text-sm text-muted-foreground w-16">{$_('composer.subject')}:</label>
       <input
         id="composer-subject"
         bind:value={subject}
         type="text"
-        placeholder="Subject"
+        placeholder={$_('composer.subject')}
         class="flex-1 bg-transparent text-sm focus:outline-none"
         onkeydown={(e) => {
           // Tab skips security rows + toolbar and goes directly to body
@@ -1421,17 +1422,17 @@
         </div>
         <div class="flex items-center gap-3 ml-auto">
           {#if securityMode === 'pgp'}
-            <span class="text-muted-foreground">S = sign · E = encrypt · Esc = exit</span>
+            <span class="text-muted-foreground">{$_('composer.securityModeHint')}</span>
           {/if}
           {#if showPGPSignOption}
-            <div class="flex items-center gap-1.5" title="PGP sign this message">
-              <span>Sign</span>
+            <div class="flex items-center gap-1.5" title={$_('composer.pgpSign')}>
+              <span>{$_('composer.sign')}</span>
               <Switch bind:checked={pgpSignMessage} onCheckedChange={(v) => { if (v) { signMessage = false } }} class="scale-75 origin-left" />
             </div>
           {/if}
           {#if showPGPEncryptOption}
-            <div class="flex items-center gap-1.5" title="PGP encrypt this message">
-              <span>Encrypt</span>
+            <div class="flex items-center gap-1.5" title={$_('composer.pgpEncrypt')}>
+              <span>{$_('composer.encrypt')}</span>
               <Switch bind:checked={pgpEncryptMessage} onCheckedChange={(v) => { if (v) { encryptMessage = false } }} class="scale-75 origin-left" />
             </div>
           {/if}
@@ -1446,17 +1447,17 @@
         </div>
         <div class="flex items-center gap-3 ml-auto">
           {#if securityMode === 'smime'}
-            <span class="text-muted-foreground">S = sign · E = encrypt · Esc = exit</span>
+            <span class="text-muted-foreground">{$_('composer.securityModeHint')}</span>
           {/if}
           {#if showSignOption}
-            <div class="flex items-center gap-1.5" title="S/MIME sign this message">
-              <span>Sign</span>
+            <div class="flex items-center gap-1.5" title={$_('composer.smimeSign')}>
+              <span>{$_('composer.sign')}</span>
               <Switch bind:checked={signMessage} onCheckedChange={(v) => { if (v) { pgpSignMessage = false } }} class="scale-75 origin-left" />
             </div>
           {/if}
           {#if showEncryptOption}
-            <div class="flex items-center gap-1.5" title="S/MIME encrypt this message">
-              <span>Encrypt</span>
+            <div class="flex items-center gap-1.5" title={$_('composer.smimeEncrypt')}>
+              <span>{$_('composer.encrypt')}</span>
               <Switch bind:checked={encryptMessage} onCheckedChange={(v) => { if (v) { pgpEncryptMessage = false } }} class="scale-75 origin-left" />
             </div>
           {/if}
@@ -1479,7 +1480,7 @@
       {#if isPlainTextMode}
         <textarea
           bind:value={plainTextContent}
-          placeholder="Write your message..."
+          placeholder={$_('composer.writePlaceholder')}
           class="w-full h-full p-3 bg-transparent resize-none focus:outline-none font-mono text-sm"
           oninput={scheduleDraftSave}
         ></textarea>
@@ -1495,9 +1496,9 @@
     {#if encryptMessage && missingCertRecipients.length > 0}
       <div class="flex items-center gap-2 text-xs px-3 py-1.5 bg-amber-50 dark:bg-amber-950/30 border-t border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300">
         <Icon icon="mdi:alert" class="w-3.5 h-3.5 flex-shrink-0" />
-        <span class="flex-1">Cannot encrypt: no S/MIME certificate for {missingCertRecipients.join(', ')}</span>
-        <button onclick={handleImportRecipientCert} class="px-2 py-0.5 rounded bg-amber-200 dark:bg-amber-800 hover:bg-amber-300 dark:hover:bg-amber-700 font-medium transition-colors">Import</button>
-        <button onclick={() => encryptMessage = false} class="px-2 py-0.5 rounded hover:bg-amber-200 dark:hover:bg-amber-800 font-medium transition-colors">Cancel</button>
+        <span class="flex-1">{$_('composer.noCertFor', { values: { emails: missingCertRecipients.join(', ') } })}</span>
+        <button onclick={handleImportRecipientCert} class="px-2 py-0.5 rounded bg-amber-200 dark:bg-amber-800 hover:bg-amber-300 dark:hover:bg-amber-700 font-medium transition-colors">{$_('composer.import')}</button>
+        <button onclick={() => encryptMessage = false} class="px-2 py-0.5 rounded hover:bg-amber-200 dark:hover:bg-amber-800 font-medium transition-colors">{$_('common.cancel')}</button>
       </div>
     {/if}
 
@@ -1505,9 +1506,9 @@
     {#if pgpEncryptMessage && missingPGPKeyRecipients.length > 0}
       <div class="flex items-center gap-2 text-xs px-3 py-1.5 bg-amber-50 dark:bg-amber-950/30 border-t border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300">
         <Icon icon="mdi:alert" class="w-3.5 h-3.5 flex-shrink-0" />
-        <span class="flex-1">Cannot encrypt: no PGP key for {missingPGPKeyRecipients.join(', ')}</span>
-        <button onclick={handleImportRecipientPGPKey} class="px-2 py-0.5 rounded bg-amber-200 dark:bg-amber-800 hover:bg-amber-300 dark:hover:bg-amber-700 font-medium transition-colors">Import</button>
-        <button onclick={() => pgpEncryptMessage = false} class="px-2 py-0.5 rounded hover:bg-amber-200 dark:hover:bg-amber-800 font-medium transition-colors">Cancel</button>
+        <span class="flex-1">{$_('composer.noPGPKeyFor', { values: { emails: missingPGPKeyRecipients.join(', ') } })}</span>
+        <button onclick={handleImportRecipientPGPKey} class="px-2 py-0.5 rounded bg-amber-200 dark:bg-amber-800 hover:bg-amber-300 dark:hover:bg-amber-700 font-medium transition-colors">{$_('composer.import')}</button>
+        <button onclick={() => pgpEncryptMessage = false} class="px-2 py-0.5 rounded hover:bg-amber-200 dark:hover:bg-amber-800 font-medium transition-colors">{$_('common.cancel')}</button>
       </div>
     {/if}
 
@@ -1518,11 +1519,11 @@
         class="flex items-center gap-1 hover:text-foreground transition-colors"
       >
         <Icon icon="mdi:attachment" class="w-4 h-4" />
-        Attach files
+        {$_('composer.attachFiles')}
       </button>
       {#if attachments.length > 0}
         <span class="text-xs">
-          {attachments.length} file{attachments.length !== 1 ? 's' : ''} attached
+          {$_('composer.filesAttached', { values: { count: attachments.length } })}
         </span>
       {/if}
       <div class="flex-1"></div>
@@ -1533,10 +1534,10 @@
             bind:checked={requestReadReceipt}
             class="w-3.5 h-3.5 rounded border-border accent-primary"
           />
-          Request read receipt
+          {$_('composer.requestReadReceipt')}
         </label>
       {/if}
-      <span class="text-xs">Ctrl+Enter to send</span>
+      <span class="text-xs">{$_('composer.ctrlEnterToSend')}</span>
     </div>
   </div>
   
@@ -1545,7 +1546,7 @@
     <div class="absolute inset-0 bg-primary/10 flex items-center justify-center pointer-events-none z-10">
       <div class="bg-background border-2 border-dashed border-primary rounded-lg px-8 py-6 text-center">
         <Icon icon="mdi:attachment" class="w-12 h-12 text-primary mx-auto mb-2" />
-        <p class="text-lg font-medium">Drop files to attach</p>
+        <p class="text-lg font-medium">{$_('composer.dropToAttach')}</p>
       </div>
     </div>
   {/if}
@@ -1555,14 +1556,14 @@
 <AlertDialog.Root bind:open={showEmptySubjectDialog}>
   <AlertDialog.Content>
     <AlertDialog.Header>
-      <AlertDialog.Title>Send without subject?</AlertDialog.Title>
+      <AlertDialog.Title>{$_('composer.emptySubjectTitle')}</AlertDialog.Title>
       <AlertDialog.Description>
-        This message has no subject line. Are you sure you want to send it?
+        {$_('composer.emptySubjectDescription')}
       </AlertDialog.Description>
     </AlertDialog.Header>
     <AlertDialog.Footer>
-      <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-      <AlertDialog.Action onclick={handleConfirmEmptySubject}>Send anyway</AlertDialog.Action>
+      <AlertDialog.Cancel>{$_('common.cancel')}</AlertDialog.Cancel>
+      <AlertDialog.Action onclick={handleConfirmEmptySubject}>{$_('composer.sendAnywayGeneric')}</AlertDialog.Action>
     </AlertDialog.Footer>
   </AlertDialog.Content>
 </AlertDialog.Root>
@@ -1571,14 +1572,14 @@
 <AlertDialog.Root bind:open={showMissingAttachmentDialog}>
   <AlertDialog.Content>
     <AlertDialog.Header>
-      <AlertDialog.Title>Attachment missing?</AlertDialog.Title>
+      <AlertDialog.Title>{$_('composer.missingAttachmentTitle')}</AlertDialog.Title>
       <AlertDialog.Description>
-        Your message mentions an attachment, but no files are attached. Do you want to send it anyway?
+        {$_('composer.missingAttachmentDescription')}
       </AlertDialog.Description>
     </AlertDialog.Header>
     <AlertDialog.Footer>
-      <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-      <AlertDialog.Action onclick={handleConfirmMissingAttachment}>Send anyway</AlertDialog.Action>
+      <AlertDialog.Cancel>{$_('common.cancel')}</AlertDialog.Cancel>
+      <AlertDialog.Action onclick={handleConfirmMissingAttachment}>{$_('composer.sendAnywayGeneric')}</AlertDialog.Action>
     </AlertDialog.Footer>
   </AlertDialog.Content>
 </AlertDialog.Root>
@@ -1586,11 +1587,11 @@
 <!-- Close Confirmation Dialog -->
 <ThreeOptionDialog
   bind:open={showCloseConfirm}
-  title="Close this message?"
-  description="What would you like to do with this draft?"
-  option1Label="Discard"
-  option2Label="Save & Close"
-  option3Label="Keep Editing"
+  title={$_('composer.closeTitle')}
+  description={$_('composer.closeDescription')}
+  option1Label={$_('composer.discardDraft')}
+  option2Label={$_('composer.saveAndClose')}
+  option3Label={$_('composer.keepEditing')}
   option1Variant="destructive"
   option2Variant="default"
   loading={closeLoading === 'discard' ? 'option1' : closeLoading === 'save' ? 'option2' : null}

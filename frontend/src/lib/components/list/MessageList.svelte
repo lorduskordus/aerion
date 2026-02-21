@@ -4,9 +4,11 @@
   import ConversationRow from './ConversationRow.svelte'
   import { DropdownMenu } from 'bits-ui'
   import { cn } from '$lib/utils'
+  import { Button } from '$lib/components/ui/button'
   // @ts-ignore - wailsjs bindings
-  import { GetConversations, GetConversationCount, SyncFolder, ForceSyncFolder, CancelFolderSync, SetMessageListSortOrder, GetUnifiedInboxConversations, GetUnifiedInboxCount, SearchConversations, SearchUnifiedInbox, GetSearchCount, GetSearchCountUnifiedInbox, GetFTSIndexStatus, IsFTSIndexing, Trash, DeletePermanently, Undo } from '../../../../wailsjs/go/app/App'
+  import { GetConversations, GetConversationCount, SyncFolder, ForceSyncFolder, CancelFolderSync, SetMessageListSortOrder, GetUnifiedInboxConversations, GetUnifiedInboxCount, SearchConversations, SearchUnifiedInbox, GetSearchCount, GetSearchCountUnifiedInbox, GetFTSIndexStatus, IsFTSIndexing, Trash, DeletePermanently, EmptyTrash, Undo, IMAPSearchFolder, FetchServerMessage } from '../../../../wailsjs/go/app/App'
   import { toasts } from '$lib/stores/toast'
+  import { _ } from '$lib/i18n'
   import { ConfirmDialog } from '$lib/components/ui/confirm-dialog'
   // @ts-ignore - wailsjs path
   import { message } from '../../../../wailsjs/go/models'
@@ -24,6 +26,8 @@
     onReply?: (mode: 'reply' | 'reply-all' | 'forward', messageId: string) => void
     isFocused?: boolean
     isFlashing?: boolean
+    showFolderToggle?: boolean
+    onToggleSidebar?: () => void
   }
 
   let {
@@ -35,6 +39,8 @@
     onReply,
     isFocused = false,
     isFlashing = false,
+    showFolderToggle = false,
+    onToggleSidebar,
   }: Props = $props()
 
   // State
@@ -81,6 +87,15 @@
   let searchOffset = $state(0)
   let isSearching = $state(false)
   let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+  // Server search state
+  let serverSearchMode = $state(false)
+  let serverSearchResults = $state<any[]>([])
+  let serverSearchCount = $state(0)
+  let serverSearchTotalCount = $state(0)  // Total matching UIDs on server (may exceed serverSearchCount when limited)
+  let isServerSearching = $state(false)
+  let lastServerQuery = $state('')
+  const SERVER_SEARCH_LIMIT = 200
 
   // FTS indexing state
   let indexProgress = $state(0)
@@ -217,6 +232,11 @@
         searchResults = []
         searchTotalCount = 0
         searchOffset = 0
+        serverSearchMode = false
+        serverSearchResults = []
+        serverSearchCount = 0
+        serverSearchTotalCount = 0
+        lastServerQuery = ''
         loadConversations()
         checkFTSIndexStatus()
       }
@@ -398,13 +418,20 @@
   // Handle search input with debounce
   function handleSearchInput() {
     if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
-    
+
     if (!searchQuery.trim()) {
       // Clear search immediately if query is empty
       searchResults = []
       searchTotalCount = 0
+      serverSearchResults = []
+      serverSearchCount = 0
+      serverSearchTotalCount = 0
+      serverSearchMode = false
       return
     }
+
+    // In server mode, don't auto-search locally — user will press Shift+Enter
+    if (serverSearchMode) return
 
     searchDebounceTimer = setTimeout(() => {
       performSearch()
@@ -505,18 +532,92 @@
     searchTotalCount = 0
     searchOffset = 0
     showSearch = false
+    serverSearchMode = false
+    serverSearchResults = []
+    serverSearchCount = 0
+    serverSearchTotalCount = 0
+    lastServerQuery = ''
+    isServerSearching = false
     if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
   }
 
   // Handle keyboard events in search input
   function handleSearchKeydown(event: KeyboardEvent) {
-    if (event.key === 'Escape') {
-      clearSearch()
-    } else if (event.key === 'Enter') {
-      // Move focus from search input to message list so user can navigate with arrow keys
-      event.preventDefault()
-      searchInputRef?.blur()
-      listContainerRef?.focus()
+    switch (true) {
+      case event.key === 'Enter' && event.shiftKey:
+        event.preventDefault()
+        if (isUnifiedView) return
+        handleShiftEnter()
+        break
+      case event.key === 'Enter':
+        // Move focus from search input to message list so user can navigate with arrow keys
+        event.preventDefault()
+        searchInputRef?.blur()
+        listContainerRef?.focus()
+        break
+    }
+  }
+
+  // Smart toggle/re-search for server search (Shift+Enter)
+  function handleShiftEnter() {
+    const query = searchQuery.trim()
+    if (!query) return
+
+    if (!serverSearchMode) {
+      // Local → server
+      serverSearchMode = true
+      lastServerQuery = query
+      performServerSearch()
+    } else if (query !== lastServerQuery) {
+      // Server mode, query changed → re-search
+      lastServerQuery = query
+      performServerSearch()
+    } else {
+      // Server mode, same query → toggle back to local
+      serverSearchMode = false
+    }
+  }
+
+  // Perform IMAP server-side search. limit=0 means no limit (show all).
+  async function performServerSearch(limit: number = SERVER_SEARCH_LIMIT) {
+    const query = searchQuery.trim()
+    if (!query || !accountId || !folderId || isUnifiedView) return
+
+    isServerSearching = true
+    error = null
+    try {
+      const response = await IMAPSearchFolder(accountId, folderId, query, limit)
+      const items = (response?.results || []).map(adaptServerResult)
+      serverSearchResults = items
+      serverSearchCount = items.length
+      serverSearchTotalCount = response?.totalCount ?? items.length
+      if (items.length > 0) {
+        selectedThreadId = items[0].threadId
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err)
+    } finally {
+      isServerSearching = false
+    }
+  }
+
+  // Map IMAPSearchResult to ConversationRow-compatible shape
+  function adaptServerResult(r: any): any {
+    return {
+      threadId: r.messageId || `server-uid-${r.uid}`,
+      subject: r.subject,
+      snippet: r.isLocal ? r.snippet : '',
+      messageCount: 1,
+      unreadCount: r.isRead ? 0 : 1,
+      hasAttachments: r.hasAttachments,
+      isStarred: r.isStarred,
+      latestDate: r.date,
+      participants: [{ name: r.fromName, email: r.fromEmail }],
+      messageIds: r.messageId ? [r.messageId] : [],
+      accountId: r.accountId,
+      folderId: r.folderId,
+      _isLocal: r.isLocal,
+      _uid: r.uid,
     }
   }
 
@@ -534,9 +635,17 @@
   // Check if we're in search mode with results
   const isSearchMode = $derived(showSearch && searchQuery.trim().length > 0)
 
-  // Active list - either conversations or search results depending on mode
-  const activeList = $derived(isSearchMode ? searchResults : conversations)
-  const activeCount = $derived(isSearchMode ? searchTotalCount : totalCount)
+  // Active list - either conversations, local search results, or server search results
+  const activeList = $derived(
+    isSearchMode
+      ? (serverSearchMode ? serverSearchResults : searchResults)
+      : conversations
+  )
+  const activeCount = $derived(
+    isSearchMode
+      ? (serverSearchMode ? serverSearchTotalCount : searchTotalCount)
+      : totalCount
+  )
 
   function selectConversation(threadId: string, index: number, event?: MouseEvent) {
     // Handle multi-select with Shift/Ctrl/Cmd
@@ -569,9 +678,41 @@
       const conversation = activeList[index] as any
       const realFolderId = (isUnifiedView || isSearchMode) && conversation.folderId ? conversation.folderId : folderId!
       const realAccountId = (isUnifiedView || isSearchMode) && conversation.accountId ? conversation.accountId : accountId!
-      onConversationSelect?.(threadId, realFolderId, realAccountId)
+
+      // If this is a non-local server result, fetch it first
+      if (serverSearchMode && conversation._isLocal === false && conversation._uid) {
+        fetchAndSelectServerResult(conversation, realFolderId, realAccountId)
+      } else {
+        onConversationSelect?.(threadId, realFolderId, realAccountId)
+      }
     }
     lastClickedIndex = index
+  }
+
+  // Fetch a non-local server result, save locally, update the result, then select
+  async function fetchAndSelectServerResult(conversation: any, realFolderId: string, realAccountId: string) {
+    try {
+      const msg = await FetchServerMessage(realAccountId, realFolderId, conversation._uid)
+      if (msg) {
+        // Update the server result to be local
+        const idx = serverSearchResults.findIndex(r => r._uid === conversation._uid)
+        if (idx >= 0) {
+          serverSearchResults[idx] = {
+            ...serverSearchResults[idx],
+            threadId: msg.threadId || msg.id,
+            messageIds: [msg.id],
+            snippet: msg.snippet || '',
+            _isLocal: true,
+            _uid: conversation._uid,
+          }
+          serverSearchResults = serverSearchResults
+          selectedThreadId = serverSearchResults[idx].threadId
+        }
+        onConversationSelect?.(msg.threadId || msg.id, realFolderId, realAccountId)
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err)
+    }
   }
 
   function handleCheck(threadId: string, isChecked: boolean) {
@@ -729,10 +870,20 @@
     }
   }
 
-  // Focus the search input (exposed for keyboard navigation)
-  export function focusSearch() {
-    showSearch = true
-    setTimeout(() => searchInputRef?.focus(), 50)
+  // Toggle search focus (exposed for keyboard navigation via Ctrl+S)
+  // Three-state: closed → open, open but unfocused → focus, open and focused → close
+  export function toggleSearchFocus() {
+    switch (true) {
+      case !showSearch:
+        showSearch = true
+        setTimeout(() => searchInputRef?.focus(), 50)
+        break
+      case document.activeElement !== searchInputRef:
+        searchInputRef?.focus()
+        break
+      default:
+        clearSearch()
+    }
   }
 
   // Get the currently selected thread ID (exposed for parent access)
@@ -879,26 +1030,42 @@
   let showDeleteConfirm = $state(false)
   let pendingDeleteIds = $state<string[]>([])
 
+  // Empty trash confirmation state
+  let showEmptyTrashConfirm = $state(false)
+
   async function handleUndo() {
     try {
       const description = await Undo()
-      toasts.success(`Undone: ${description}`)
+      toasts.success($_('toast.undone', { values: { description } }))
     } catch (err) {
-      toasts.error(`Undo failed: ${err}`)
+      toasts.error($_('toast.undoFailed', { values: { error: String(err) } }))
     }
   }
 
   async function handleConfirmPermanentDelete() {
     try {
       await DeletePermanently(pendingDeleteIds)
-      toasts.success('Permanently deleted')
+      toasts.success($_('toast.permanentlyDeleted'))
       clearChecked()
       handleActionComplete(true)
     } catch (err) {
-      toasts.error(`Failed to delete: ${err}`)
+      toasts.error($_('toast.failedToDelete', { values: { error: String(err) } }))
     }
     showDeleteConfirm = false
     pendingDeleteIds = []
+  }
+
+  async function handleEmptyTrash() {
+    if (!accountId || !folderId) return
+    try {
+      await EmptyTrash(accountId, folderId)
+      toasts.success($_('toast.trashEmptied'))
+      clearChecked()
+      handleActionComplete(true)
+    } catch (err) {
+      toasts.error($_('toast.failedToEmptyTrash', { values: { error: String(err) } }))
+    }
+    showEmptyTrashConfirm = false
   }
 
   // Shared delete handler — same flow as context menu "Delete" action
@@ -911,12 +1078,12 @@
     }
     Trash(messageIds)
       .then(() => {
-        toasts.success('Moved to trash', [{ label: 'Undo', onClick: handleUndo }])
+        toasts.success($_('toast.movedToTrash'), [{ label: $_('common.undo'), onClick: handleUndo }])
         clearChecked()
         handleActionComplete(true)
       })
       .catch((err) => {
-        toasts.error(`Failed to delete: ${err}`)
+        toasts.error($_('toast.failedToDelete', { values: { error: String(err) } }))
       })
   }
 
@@ -936,6 +1103,16 @@
   <!-- Header -->
   <div class="flex items-center justify-between px-4 py-3 border-b border-border">
     <div class="flex items-center gap-2">
+      {#if showFolderToggle}
+        <button
+          class="p-1.5 -ml-1 rounded-md hover:bg-muted transition-colors"
+          title={$_('responsive.folders')}
+          aria-label={$_('aria.toggleSidebar')}
+          onclick={onToggleSidebar}
+        >
+          <Icon icon="mdi:dock-left" class="w-5 h-5 text-muted-foreground" />
+        </button>
+      {/if}
       {#if showSearch}
         <!-- Search input -->
         <div class="flex items-center gap-1 bg-muted rounded-md px-2 flex-1">
@@ -943,19 +1120,28 @@
           <input
             bind:this={searchInputRef}
             type="text"
-            placeholder="Search messages..."
+            placeholder={$_('messageList.searchMessages')}
             class="bg-transparent border-none outline-none text-sm py-1.5 w-full min-w-[200px]"
             bind:value={searchQuery}
             oninput={handleSearchInput}
             onkeydown={handleSearchKeydown}
           />
-          {#if searchQuery || isSearching}
-            <button 
+          {#if serverSearchMode}
+            <button
+              onclick={() => { serverSearchMode = false }}
+              class="px-1.5 py-0.5 text-[10px] font-medium bg-primary/20 text-primary rounded-full flex-shrink-0 hover:bg-primary/30 transition-colors"
+              title={$_('search.localSearch')}
+            >
+              {$_('search.server')}
+            </button>
+          {/if}
+          {#if searchQuery || isSearching || isServerSearching}
+            <button
               onclick={clearSearch}
               class="p-0.5 hover:bg-muted-foreground/20 rounded"
-              title="Clear search"
+              title={$_('messageList.clearSearch')}
             >
-              {#if isSearching}
+              {#if isSearching || isServerSearching}
                 <Icon icon="mdi:loading" class="w-4 h-4 animate-spin text-muted-foreground" />
               {:else}
                 <Icon icon="mdi:close" class="w-4 h-4 text-muted-foreground" />
@@ -966,7 +1152,7 @@
       {:else}
         <h2 class="font-semibold text-foreground">{folderName}</h2>
         <span class="text-sm text-muted-foreground">
-          ({unreadCount} unread)
+          {$_('messageList.unread', { values: { count: unreadCount } })}
         </span>
       {/if}
     </div>
@@ -975,7 +1161,7 @@
         <!-- While syncing, show spinning icon that cancels on click -->
         <button
           class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={syncProgress ? `Syncing ${syncProgress.phase}: ${syncProgress.percentage}% - Click to cancel` : 'Syncing... Click to cancel'}
+          title={syncProgress ? `${$_('sidebar.syncing')} ${syncProgress.phase}: ${syncProgress.percentage}% - ${$_('sidebar.clickToCancel')}` : `${$_('sidebar.syncing')} ${$_('sidebar.clickToCancel')}`}
           onclick={cancelFolderSync}
         >
           <Icon
@@ -1013,7 +1199,7 @@
                 class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent focus:text-accent-foreground"
               >
                 <Icon icon="mdi:refresh" class="w-4 h-4 mr-2" />
-                Sync Folder
+                {$_('messageList.syncFolder')}
               </DropdownMenu.Item>
               <DropdownMenu.Separator class="-mx-1 my-1 h-px bg-border" />
               <DropdownMenu.Item
@@ -1021,7 +1207,7 @@
                 class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent focus:text-accent-foreground"
               >
                 <Icon icon="mdi:refresh-auto" class="w-4 h-4 mr-2" />
-                Force Re-sync
+                {$_('messageList.forceResync')}
               </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
@@ -1029,14 +1215,14 @@
       {/if}
       <button
         class="p-2 rounded-md hover:bg-muted transition-colors {showSearch ? 'bg-muted' : ''}"
-        title={showSearch ? 'Close search' : 'Search'}
+        title={showSearch ? $_('common.close') : $_('common.search')}
         onclick={toggleSearch}
       >
         <Icon icon={showSearch ? 'mdi:close' : 'mdi:magnify'} class="w-5 h-5 text-muted-foreground" />
       </button>
       <button
         class="p-2 rounded-md hover:bg-muted transition-colors"
-        title={getMessageListSortOrder() === 'newest' ? 'Showing newest first' : 'Showing oldest first'}
+        title={getMessageListSortOrder() === 'newest' ? $_('messageList.showingNewest') : $_('messageList.showingOldest')}
         onclick={toggleSortOrder}
       >
         <Icon
@@ -1047,12 +1233,27 @@
     </div>
   </div>
 
+  <!-- Empty Trash bar (only shown when viewing trash folder with messages, not in search mode) -->
+  {#if folderType === 'trash' && totalCount > 0 && !isSearchMode}
+    <div class="flex items-center justify-end px-4 py-2 bg-muted/50 border-b border-border">
+      <Button
+        size="sm"
+        variant="outline"
+        class="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/50 bg-muted/50"
+        onclick={() => { showEmptyTrashConfirm = true }}
+      >
+        <Icon icon="mdi:delete-sweep-outline" class="w-4 h-4 mr-1.5" />
+        {$_('messageList.emptyTrash')}
+      </Button>
+    </div>
+  {/if}
+
   <!-- FTS Indexing indicator (only shown when searching and index is incomplete) -->
   {#if showSearch && !indexComplete && isIndexing}
     <div class="px-4 py-2 bg-muted/50 border-b border-border">
       <div class="flex items-center gap-2 text-sm text-muted-foreground">
         <Icon icon="mdi:database-sync" class="w-4 h-4 animate-pulse" />
-        <span>Building search index... ({indexProgress}%)</span>
+        <span>{$_('messageList.ftsBuilding', { values: { percentage: indexProgress } })}</span>
       </div>
       <div class="h-1 bg-muted rounded-full mt-1.5 overflow-hidden">
         <div 
@@ -1077,32 +1278,112 @@
           class="mt-2 text-sm text-primary hover:underline"
           onclick={() => isSearchMode ? performSearch() : loadConversations()}
         >
-          Try again
+          {$_('messageList.tryAgain')}
         </button>
       </div>
     {:else if !isUnifiedView && (!accountId || !folderId)}
       <div class="flex flex-col items-center justify-center h-full text-muted-foreground">
         <Icon icon="mdi:email-outline" class="w-12 h-12 mb-2" />
-        <p>Select a folder to view messages</p>
+        <p>{$_('messageList.selectFolder')}</p>
       </div>
     {:else if isSearchMode}
       <!-- Search Results -->
-      {#if isSearching}
-        <div class="flex items-center justify-center h-32">
+      {#if isSearching || isServerSearching}
+        <div class="flex flex-col items-center justify-center h-32 gap-2">
           <Icon icon="mdi:loading" class="w-6 h-6 animate-spin text-muted-foreground" />
+          {#if isServerSearching}
+            <span class="text-xs text-muted-foreground">{$_('search.serverSearching')}</span>
+          {/if}
         </div>
+      {:else if serverSearchMode}
+        <!-- Server search results -->
+        {#if serverSearchResults.length === 0}
+          <div class="flex flex-col items-center justify-center h-full text-muted-foreground">
+            <Icon icon="mdi:magnify" class="w-12 h-12 mb-2" />
+            <p>{$_('messageList.noResults', { values: { query: searchQuery } })}</p>
+          </div>
+        {:else}
+          <!-- Server results header -->
+          <div class="flex items-center justify-between px-4 py-2 bg-muted/30 border-b border-border text-sm text-muted-foreground">
+            <span>
+              {#if serverSearchCount < serverSearchTotalCount}
+                {$_('search.serverResultsCapped', { values: { shown: serverSearchCount, total: serverSearchTotalCount, query: searchQuery } })}
+              {:else}
+                {$_('search.serverResults', { values: { count: serverSearchCount, query: searchQuery } })}
+              {/if}
+            </span>
+            <button
+              class="text-xs text-primary hover:underline"
+              onclick={() => { serverSearchMode = false }}
+            >
+              {$_('search.localSearch')}
+            </button>
+          </div>
+          {#each serverSearchResults as result, index (result.threadId + '-' + index)}
+            {@const resultAccountId = result.accountId || accountId}
+            {@const resultFolderId = result.folderId || folderId}
+            <ConversationRow
+              conversation={result}
+              density={getMessageListDensity()}
+              selected={selectedThreadId === result.threadId}
+              checked={checkedThreadIds.has(result.threadId)}
+              accountId={resultAccountId}
+              folderId={resultFolderId}
+              {folderType}
+              {selectedMessageIds}
+              selectedIsStarred={!selectedHasUnstarred}
+              selectedIsRead={!selectedHasUnread}
+              isNonLocal={result._isLocal === false}
+              onSelect={(e) => selectConversation(result.threadId, index, e)}
+              onCheck={(checked) => handleCheck(result.threadId, checked)}
+              onClearSelection={clearSelection}
+              onActionComplete={handleActionComplete}
+              {onReply}
+            />
+          {/each}
+
+          <!-- Show all results button (when results are capped) -->
+          {#if serverSearchCount < serverSearchTotalCount}
+            <div class="flex justify-center py-4">
+              <button
+                bind:this={loadMoreButtonRef}
+                class="text-sm text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-2 py-1"
+                onclick={() => performServerSearch(0)}
+                disabled={isServerSearching}
+              >
+                {isServerSearching ? $_('common.loading') : $_('search.showAllResults', { values: { total: serverSearchTotalCount } })}
+              </button>
+            </div>
+          {/if}
+        {/if}
       {:else if searchResults.length === 0}
         <div class="flex flex-col items-center justify-center h-full text-muted-foreground">
           <Icon icon="mdi:magnify" class="w-12 h-12 mb-2" />
-          <p>No results found for "{searchQuery}"</p>
+          <p>{$_('messageList.noResults', { values: { query: searchQuery } })}</p>
           {#if !indexComplete}
-            <p class="text-xs mt-1">Search index is still building...</p>
+            <p class="text-xs mt-1">{$_('messageList.indexBuilding')}</p>
+          {/if}
+          {#if !isUnifiedView && accountId && folderId}
+            <button
+              class="mt-2 text-sm text-primary hover:underline"
+              onclick={() => { serverSearchMode = true; lastServerQuery = searchQuery.trim(); performServerSearch() }}
+            >
+              {$_('search.searchOnServer')}
+            </button>
           {/if}
         </div>
       {:else}
-        <!-- Search results header -->
-        <div class="px-4 py-2 bg-muted/30 border-b border-border text-sm text-muted-foreground">
-          Found {searchTotalCount} result{searchTotalCount !== 1 ? 's' : ''} for "{searchQuery}"
+        <!-- Local search results header -->
+        <div class="flex items-center justify-between px-4 py-2 bg-muted/30 border-b border-border text-sm text-muted-foreground">
+          <span>{$_('messageList.foundResults', { values: { count: searchTotalCount, query: searchQuery } })}</span>
+          {#if !isUnifiedView && accountId && folderId}
+            <button
+              class="text-xs text-primary hover:underline"
+              onclick={() => { serverSearchMode = true; lastServerQuery = searchQuery.trim(); performServerSearch() }}
+            >
+              {$_('search.serverSearch')}
+            </button>
+          {/if}
         </div>
         {#each searchResults as result, index (result.threadId + '-' + index)}
           {@const resultAccountId = result.accountId || accountId}
@@ -1145,7 +1426,7 @@
               onclick={() => loadMoreSearchResults()}
               disabled={isSearching}
             >
-              {isSearching ? 'Loading...' : `Load more (${searchTotalCount - searchResults.length} remaining)`}
+              {isSearching ? $_('common.loading') : $_('messageList.loadMore', { values: { remaining: searchTotalCount - searchResults.length } })}
             </button>
           </div>
         {/if}
@@ -1153,13 +1434,13 @@
     {:else if conversations.length === 0}
       <div class="flex flex-col items-center justify-center h-full text-muted-foreground">
         <Icon icon="mdi:inbox-outline" class="w-12 h-12 mb-2" />
-        <p>No messages in this folder</p>
+        <p>{$_('messageList.noMessages')}</p>
         <button
           class="mt-2 text-sm text-primary hover:underline"
           onclick={syncFolder}
           disabled={syncing}
         >
-          Sync now
+          {$_('messageList.syncNow')}
         </button>
       </div>
     {:else}
@@ -1202,7 +1483,7 @@
             }}
             disabled={loading}
           >
-            {loading ? 'Loading...' : `Load more (${totalCount - conversations.length} remaining)`}
+            {loading ? $_('common.loading') : $_('messageList.loadMore', { values: { remaining: totalCount - conversations.length } })}
           </button>
         </div>
       {/if}
@@ -1213,10 +1494,21 @@
 <!-- Permanent Delete Confirmation Dialog -->
 <ConfirmDialog
   bind:open={showDeleteConfirm}
-  title="Delete Permanently?"
-  description="This will permanently delete the selected message(s). This action cannot be undone."
-  confirmLabel="Delete Permanently"
+  title={$_('dialog.deletePermanently')}
+  description={$_('dialog.deleteDescription')}
+  confirmLabel={$_('dialog.confirmDeletePermanently')}
   variant="destructive"
   onConfirm={handleConfirmPermanentDelete}
   onCancel={() => { showDeleteConfirm = false; pendingDeleteIds = [] }}
+/>
+
+<!-- Empty Trash Confirmation Dialog -->
+<ConfirmDialog
+  bind:open={showEmptyTrashConfirm}
+  title={$_('dialog.emptyTrash')}
+  description={$_('dialog.emptyTrashDescription')}
+  confirmLabel={$_('dialog.confirmEmptyTrash')}
+  variant="destructive"
+  onConfirm={handleEmptyTrash}
+  onCancel={() => { showEmptyTrashConfirm = false }}
 />

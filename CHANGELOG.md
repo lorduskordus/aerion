@@ -1,5 +1,25 @@
 # CHANGELOG
 
+**v0.1.25 - 02-21-2026**
+---
+
+- Added run in background - [#15](https://github.com/hkdb/aerion/issues/15)
+- Added launch hidden - [#15](https://github.com/hkdb/aerion/issues/15)
+- Added launch on startup - [#15](https://github.com/hkdb/aerion/issues/15)
+- Added Wake and net detection for Windows and Mac
+- Added Clickable notifications for Windows and Mac
+- Added Empty Trash button for Trash folders - [#21](https://github.com/hkdb/aerion/issues/21)
+- Added multi-language support foundation - [#10](https://github.com/hkdb/aerion/issues/10)
+- Added 中文(香港), 中文(台灣), 中文(中国)
+- Added IMAP search - [#24](https://github.com/hkdb/aerion/issues/24)
+- Added Responsive layout to handle both tiling and mobile - [#8](https://github.com/hkdb/aerion/issues/8)
+- Fixed sync race condition when moving message during post move sync
+- Fixed Trash folder detection to include Bin
+- Cleaned up and reorganized sync engine code to be more maintainable
+
+**Note:** Not submitting this release to Flathub until [this issue](https://github.com/flathub/io.github.hkdb.Aerion/issues/6) is resolved.
+
+
 **v0.1.24 - 02-18-2026**
 ---
 

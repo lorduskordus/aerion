@@ -3,6 +3,7 @@
   import Icon from '@iconify/svelte'
   import { Button } from '$lib/components/ui/button'
   import { addToast } from '$lib/stores/toast'
+  import { _ } from '$lib/i18n'
   // @ts-ignore - wailsjs path
   import { smime } from '../../../../../wailsjs/go/models'
   // @ts-ignore - wailsjs path
@@ -158,7 +159,7 @@
       const result = await ImportSMIMECertificateFromPath(accountId, importFilePath, importPassword)
       addToast({
         type: 'success',
-        message: `Certificate imported (${result.chainLength} cert${result.chainLength !== 1 ? 's' : ''} in chain)`,
+        message: $_('security.certImported', { values: { count: result.chainLength } }),
       })
       showImportDialog = false
       importFilePath = ''
@@ -181,12 +182,12 @@
   async function handleDeleteCert(certId: string) {
     try {
       await DeleteSMIMECertificate(certId)
-      addToast({ type: 'success', message: 'Certificate removed' })
+      addToast({ type: 'success', message: $_('security.certRemoved') })
       await loadData()
     } catch (err) {
       addToast({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Failed to remove certificate',
+        message: err instanceof Error ? err.message : $_('security.failedToRemoveCert'),
       })
     }
   }
@@ -194,12 +195,12 @@
   async function handleSetDefault(certId: string) {
     try {
       await SetDefaultSMIMECertificate(accountId, certId)
-      addToast({ type: 'success', message: 'Default certificate updated' })
+      addToast({ type: 'success', message: $_('security.defaultCertUpdated') })
       await loadData()
     } catch (err) {
       addToast({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Failed to set default certificate',
+        message: err instanceof Error ? err.message : $_('security.failedToSetDefaultCert'),
       })
     }
   }
@@ -211,7 +212,7 @@
     } catch (err) {
       addToast({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Failed to update signing policy',
+        message: err instanceof Error ? err.message : $_('security.failedToUpdateSignPolicy'),
       })
     }
   }
@@ -223,7 +224,7 @@
     } catch (err) {
       addToast({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Failed to update encryption policy',
+        message: err instanceof Error ? err.message : $_('security.failedToUpdateEncryptPolicy'),
       })
     }
   }
@@ -242,7 +243,7 @@
 
   async function handleImportRecipientCert() {
     if (!recipientImportFilePath || !recipientImportEmail.trim()) {
-      recipientImportError = 'Please enter the recipient email address'
+      recipientImportError = $_('security.enterRecipientEmail')
       return
     }
 
@@ -250,7 +251,7 @@
     recipientImportError = ''
     try {
       await ImportRecipientCert(recipientImportEmail.trim(), recipientImportFilePath)
-      addToast({ type: 'success', message: `Certificate imported for ${recipientImportEmail.trim()}` })
+      addToast({ type: 'success', message: $_('security.recipientCertImported', { values: { email: recipientImportEmail.trim() } }) })
       showRecipientImportDialog = false
       recipientImportFilePath = ''
       recipientImportEmail = ''
@@ -272,12 +273,12 @@
   async function handleDeleteSenderCert(certId: string) {
     try {
       await DeleteSenderCert(certId)
-      addToast({ type: 'success', message: 'Sender certificate removed' })
+      addToast({ type: 'success', message: $_('security.senderCertRemoved') })
       await loadData()
     } catch (err) {
       addToast({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Failed to remove sender certificate',
+        message: err instanceof Error ? err.message : $_('security.failedToRemoveSenderCert'),
       })
     }
   }
@@ -301,7 +302,7 @@
     pgpImportError = ''
     try {
       await ImportPGPKeyFromPath(accountId, pgpImportFilePath, pgpImportPassphrase)
-      addToast({ type: 'success', message: 'PGP key imported successfully' })
+      addToast({ type: 'success', message: $_('security.pgpKeyImported') })
       showPGPImportDialog = false
       pgpImportFilePath = ''
       pgpImportPassphrase = ''
@@ -323,20 +324,20 @@
   async function handleDeletePGPKey(keyId: string) {
     try {
       await DeletePGPKey(keyId)
-      addToast({ type: 'success', message: 'PGP key removed' })
+      addToast({ type: 'success', message: $_('security.pgpKeyRemoved') })
       await loadData()
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to remove PGP key' })
+      addToast({ type: 'error', message: err instanceof Error ? err.message : $_('security.failedToRemovePGPKey') })
     }
   }
 
   async function handleSetDefaultPGP(keyId: string) {
     try {
       await SetDefaultPGPKey(accountId, keyId)
-      addToast({ type: 'success', message: 'Default PGP key updated' })
+      addToast({ type: 'success', message: $_('security.defaultPGPKeyUpdated') })
       await loadData()
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to set default PGP key' })
+      addToast({ type: 'error', message: err instanceof Error ? err.message : $_('security.failedToSetDefaultPGPKey') })
     }
   }
 
@@ -345,7 +346,7 @@
       await SetPGPSignPolicy(accountId, policy)
       pgpSignPolicy = policy
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to update PGP signing policy' })
+      addToast({ type: 'error', message: err instanceof Error ? err.message : $_('security.failedToUpdatePGPSignPolicy') })
     }
   }
 
@@ -354,7 +355,7 @@
       await SetPGPEncryptPolicy(accountId, policy)
       pgpEncryptPolicy = policy
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to update PGP encryption policy' })
+      addToast({ type: 'error', message: err instanceof Error ? err.message : $_('security.failedToUpdatePGPEncryptPolicy') })
     }
   }
 
@@ -372,14 +373,14 @@
 
   async function handleImportPGPRecipientKey() {
     if (!pgpRecipientImportFilePath || !pgpRecipientImportEmail.trim()) {
-      pgpRecipientImportError = 'Please enter the recipient email address'
+      pgpRecipientImportError = $_('security.enterRecipientEmail')
       return
     }
     pgpRecipientImporting = true
     pgpRecipientImportError = ''
     try {
       await ImportRecipientPGPKey(pgpRecipientImportEmail.trim(), pgpRecipientImportFilePath)
-      addToast({ type: 'success', message: `PGP key imported for ${pgpRecipientImportEmail.trim()}` })
+      addToast({ type: 'success', message: $_('security.recipientPGPKeyImported', { values: { email: pgpRecipientImportEmail.trim() } }) })
       showPGPRecipientImportDialog = false
       pgpRecipientImportFilePath = ''
       pgpRecipientImportEmail = ''
@@ -401,10 +402,10 @@
   async function handleDeletePGPSenderKey(keyId: string) {
     try {
       await DeletePGPSenderKey(keyId)
-      addToast({ type: 'success', message: 'Recipient PGP key removed' })
+      addToast({ type: 'success', message: $_('security.recipientPGPKeyRemoved') })
       await loadData()
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to remove recipient PGP key' })
+      addToast({ type: 'error', message: err instanceof Error ? err.message : $_('security.failedToRemoveRecipientPGPKey') })
     }
   }
 
@@ -414,11 +415,11 @@
     addingKeyServer = true
     try {
       await AddPGPKeyServer(url)
-      addToast({ type: 'success', message: 'Key server added' })
+      addToast({ type: 'success', message: $_('security.keyServerAdded') })
       newKeyServerURL = ''
       await loadData()
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to add key server' })
+      addToast({ type: 'error', message: err instanceof Error ? err.message : $_('security.failedToAddKeyServer') })
     } finally {
       addingKeyServer = false
     }
@@ -427,10 +428,10 @@
   async function handleRemoveKeyServer(id: number) {
     try {
       await RemovePGPKeyServer(id)
-      addToast({ type: 'success', message: 'Key server removed' })
+      addToast({ type: 'success', message: $_('security.keyServerRemoved') })
       await loadData()
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to remove key server' })
+      addToast({ type: 'error', message: err instanceof Error ? err.message : $_('security.failedToRemoveKeyServer') })
     }
   }
 
@@ -440,14 +441,14 @@
     try {
       const armored = await LookupPGPKey(keyLookupEmail.trim())
       if (armored) {
-        addToast({ type: 'success', message: `PGP key found and imported for ${keyLookupEmail.trim()}` })
+        addToast({ type: 'success', message: $_('security.pgpKeyFound', { values: { email: keyLookupEmail.trim() } }) })
         keyLookupEmail = ''
         await loadData()
       } else {
-        addToast({ type: 'info', message: `No PGP key found for ${keyLookupEmail.trim()}` })
+        addToast({ type: 'info', message: $_('security.pgpKeyNotFound', { values: { email: keyLookupEmail.trim() } }) })
       }
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Key lookup failed' })
+      addToast({ type: 'error', message: err instanceof Error ? err.message : $_('security.keyLookupFailed') })
     } finally {
       keyLookupLoading = false
     }
@@ -492,15 +493,15 @@
       <!-- Your PGP Keys -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">
-          <h4 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Your Keys</h4>
+          <h4 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{$_('security.yourKeys')}</h4>
           <Button variant="outline" size="sm" onclick={handlePickAndImportPGP}>
             <Icon icon="mdi:key-plus" class="w-4 h-4 mr-1" />
-            Import Secret Key
+            {$_('security.importSecretKey')}
           </Button>
         </div>
 
         {#if pgpKeys.length === 0}
-          <p class="text-sm text-muted-foreground py-2">No PGP keys imported. Import an ASCII-armored (.asc) or binary (.gpg) key file to enable PGP signing and encryption.</p>
+          <p class="text-sm text-muted-foreground py-2">{$_('security.noPGPKeysHelp')}</p>
         {:else}
           <div class="space-y-2">
             {#each pgpKeys as key}
@@ -516,10 +517,10 @@
                   <div class="flex items-center gap-2">
                     <span class="text-sm font-medium truncate">{key.email}</span>
                     {#if key.isDefault}
-                      <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">Default</span>
+                      <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">{$_('security.defaultBadge')}</span>
                     {/if}
                     {#if key.isExpired}
-                      <span class="text-[10px] px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-medium">Expired</span>
+                      <span class="text-[10px] px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-medium">{$_('security.expiredBadge')}</span>
                     {/if}
                   </div>
                   <p class="text-xs text-muted-foreground truncate mt-0.5">{key.userId}</p>
@@ -527,16 +528,16 @@
                     {key.algorithm}{key.keySize ? ` ${key.keySize}-bit` : ''} &middot; {key.fingerprint?.slice(-16)}
                   </p>
                   <p class="text-xs text-muted-foreground">
-                    Created: {formatDate(key.createdAtKey)}{key.expiresAtKey ? ` · Expires: ${formatDate(key.expiresAtKey)}` : ''}
+                    {$_('security.created')} {formatDate(key.createdAtKey)}{key.expiresAtKey ? ` · ${$_('security.expires')} ${formatDate(key.expiresAtKey)}` : ''}
                   </p>
                 </div>
                 <div class="flex items-center gap-1 flex-shrink-0">
                   {#if !key.isDefault}
-                    <Button variant="ghost" size="sm" onclick={() => handleSetDefaultPGP(key.id)} title="Set as default">
+                    <Button variant="ghost" size="sm" onclick={() => handleSetDefaultPGP(key.id)} title={$_('security.setAsDefault')}>
                       <Icon icon="mdi:star-outline" class="w-4 h-4" />
                     </Button>
                   {/if}
-                  <Button variant="ghost" size="sm" onclick={() => handleDeletePGPKey(key.id)} title="Remove key">
+                  <Button variant="ghost" size="sm" onclick={() => handleDeletePGPKey(key.id)} title={$_('security.removeKey')}>
                     <Icon icon="mdi:delete-outline" class="w-4 h-4 text-destructive" />
                   </Button>
                 </div>
@@ -549,7 +550,7 @@
       <!-- PGP Signing Policy -->
       {#if pgpKeys.length > 0}
         <div class="space-y-2">
-          <h4 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Signing Policy</h4>
+          <h4 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{$_('security.signingPolicy')}</h4>
           <div class="flex items-center gap-4">
             <label class="flex items-center gap-2 text-sm cursor-pointer">
               <input
@@ -560,7 +561,7 @@
                 onchange={() => handlePGPSignPolicyChange('never')}
                 class="accent-primary"
               />
-              Never sign by default
+              {$_('security.neverSignByDefault')}
             </label>
             <label class="flex items-center gap-2 text-sm cursor-pointer">
               <input
@@ -571,15 +572,15 @@
                 onchange={() => handlePGPSignPolicyChange('always')}
                 class="accent-primary"
               />
-              Always sign by default
+              {$_('security.alwaysSignByDefault')}
             </label>
           </div>
-          <p class="text-xs text-muted-foreground">You can override this per-message in the composer.</p>
+          <p class="text-xs text-muted-foreground">{$_('security.policyOverrideHint')}</p>
         </div>
 
         <!-- PGP Encryption Policy -->
         <div class="space-y-2">
-          <h4 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Encryption Policy</h4>
+          <h4 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{$_('security.encryptionPolicy')}</h4>
           <div class="flex items-center gap-4">
             <label class="flex items-center gap-2 text-sm cursor-pointer">
               <input
@@ -590,7 +591,7 @@
                 onchange={() => handlePGPEncryptPolicyChange('never')}
                 class="accent-primary"
               />
-              Never encrypt by default
+              {$_('security.neverEncryptByDefault')}
             </label>
             <label class="flex items-center gap-2 text-sm cursor-pointer">
               <input
@@ -601,10 +602,10 @@
                 onchange={() => handlePGPEncryptPolicyChange('always')}
                 class="accent-primary"
               />
-              Always encrypt by default
+              {$_('security.alwaysEncryptByDefault')}
             </label>
           </div>
-          <p class="text-xs text-muted-foreground">You can override this per-message in the composer. Encryption requires recipient public keys.</p>
+          <p class="text-xs text-muted-foreground">{$_('security.encryptRequiresRecipientKeys')}</p>
         </div>
       {/if}
 
@@ -615,7 +616,7 @@
           onclick={() => keyServersCollapsed = !keyServersCollapsed}
         >
           <Icon icon={keyServersCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'} class="w-3.5 h-3.5 flex-shrink-0" />
-          KEY SERVERS
+          {$_('security.keyServersLabel')}
           <span class="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">{keyServers.length}</span>
         </button>
 
@@ -626,7 +627,7 @@
                 <div class="flex items-center gap-3 p-2 rounded-md border border-border">
                   <Icon icon="mdi:web" class="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   <span class="text-sm flex-1 truncate">{server.url.replace('https://', '')}</span>
-                  <Button variant="ghost" size="sm" onclick={() => handleRemoveKeyServer(server.id)} title="Remove server">
+                  <Button variant="ghost" size="sm" onclick={() => handleRemoveKeyServer(server.id)} title={$_('security.removeServer')}>
                     <Icon icon="mdi:close" class="w-3.5 h-3.5" />
                   </Button>
                 </div>
@@ -646,21 +647,21 @@
               {#if addingKeyServer}
                 <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
               {:else}
-                Add
+                {$_('security.addButton')}
               {/if}
             </Button>
           </div>
-          <p class="text-xs text-muted-foreground">Add key servers to search for recipient PGP keys. Servers are queried in order during key lookups.</p>
+          <p class="text-xs text-muted-foreground">{$_('security.keyServersHelp')}</p>
         {/if}
       </div>
 
       <!-- PGP Recipient Keys -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">
-          <h4 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Recipient Keys</h4>
+          <h4 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{$_('security.recipientKeys')}</h4>
           <Button variant="outline" size="sm" onclick={handlePickPGPRecipientKey}>
             <Icon icon="mdi:key-plus" class="w-4 h-4 mr-1" />
-            Import
+            {$_('security.importButton')}
           </Button>
         </div>
 
@@ -669,7 +670,7 @@
           <input
             type="email"
             bind:value={keyLookupEmail}
-            placeholder="Search by email (WKD + key servers)..."
+            placeholder={$_('security.searchByEmail')}
             class="flex-1 px-3 py-1.5 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             onkeydown={(e) => { if (e.key === 'Enter') handleKeyLookup() }}
           />
@@ -683,7 +684,7 @@
         </div>
 
         {#if pgpSenderKeys.length === 0}
-          <p class="text-sm text-muted-foreground py-2">No recipient keys collected yet. Keys are automatically saved when you receive PGP-signed messages, discovered via WKD or key servers, or imported manually.</p>
+          <p class="text-sm text-muted-foreground py-2">{$_('security.noRecipientPGPKeysHelp')}</p>
         {:else}
           <div class="space-y-2">
             {#each pgpSenderKeys as key}
@@ -699,7 +700,7 @@
                 <span class="text-xs text-muted-foreground flex-shrink-0">
                   {formatDate(key.lastSeenAt)}
                 </span>
-                <Button variant="ghost" size="sm" onclick={() => handleDeletePGPSenderKey(key.id)} title="Remove">
+                <Button variant="ghost" size="sm" onclick={() => handleDeletePGPSenderKey(key.id)} title={$_('security.removeButton')}>
                   <Icon icon="mdi:close" class="w-3.5 h-3.5" />
                 </Button>
               </div>
@@ -728,15 +729,15 @@
       <!-- Your Certificates -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">
-          <h4 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Your Certificates</h4>
+          <h4 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{$_('security.yourCertificates')}</h4>
           <Button variant="outline" size="sm" onclick={handlePickAndImport}>
             <Icon icon="mdi:certificate" class="w-4 h-4 mr-1" />
-            Import .p12
+            {$_('security.importP12')}
           </Button>
         </div>
 
         {#if certificates.length === 0}
-          <p class="text-sm text-muted-foreground py-2">No certificates imported. Import a PKCS#12 (.p12/.pfx) certificate to enable message signing.</p>
+          <p class="text-sm text-muted-foreground py-2">{$_('security.noSMIMECertsHelp')}</p>
         {:else}
           <div class="space-y-2">
             {#each certificates as cert}
@@ -752,30 +753,30 @@
                   <div class="flex items-center gap-2">
                     <span class="text-sm font-medium truncate">{cert.email}</span>
                     {#if cert.isDefault}
-                      <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">Default</span>
+                      <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">{$_('security.defaultBadge')}</span>
                     {/if}
                     {#if cert.isExpired}
-                      <span class="text-[10px] px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-medium">Expired</span>
+                      <span class="text-[10px] px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-medium">{$_('security.expiredBadge')}</span>
                     {/if}
                     {#if cert.isSelfSigned}
-                      <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium">Self-signed</span>
+                      <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium">{$_('security.selfSignedBadge')}</span>
                     {/if}
                   </div>
                   <p class="text-xs text-muted-foreground truncate mt-0.5">{cert.subject}</p>
                   <p class="text-xs text-muted-foreground mt-0.5">
-                    Issuer: {cert.issuer}
+                    {$_('security.issuerLabel')} {cert.issuer}
                   </p>
                   <p class="text-xs text-muted-foreground">
-                    Valid: {formatDate(cert.notBefore)} - {formatDate(cert.notAfter)}
+                    {$_('security.validLabel')} {formatDate(cert.notBefore)} - {formatDate(cert.notAfter)}
                   </p>
                 </div>
                 <div class="flex items-center gap-1 flex-shrink-0">
                   {#if !cert.isDefault}
-                    <Button variant="ghost" size="sm" onclick={() => handleSetDefault(cert.id)} title="Set as default">
+                    <Button variant="ghost" size="sm" onclick={() => handleSetDefault(cert.id)} title={$_('security.setAsDefault')}>
                       <Icon icon="mdi:star-outline" class="w-4 h-4" />
                     </Button>
                   {/if}
-                  <Button variant="ghost" size="sm" onclick={() => handleDeleteCert(cert.id)} title="Remove certificate">
+                  <Button variant="ghost" size="sm" onclick={() => handleDeleteCert(cert.id)} title={$_('security.removeCertificate')}>
                     <Icon icon="mdi:delete-outline" class="w-4 h-4 text-destructive" />
                   </Button>
                 </div>
@@ -788,7 +789,7 @@
       <!-- Signing Policy -->
       {#if certificates.length > 0}
         <div class="space-y-2">
-          <h4 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Signing Policy</h4>
+          <h4 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{$_('security.signingPolicy')}</h4>
           <div class="flex items-center gap-4">
             <label class="flex items-center gap-2 text-sm cursor-pointer">
               <input
@@ -799,7 +800,7 @@
                 onchange={() => handleSignPolicyChange('never')}
                 class="accent-primary"
               />
-              Never sign by default
+              {$_('security.neverSignByDefault')}
             </label>
             <label class="flex items-center gap-2 text-sm cursor-pointer">
               <input
@@ -810,15 +811,15 @@
                 onchange={() => handleSignPolicyChange('always')}
                 class="accent-primary"
               />
-              Always sign by default
+              {$_('security.alwaysSignByDefault')}
             </label>
           </div>
-          <p class="text-xs text-muted-foreground">You can override this per-message in the composer.</p>
+          <p class="text-xs text-muted-foreground">{$_('security.policyOverrideHint')}</p>
         </div>
 
         <!-- Encryption Policy -->
         <div class="space-y-2">
-          <h4 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Encryption Policy</h4>
+          <h4 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{$_('security.encryptionPolicy')}</h4>
           <div class="flex items-center gap-4">
             <label class="flex items-center gap-2 text-sm cursor-pointer">
               <input
@@ -829,7 +830,7 @@
                 onchange={() => handleEncryptPolicyChange('never')}
                 class="accent-primary"
               />
-              Never encrypt by default
+              {$_('security.neverEncryptByDefault')}
             </label>
             <label class="flex items-center gap-2 text-sm cursor-pointer">
               <input
@@ -840,24 +841,24 @@
                 onchange={() => handleEncryptPolicyChange('always')}
                 class="accent-primary"
               />
-              Always encrypt by default
+              {$_('security.alwaysEncryptByDefault')}
             </label>
           </div>
-          <p class="text-xs text-muted-foreground">You can override this per-message in the composer. Encryption requires recipient certificates.</p>
+          <p class="text-xs text-muted-foreground">{$_('security.encryptRequiresRecipientCerts')}</p>
         </div>
       {/if}
 
       <!-- Sender Certificates (auto-collected) -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">
-          <h4 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Recipient Certificates</h4>
+          <h4 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{$_('security.recipientCertificates')}</h4>
           <Button variant="outline" size="sm" onclick={handlePickRecipientCert}>
             <Icon icon="mdi:certificate" class="w-4 h-4 mr-1" />
-            Import
+            {$_('security.importButton')}
           </Button>
         </div>
         {#if senderCerts.length === 0}
-          <p class="text-sm text-muted-foreground py-2">No recipient certificates collected yet. Certificates are automatically saved when you receive signed messages, or you can import them manually.</p>
+          <p class="text-sm text-muted-foreground py-2">{$_('security.noRecipientCertsHelp')}</p>
         {:else}
           <div class="space-y-2">
             {#each senderCerts as cert}
@@ -870,7 +871,7 @@
                 <span class="text-xs text-muted-foreground flex-shrink-0">
                   {formatDate(cert.lastSeenAt)}
                 </span>
-                <Button variant="ghost" size="sm" onclick={() => handleDeleteSenderCert(cert.id)} title="Remove">
+                <Button variant="ghost" size="sm" onclick={() => handleDeleteSenderCert(cert.id)} title={$_('security.removeButton')}>
                   <Icon icon="mdi:close" class="w-3.5 h-3.5" />
                 </Button>
               </div>
@@ -889,27 +890,27 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div role="button" tabindex="-1" class="absolute inset-0 bg-black/50" onclick={handleCancelImport} onkeydown={(e) => { if (e.key === 'Escape') handleCancelImport() }}></div>
     <div class="relative bg-background border border-border rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-      <h3 class="text-lg font-semibold mb-4">Import Certificate</h3>
+      <h3 class="text-lg font-semibold mb-4">{$_('security.importCertificateTitle')}</h3>
 
       <div class="space-y-4">
         <div>
-          <p class="text-sm text-muted-foreground mb-1">File</p>
+          <p class="text-sm text-muted-foreground mb-1">{$_('security.fileLabel')}</p>
           <p class="text-sm font-mono bg-muted/50 px-3 py-2 rounded truncate">{getFileName(importFilePath)}</p>
         </div>
 
         <div>
           <label for="cert-password" class="text-sm text-muted-foreground block mb-1">
-            Certificate Password
+            {$_('security.certificatePassword')}
           </label>
           <input
             id="cert-password"
             type="password"
             bind:value={importPassword}
-            placeholder="Enter the password for this .p12 file"
+            placeholder={$_('security.certificatePasswordPlaceholder')}
             class="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             onkeydown={(e) => { if (e.key === 'Enter') handleImport() }}
           />
-          <p class="text-xs text-muted-foreground mt-1">The password used when the certificate was exported.</p>
+          <p class="text-xs text-muted-foreground mt-1">{$_('security.certificatePasswordHelp')}</p>
         </div>
 
         {#if importError}
@@ -921,13 +922,13 @@
 
       <div class="flex items-center justify-end gap-2 mt-6">
         <Button variant="ghost" onclick={handleCancelImport} disabled={importing}>
-          Cancel
+          {$_('common.cancel')}
         </Button>
         <Button onclick={handleImport} disabled={importing}>
           {#if importing}
             <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
           {/if}
-          Import
+          {$_('security.importButton')}
         </Button>
       </div>
     </div>
@@ -940,17 +941,17 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div role="button" tabindex="-1" class="absolute inset-0 bg-black/50" onclick={handleCancelRecipientImport} onkeydown={(e) => { if (e.key === 'Escape') handleCancelRecipientImport() }}></div>
     <div class="relative bg-background border border-border rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-      <h3 class="text-lg font-semibold mb-4">Import Recipient Certificate</h3>
+      <h3 class="text-lg font-semibold mb-4">{$_('security.importRecipientCertTitle')}</h3>
 
       <div class="space-y-4">
         <div>
-          <p class="text-sm text-muted-foreground mb-1">File</p>
+          <p class="text-sm text-muted-foreground mb-1">{$_('security.fileLabel')}</p>
           <p class="text-sm font-mono bg-muted/50 px-3 py-2 rounded truncate">{getFileName(recipientImportFilePath)}</p>
         </div>
 
         <div>
           <label for="recipient-email" class="text-sm text-muted-foreground block mb-1">
-            Recipient Email Address
+            {$_('security.recipientEmailAddress')}
           </label>
           <input
             id="recipient-email"
@@ -960,7 +961,7 @@
             class="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             onkeydown={(e) => { if (e.key === 'Enter') handleImportRecipientCert() }}
           />
-          <p class="text-xs text-muted-foreground mt-1">The email address of the person this certificate belongs to.</p>
+          <p class="text-xs text-muted-foreground mt-1">{$_('security.recipientEmailHelp')}</p>
         </div>
 
         {#if recipientImportError}
@@ -972,13 +973,13 @@
 
       <div class="flex items-center justify-end gap-2 mt-6">
         <Button variant="ghost" onclick={handleCancelRecipientImport} disabled={recipientImporting}>
-          Cancel
+          {$_('common.cancel')}
         </Button>
         <Button onclick={handleImportRecipientCert} disabled={recipientImporting}>
           {#if recipientImporting}
             <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
           {/if}
-          Import
+          {$_('security.importButton')}
         </Button>
       </div>
     </div>
@@ -991,27 +992,27 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div role="button" tabindex="-1" class="absolute inset-0 bg-black/50" onclick={handleCancelPGPImport} onkeydown={(e) => { if (e.key === 'Escape') handleCancelPGPImport() }}></div>
     <div class="relative bg-background border border-border rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-      <h3 class="text-lg font-semibold mb-4">Import PGP Key</h3>
+      <h3 class="text-lg font-semibold mb-4">{$_('security.importPGPKeyTitle')}</h3>
 
       <div class="space-y-4">
         <div>
-          <p class="text-sm text-muted-foreground mb-1">File</p>
+          <p class="text-sm text-muted-foreground mb-1">{$_('security.fileLabel')}</p>
           <p class="text-sm font-mono bg-muted/50 px-3 py-2 rounded truncate">{getFileName(pgpImportFilePath)}</p>
         </div>
 
         <div>
           <label for="pgp-passphrase" class="text-sm text-muted-foreground block mb-1">
-            Key Passphrase (optional)
+            {$_('security.keyPassphrase')}
           </label>
           <input
             id="pgp-passphrase"
             type="password"
             bind:value={pgpImportPassphrase}
-            placeholder="Enter passphrase if the key is encrypted"
+            placeholder={$_('security.keyPassphrasePlaceholder')}
             class="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             onkeydown={(e) => { if (e.key === 'Enter') handleImportPGP() }}
           />
-          <p class="text-xs text-muted-foreground mt-1">Leave blank if the private key is not passphrase-protected.</p>
+          <p class="text-xs text-muted-foreground mt-1">{$_('security.keyPassphraseHelp')}</p>
         </div>
 
         {#if pgpImportError}
@@ -1023,13 +1024,13 @@
 
       <div class="flex items-center justify-end gap-2 mt-6">
         <Button variant="ghost" onclick={handleCancelPGPImport} disabled={pgpImporting}>
-          Cancel
+          {$_('common.cancel')}
         </Button>
         <Button onclick={handleImportPGP} disabled={pgpImporting}>
           {#if pgpImporting}
             <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
           {/if}
-          Import
+          {$_('security.importButton')}
         </Button>
       </div>
     </div>
@@ -1042,17 +1043,17 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div role="button" tabindex="-1" class="absolute inset-0 bg-black/50" onclick={handleCancelPGPRecipientImport} onkeydown={(e) => { if (e.key === 'Escape') handleCancelPGPRecipientImport() }}></div>
     <div class="relative bg-background border border-border rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-      <h3 class="text-lg font-semibold mb-4">Import Recipient PGP Key</h3>
+      <h3 class="text-lg font-semibold mb-4">{$_('security.importRecipientPGPKeyTitle')}</h3>
 
       <div class="space-y-4">
         <div>
-          <p class="text-sm text-muted-foreground mb-1">File</p>
+          <p class="text-sm text-muted-foreground mb-1">{$_('security.fileLabel')}</p>
           <p class="text-sm font-mono bg-muted/50 px-3 py-2 rounded truncate">{getFileName(pgpRecipientImportFilePath)}</p>
         </div>
 
         <div>
           <label for="pgp-recipient-email" class="text-sm text-muted-foreground block mb-1">
-            Recipient Email Address
+            {$_('security.recipientEmailAddress')}
           </label>
           <input
             id="pgp-recipient-email"
@@ -1062,7 +1063,7 @@
             class="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             onkeydown={(e) => { if (e.key === 'Enter') handleImportPGPRecipientKey() }}
           />
-          <p class="text-xs text-muted-foreground mt-1">The email address of the person this key belongs to.</p>
+          <p class="text-xs text-muted-foreground mt-1">{$_('security.recipientEmailHelpKey')}</p>
         </div>
 
         {#if pgpRecipientImportError}
@@ -1074,13 +1075,13 @@
 
       <div class="flex items-center justify-end gap-2 mt-6">
         <Button variant="ghost" onclick={handleCancelPGPRecipientImport} disabled={pgpRecipientImporting}>
-          Cancel
+          {$_('common.cancel')}
         </Button>
         <Button onclick={handleImportPGPRecipientKey} disabled={pgpRecipientImporting}>
           {#if pgpRecipientImporting}
             <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
           {/if}
-          Import
+          {$_('security.importButton')}
         </Button>
       </div>
     </div>

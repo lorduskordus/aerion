@@ -147,6 +147,18 @@ type App struct {
 
 	// UseDirectDBus forces direct D-Bus notifications instead of portal (Linux only)
 	useDirectDBus bool
+
+	// Single-instance lock (set by main before wails.Run)
+	SingleInstanceLock platform.SingleInstanceLock
+
+	// Autostart manager
+	autostartMgr platform.AutostartManager
+
+	// Start hidden flag (set by main from --start-hidden CLI flag)
+	StartHiddenFlag bool
+
+	// Window hidden state (background mode)
+	windowHidden bool
 }
 
 // NewApp creates a new App application struct
@@ -163,6 +175,15 @@ var shuttingDown bool
 // Startup is called when the app starts
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
+
+	// Set single-instance onShow callback immediately — must happen before any
+	// potentially-blocking D-Bus calls (theme monitor, sleep/wake, network)
+	// that could delay the rest of Startup.
+	if a.SingleInstanceLock != nil {
+		a.SingleInstanceLock.SetOnShow(func() {
+			a.ShowWindow()
+		})
+	}
 
 	// Initialize logging - fatal only unless --debug flag is used
 	logLevel := "fatal"
@@ -259,7 +280,7 @@ func (a *App) Startup(ctx context.Context) {
 	a.imapPool = imap.NewPool(poolConfig, a.getIMAPCredentials)
 
 	// Initialize sync engine
-	a.syncEngine = sync.NewEngine(a.imapPool, a.folderStore, a.messageStore, a.attachmentStore)
+	a.syncEngine = sync.NewEngine(a.imapPool, a.accountStore, a.folderStore, a.messageStore, a.attachmentStore)
 
 	// Wire S/MIME and PGP verifiers into sync engine for signature verification during body parsing
 	a.syncEngine.SetSMIMEVerifier(a.smimeVerifier)
@@ -403,16 +424,29 @@ func (a *App) Startup(ctx context.Context) {
 		}
 	}()
 
+	// Initialize autostart manager
+	a.autostartMgr = platform.NewAutostartManager()
+
 	log.Info().Msg("Aerion started successfully")
 }
 
 // BeforeClose is called when the window is about to close (e.g., OS close signal)
 func (a *App) BeforeClose(ctx context.Context) bool {
 	if shuttingDown {
-		// Already shutting down, allow the close
 		return false
 	}
 
+	// Background mode: hide window instead of quitting
+	runBg, _ := a.settingsStore.GetRunBackground()
+	if runBg {
+		log := logging.WithComponent("app")
+		log.Info().Msg("Window close requested, hiding to background")
+		wailsRuntime.WindowHide(a.ctx)
+		a.windowHidden = true
+		return true
+	}
+
+	// Normal shutdown flow
 	log := logging.WithComponent("app")
 	log.Info().Msg("Window close requested, showing shutdown overlay")
 
@@ -429,6 +463,76 @@ func (a *App) BeforeClose(ctx context.Context) bool {
 
 	// Prevent immediate close
 	return true
+}
+
+// ShowWindow brings the window to the foreground from hidden/minimized state.
+// Used by single-instance activation, notification clicks, etc.
+func (a *App) ShowWindow() {
+	log := logging.WithComponent("app")
+	log.Info().Msg("Showing window")
+
+	wailsRuntime.WindowUnminimise(a.ctx)
+	wailsRuntime.WindowShow(a.ctx)
+	a.windowHidden = false
+
+	// Emit event so frontend can also attempt to focus
+	wailsRuntime.EventsEmit(a.ctx, "window:show")
+}
+
+// CloseWindow handles the window close button click.
+// If background mode is enabled, hides the window instead of quitting.
+// Called by the frontend title bar close button.
+func (a *App) CloseWindow() {
+	runBg, _ := a.settingsStore.GetRunBackground()
+	if runBg {
+		log := logging.WithComponent("app")
+		log.Info().Msg("Window close requested, hiding to background")
+		wailsRuntime.WindowHide(a.ctx)
+		a.windowHidden = true
+		return
+	}
+
+	// Normal shutdown flow
+	if shuttingDown {
+		return
+	}
+	shuttingDown = true
+
+	log := logging.WithComponent("app")
+	log.Info().Msg("Window close requested, shutting down")
+	wailsRuntime.EventsEmit(a.ctx, "app:shutting-down")
+	go func() {
+		time.Sleep(150 * time.Millisecond)
+		wailsRuntime.Quit(a.ctx)
+	}()
+}
+
+// QuitApp forces a real quit, bypassing background mode.
+// Used by frontend or future tray menu to actually exit.
+func (a *App) QuitApp() {
+	if shuttingDown {
+		return
+	}
+	shuttingDown = true
+
+	log := logging.WithComponent("app")
+	log.Info().Msg("Quit requested")
+	wailsRuntime.EventsEmit(a.ctx, "app:shutting-down")
+	go func() {
+		time.Sleep(150 * time.Millisecond)
+		wailsRuntime.Quit(a.ctx)
+	}()
+}
+
+// GetStartHiddenActive returns true if the window should remain hidden on startup.
+// True when both start_hidden and run_background settings are enabled.
+func (a *App) GetStartHiddenActive() bool {
+	startHidden, _ := a.settingsStore.GetStartHidden()
+	if !startHidden {
+		return false
+	}
+	runBg, _ := a.settingsStore.GetRunBackground()
+	return runBg
 }
 
 // InitiateShutdown triggers the application quit (called from frontend)

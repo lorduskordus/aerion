@@ -4,6 +4,7 @@
   import { account, folder } from '../../../../wailsjs/go/models'
   import type { SyncProgress } from '$lib/stores/accounts.svelte'
   import FolderContextMenu from './FolderContextMenu.svelte'
+  import { _ } from '$lib/i18n'
 
   interface Props {
     account: account.Account
@@ -150,14 +151,14 @@
           onclick={handleSync}
         >
           <Icon icon="mdi:sync" class="w-4 h-4" />
-          <span>Sync Now</span>
+          <span>{$_('sidebar.syncNow')}</span>
         </button>
         <button
           class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
           onclick={handleEdit}
         >
           <Icon icon="mdi:pencil-outline" class="w-4 h-4" />
-          <span>Edit Account</span>
+          <span>{$_('sidebar.editAccount')}</span>
         </button>
         <div class="my-1 border-t border-border"></div>
         <button
@@ -165,7 +166,7 @@
           onclick={handleDelete}
         >
           <Icon icon="mdi:delete-outline" class="w-4 h-4" />
-          <span>Delete Account</span>
+          <span>{$_('sidebar.deleteAccount')}</span>
         </button>
       </div>
     {/if}
@@ -176,7 +177,7 @@
     <div class="px-3 py-1.5">
       <div class="flex items-center gap-2 text-destructive">
         <Icon icon="mdi:alert-circle" class="w-4 h-4 flex-shrink-0" />
-        <p class="text-xs">Sync error. Try again...</p>
+        <p class="text-xs">{$_('sidebar.syncError')}</p>
       </div>
     </div>
   {:else if syncing && syncProgress}
@@ -189,13 +190,13 @@
       </div>
       <p class="text-xs text-muted-foreground mt-1">
         {#if syncProgress.phase === 'folders'}
-          Syncing folders...
+          {$_('sidebar.syncingFolders')}
         {:else if syncProgress.phase === 'messages'}
-          Fetching message list...
+          {$_('sidebar.fetchingMessageList')}
         {:else if syncProgress.phase === 'headers'}
-          Fetching headers {syncProgress.percentage}%
+          {$_('sidebar.fetchingHeaders', { values: { percentage: syncProgress.percentage } })}
         {:else}
-          Syncing content {syncProgress.percentage}%
+          {$_('sidebar.syncingContent', { values: { percentage: syncProgress.percentage } })}
         {/if}
       </p>
     </div>
@@ -207,11 +208,11 @@
       {#if loading}
         <div class="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
           <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-          <span>Loading folders...</span>
+          <span>{$_('sidebar.loadingFolders')}</span>
         </div>
       {:else if folders.length === 0}
         <div class="px-3 py-2 text-sm text-muted-foreground">
-          No folders synced
+          {$_('sidebar.noFoldersSynced')}
         </div>
       {:else}
         {#each folders as tree (tree.folder?.id ?? 'unknown')}

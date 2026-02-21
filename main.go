@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/hkdb/aerion/app"
+	"github.com/hkdb/aerion/internal/platform"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -29,6 +30,7 @@ var (
 	messageID   = flag.String("message-id", "", "Original message ID for reply/forward")
 	draftID     = flag.String("draft-id", "", "Draft ID to resume editing")
 	dbusNotify  = flag.Bool("dbus-notify", false, "Use direct D-Bus notifications instead of portal (Linux only)")
+	startHidden = flag.Bool("start-hidden", false, "Start with window hidden (background mode)")
 )
 
 // DebugMode returns whether debug logging is enabled
@@ -128,8 +130,22 @@ func main() {
 
 // runMainMode runs the main application window
 func runMainMode(mailtoData *app.MailtoData) {
+	// Single-instance detection: if another instance is running, activate it and exit
+	lock := platform.NewSingleInstanceLock()
+	locked, err := lock.TryLock()
+	if err != nil {
+		println("Warning: single-instance check failed:", err.Error())
+	}
+	if !locked {
+		// Existing instance was activated
+		return
+	}
+	defer lock.Unlock()
+
 	// Create an instance of the app structure
 	application := app.NewApp(DebugMode, *dbusNotify)
+	application.SingleInstanceLock = lock
+	application.StartHiddenFlag = *startHidden
 
 	// Store mailto data if provided (will be used after startup)
 	if mailtoData != nil {
@@ -142,12 +158,12 @@ func runMainMode(mailtoData *app.MailtoData) {
 	dummyComposerApp := app.NewComposerApp(app.ComposerConfig{}, DebugMode)
 
 	// Create application with options
-	err := wails.Run(&options.App{
+	err = wails.Run(&options.App{
 		Title:       "Aerion",
 		Width:       1280,
 		Height:      800,
-		MinWidth:    800,
-		MinHeight:   600,
+		MinWidth:    360,
+		MinHeight:   400,
 		Frameless:   true,
 		StartHidden: true, // Hide until frontend is ready to prevent white flash
 		AssetServer: &assetserver.Options{

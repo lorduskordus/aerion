@@ -3,6 +3,7 @@
   import { Button } from '$lib/components/ui/button'
   import Icon from '@iconify/svelte'
   import { cn } from '$lib/utils'
+  import { _ } from '$lib/i18n'
   // @ts-ignore - wailsjs path
   import type { certificate } from '../../../../wailsjs/go/models'
 
@@ -65,9 +66,9 @@
             <Icon icon="mdi:shield-alert-outline" class="w-6 h-6 text-yellow-500" />
           </div>
           <div>
-            <h2 class="text-lg font-semibold">Untrusted Certificate</h2>
+            <h2 class="text-lg font-semibold">{$_('certificate.title')}</h2>
             <p class="text-sm text-muted-foreground">
-              The server presented a certificate that could not be verified.
+              {$_('certificate.description')}
             </p>
           </div>
         </div>
@@ -76,34 +77,34 @@
         <div class="px-6 pb-4 space-y-3">
           <div class="rounded-lg border bg-muted/30 p-4 space-y-2.5 text-sm">
             <div class="grid grid-cols-[100px_1fr] gap-1">
-              <span class="text-muted-foreground">Subject:</span>
+              <span class="text-muted-foreground">{$_('certificate.subject')}</span>
               <span class="font-mono text-xs break-all">{cert.subject}</span>
             </div>
             <div class="grid grid-cols-[100px_1fr] gap-1">
-              <span class="text-muted-foreground">Issuer:</span>
+              <span class="text-muted-foreground">{$_('certificate.issuer')}</span>
               <span class="font-mono text-xs break-all">{cert.issuer}</span>
             </div>
             <div class="grid grid-cols-[100px_1fr] gap-1">
-              <span class="text-muted-foreground">Fingerprint:</span>
+              <span class="text-muted-foreground">{$_('certificate.fingerprint')}</span>
               <span class="font-mono text-xs break-all select-all">{formatFingerprint(cert.fingerprint)}</span>
             </div>
             <div class="grid grid-cols-[100px_1fr] gap-1">
-              <span class="text-muted-foreground">Valid:</span>
+              <span class="text-muted-foreground">{$_('certificate.validPeriod')}</span>
               <span class={cn('text-xs', cert.isExpired && 'text-destructive font-medium')}>
-                {formatDate(cert.notBefore)} to {formatDate(cert.notAfter)}
+                {formatDate(cert.notBefore)} {$_('certificate.to')} {formatDate(cert.notAfter)}
                 {#if cert.isExpired}
-                  (expired)
+                  {$_('certificate.expired')}
                 {/if}
               </span>
             </div>
             {#if cert.dnsNames && cert.dnsNames.length > 0}
               <div class="grid grid-cols-[100px_1fr] gap-1">
-                <span class="text-muted-foreground">DNS Names:</span>
+                <span class="text-muted-foreground">{$_('certificate.dnsNames')}</span>
                 <span class="font-mono text-xs break-all">{cert.dnsNames.join(', ')}</span>
               </div>
             {/if}
             <div class="grid grid-cols-[100px_1fr] gap-1">
-              <span class="text-muted-foreground">Reason:</span>
+              <span class="text-muted-foreground">{$_('certificate.reason')}</span>
               <span class="text-xs text-yellow-600 dark:text-yellow-400">{cert.errorReason}</span>
             </div>
           </div>
@@ -112,13 +113,13 @@
         <!-- Actions -->
         <div class="flex items-center justify-end gap-2 px-6 pb-6">
           <Button variant="outline" onclick={onDecline}>
-            Decline
+            {$_('certificate.decline')}
           </Button>
           <Button variant="outline" onclick={onAcceptOnce}>
-            Accept Once
+            {$_('certificate.acceptOnce')}
           </Button>
           <Button onclick={onAcceptPermanently}>
-            Accept Always
+            {$_('certificate.acceptAlways')}
           </Button>
         </div>
       {/if}

@@ -5,6 +5,7 @@
   import AccountDialog from './AccountDialog.svelte'
   // @ts-ignore - wailsjs path
   import type { account } from '../../../../wailsjs/go/models'
+  import { _ } from '$lib/i18n'
 
   // Dialog state
   let showAccountDialog = $state(false)
@@ -45,7 +46,7 @@
 <div class="space-y-4">
   <h3 class="text-sm font-medium flex items-center gap-2">
     <Icon icon="mdi:email-multiple" class="w-4 h-4" />
-    Email Accounts
+    {$_('settingsAccounts.emailAccounts')}
   </h3>
 
   {#if accountStore.loading}
@@ -54,10 +55,10 @@
     </div>
   {:else if accountStore.accounts.length === 0}
     <div class="text-sm text-muted-foreground py-4 text-center">
-      <p class="mb-3">No email accounts configured</p>
+      <p class="mb-3">{$_('settingsAccounts.noAccountsConfigured')}</p>
       <Button size="sm" onclick={openAdd}>
         <Icon icon="mdi:plus" class="w-4 h-4 mr-1" />
-        Add Account
+        {$_('settingsAccounts.addAccount')}
       </Button>
     </div>
   {:else}
@@ -90,7 +91,7 @@
               class="h-7 w-7"
               onclick={() => moveUp(index)}
               disabled={index === 0}
-              title="Move up"
+              title={$_('settingsAccounts.moveUp')}
             >
               <Icon icon="mdi:chevron-up" class="w-4 h-4" />
             </Button>
@@ -100,7 +101,7 @@
               class="h-7 w-7"
               onclick={() => moveDown(index)}
               disabled={index === accountStore.accounts.length - 1}
-              title="Move down"
+              title={$_('settingsAccounts.moveDown')}
             >
               <Icon icon="mdi:chevron-down" class="w-4 h-4" />
             </Button>
@@ -112,7 +113,7 @@
             variant="ghost"
             class="h-7 w-7"
             onclick={() => openEdit(acc)}
-            title="Edit account"
+            title={$_('settingsAccounts.editAccount')}
           >
             <Icon icon="mdi:pencil" class="w-4 h-4" />
           </Button>
@@ -122,7 +123,7 @@
       <!-- Add button -->
       <Button size="sm" variant="outline" class="w-full" onclick={openAdd}>
         <Icon icon="mdi:plus" class="w-4 h-4 mr-1" />
-        Add Account
+        {$_('settingsAccounts.addAccount')}
       </Button>
     </div>
   {/if}

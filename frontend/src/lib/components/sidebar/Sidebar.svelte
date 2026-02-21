@@ -11,11 +11,13 @@
   import { contactSourcesStore } from '$lib/stores/contactSources.svelte'
   import { isAccountExpanded, setAccountExpanded, isUnifiedInboxExpanded, getUIStateVersion } from '$lib/stores/uiState.svelte'
   import { setFocusedPane } from '$lib/stores/keyboard.svelte'
+  import { _ } from '$lib/i18n'
   // @ts-ignore - wailsjs path
   import { account, folder } from '../../../../wailsjs/go/models'
   // @ts-ignore - wailsjs path
   import { GetUnifiedInboxUnreadCount } from '../../../../wailsjs/go/app/App'
   import { formatDistanceToNow } from 'date-fns'
+  import { getCurrentDateFnsLocale } from '$lib/stores/settings.svelte'
   import { EventsOn } from '../../../../wailsjs/runtime/runtime'
 
   // Folder item type for flat navigation list
@@ -67,18 +69,22 @@
     selectionSource?: 'unified' | 'account' | null
     isFocused?: boolean
     isFlashing?: boolean
+    showBackButton?: boolean
+    onBack?: () => void
   }
 
-  let { 
-    onFolderSelect, 
+  let {
+    onFolderSelect,
     onUnifiedFolderSelect,
-    onUnifiedInboxSelect, 
-    onCompose, 
-    selectedAccountId = null, 
+    onUnifiedInboxSelect,
+    onCompose,
+    selectedAccountId = null,
     selectedFolderId = null,
     selectionSource = null,
     isFocused = false,
     isFlashing = false,
+    showBackButton = false,
+    onBack,
   }: Props = $props()
 
   // Unified inbox state
@@ -160,10 +166,10 @@
 
   // Format last sync time
   function formatLastSync(): string {
-    if (accountStore.isAnySyncing) return 'Syncing...'
-    if (!accountStore.isOnline) return 'Offline'
-    if (!accountStore.lastSyncTime) return 'Not synced'
-    return `Synced ${formatDistanceToNow(accountStore.lastSyncTime, { addSuffix: true })}`
+    if (accountStore.isAnySyncing) return $_('sidebar.syncing')
+    if (!accountStore.isOnline) return $_('sidebar.offline')
+    if (!accountStore.lastSyncTime) return $_('sidebar.notSynced')
+    return $_('sidebar.synced', { values: { time: formatDistanceToNow(accountStore.lastSyncTime, { addSuffix: true, locale: getCurrentDateFnsLocale() }) } })
   }
 
   // Handle folder selection
@@ -418,13 +424,25 @@
 <div class="flex flex-col h-full {isFlashing ? 'pane-focus-flash' : ''}">
   <!-- Header with Compose Button -->
   <div class="px-4 py-3 border-b border-border">
-    <button
-      class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
-      onclick={onCompose}
-    >
-      <Icon icon="mdi:pencil" class="w-4 h-4" />
-      <span>Compose</span>
-    </button>
+    <div class="flex items-center gap-2">
+      <button
+        class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+        onclick={onCompose}
+      >
+        <Icon icon="mdi:pencil" class="w-4 h-4" />
+        <span>{$_('sidebar.compose')}</span>
+      </button>
+      {#if showBackButton}
+        <button
+          class="p-2 rounded-md hover:bg-muted transition-colors flex-shrink-0"
+          title={$_('responsive.back')}
+          aria-label={$_('aria.closeSidebar')}
+          onclick={onBack}
+        >
+          <Icon icon="mdi:close" class="w-5 h-5 text-muted-foreground" />
+        </button>
+      {/if}
+    </div>
   </div>
 
   <!-- Account List -->
@@ -437,13 +455,13 @@
       <!-- Empty State -->
       <div class="flex flex-col items-center justify-center py-8 px-4 text-center">
         <Icon icon="mdi:email-plus-outline" class="w-12 h-12 text-muted-foreground mb-3" />
-        <h3 class="text-sm font-medium mb-1">No accounts yet</h3>
+        <h3 class="text-sm font-medium mb-1">{$_('sidebar.noAccountsYet')}</h3>
         <p class="text-xs text-muted-foreground mb-4">
-          Add your first email account to get started
+          {$_('sidebar.addFirstAccount')}
         </p>
         <Button size="sm" onclick={openAddAccount}>
           <Icon icon="mdi:plus" class="w-4 h-4 mr-1" />
-          Add Account
+          {$_('sidebar.addAccount')}
         </Button>
       </div>
     {:else}
@@ -493,7 +511,7 @@
           onclick={openAddAccount}
         >
           <Icon icon="mdi:plus" class="w-4 h-4" />
-          <span>Add Account</span>
+          <span>{$_('sidebar.addAccount')}</span>
         </button>
       </div>
     {/if}
@@ -504,7 +522,7 @@
     <button
       class="flex items-center gap-2 hover:text-foreground transition-colors"
       onclick={accountStore.isAnySyncing ? cancelSync : syncAllAccounts}
-      title={accountStore.isAnySyncing ? 'Click to cancel sync' : 'Sync all accounts'}
+      title={$_(accountStore.isAnySyncing ? 'sidebar.clickToCancel' : 'sidebar.syncAllAccounts')}
     >
       <Icon
         icon="mdi:sync"
@@ -515,7 +533,7 @@
     <button
       class="p-1 hover:text-foreground hover:bg-muted rounded transition-colors relative"
       onclick={() => showSettingsDialog = true}
-      title="Settings"
+      title={$_('sidebar.settings')}
     >
       <Icon icon="mdi:cog" class="w-4 h-4" />
       {#if contactSourcesStore.hasErrors}

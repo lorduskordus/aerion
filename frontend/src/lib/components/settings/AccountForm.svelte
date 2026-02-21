@@ -27,6 +27,7 @@
   import { GetAccountFoldersForMapping, GetAutoDetectedFolders, GetIdentities, AcceptCertificate } from '../../../../wailsjs/go/app/App'
   import CertificateDialog from './CertificateDialog.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
+  import { _ } from '$lib/i18n'
 
   // OAuth credentials to pass to parent
   export interface OAuthCredentials {
@@ -85,11 +86,11 @@
   let readReceiptRequestPolicy = $state<string>('never')
 
   // Read receipt request policy options
-  const readReceiptRequestOptions = [
-    { value: 'never', label: 'Never request' },
-    { value: 'ask', label: 'Ask each time' },
-    { value: 'always', label: 'Always request' },
-  ]
+  const readReceiptRequestOptions = $derived([
+    { value: 'never', label: $_('account.neverRequest') },
+    { value: 'ask', label: $_('account.askEachTime') },
+    { value: 'always', label: $_('account.alwaysRequest') },
+  ])
 
   // Helper functions to get labels
   function getSecurityLabel(value: string): string {
@@ -137,15 +138,15 @@
   let starredFolderPath = $state('')
 
   // Folder mapping types configuration
-  const folderMappingTypes = [
-    { key: 'sent', label: 'Sent', getValue: () => sentFolderPath, setValue: (v: string) => sentFolderPath = v },
-    { key: 'drafts', label: 'Drafts', getValue: () => draftsFolderPath, setValue: (v: string) => draftsFolderPath = v },
-    { key: 'trash', label: 'Trash', getValue: () => trashFolderPath, setValue: (v: string) => trashFolderPath = v },
-    { key: 'spam', label: 'Spam/Junk', getValue: () => spamFolderPath, setValue: (v: string) => spamFolderPath = v },
-    { key: 'archive', label: 'Archive', getValue: () => archiveFolderPath, setValue: (v: string) => archiveFolderPath = v },
-    { key: 'all', label: 'All Mail', getValue: () => allMailFolderPath, setValue: (v: string) => allMailFolderPath = v },
-    { key: 'starred', label: 'Starred', getValue: () => starredFolderPath, setValue: (v: string) => starredFolderPath = v },
-  ]
+  const folderMappingTypes = $derived([
+    { key: 'sent', label: $_('account.folderSent'), getValue: () => sentFolderPath, setValue: (v: string) => sentFolderPath = v },
+    { key: 'drafts', label: $_('account.folderDrafts'), getValue: () => draftsFolderPath, setValue: (v: string) => draftsFolderPath = v },
+    { key: 'trash', label: $_('account.folderTrash'), getValue: () => trashFolderPath, setValue: (v: string) => trashFolderPath = v },
+    { key: 'spam', label: $_('account.folderSpam'), getValue: () => spamFolderPath, setValue: (v: string) => spamFolderPath = v },
+    { key: 'archive', label: $_('account.folderArchive'), getValue: () => archiveFolderPath, setValue: (v: string) => archiveFolderPath = v },
+    { key: 'all', label: $_('account.folderAllMail'), getValue: () => allMailFolderPath, setValue: (v: string) => allMailFolderPath = v },
+    { key: 'starred', label: $_('account.folderStarred'), getValue: () => starredFolderPath, setValue: (v: string) => starredFolderPath = v },
+  ])
 
   // Load folders for mapping UI
   async function loadFoldersForMapping() {
@@ -306,11 +307,11 @@
 
   // Get OAuth button text based on provider
   function getOAuthButtonText(provider: EmailProvider | null): string {
-    if (!provider) return 'Sign in'
+    if (!provider) return $_('account.signIn')
     const oauthType = getOAuthProviderType(provider)
-    if (oauthType === 'google') return 'Sign in with Google'
-    if (oauthType === 'microsoft') return 'Sign in with Microsoft'
-    return 'Sign in'
+    if (oauthType === 'google') return $_('account.signInWith', { values: { provider: 'Google' } })
+    if (oauthType === 'microsoft') return $_('account.signInWith', { values: { provider: 'Microsoft' } })
+    return $_('account.signIn')
   }
 
   // Get OAuth button icon based on provider
@@ -403,25 +404,25 @@
   function validate(): boolean {
     errors = {}
 
-    if (!name.trim()) errors.name = 'Account name is required'
-    if (!displayName.trim()) errors.displayName = 'Display name is required'
-    if (!email.trim()) errors.email = 'Email is required'
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Invalid email format'
+    if (!name.trim()) errors.name = $_('account.accountNameRequired')
+    if (!displayName.trim()) errors.displayName = $_('account.displayNameRequired')
+    if (!email.trim()) errors.email = $_('account.emailRequired')
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = $_('account.invalidEmail')
     
     // Password is only required for password auth on new accounts
     if (authMethod === 'password' && !password && !editAccount) {
-      errors.password = 'Password is required'
+      errors.password = $_('account.passwordRequired')
     }
     
     // For OAuth, check that the flow completed successfully
     if (authMethod === 'oauth2' && !editAccount && !oauthStore.isFlowSuccess) {
-      errors.oauth = 'Please complete the sign-in process'
+      errors.oauth = $_('account.pleaseCompleteSignIn')
     }
     
-    if (!imapHost.trim()) errors.imapHost = 'IMAP host is required'
-    if (!smtpHost.trim()) errors.smtpHost = 'SMTP host is required'
-    if (imapPort < 1 || imapPort > 65535) errors.imapPort = 'Invalid port'
-    if (smtpPort < 1 || smtpPort > 65535) errors.smtpPort = 'Invalid port'
+    if (!imapHost.trim()) errors.imapHost = $_('account.imapHostRequired')
+    if (!smtpHost.trim()) errors.smtpHost = $_('account.smtpHostRequired')
+    if (imapPort < 1 || imapPort > 65535) errors.imapPort = $_('account.invalidPort')
+    if (smtpPort < 1 || smtpPort > 65535) errors.smtpPort = $_('account.invalidPort')
 
     return Object.keys(errors).length === 0
   }
@@ -436,12 +437,12 @@
     try {
       const result = await accountStore.testConnection(buildConfig())
       if (result.success) {
-        testResult = { success: true, message: 'Connection successful!' }
+        testResult = { success: true, message: $_('account.connectionSuccessful') }
       } else if (result.certificateRequired && result.certificate) {
         pendingCertificate = result.certificate
         showCertDialog = true
       } else {
-        testResult = { success: false, message: result.error || 'Connection failed' }
+        testResult = { success: false, message: result.error || $_('account.connectionFailed') }
       }
     } catch (err) {
       testResult = {
@@ -472,7 +473,7 @@
   function handleCertDecline() {
     showCertDialog = false
     pendingCertificate = null
-    testResult = { success: false, message: 'Certificate declined' }
+    testResult = { success: false, message: $_('account.certificateDeclined') }
   }
 
   // Submit form
@@ -525,9 +526,9 @@
     <!-- Step 1: Provider Selection -->
     <div class="space-y-4">
       <div class="text-center">
-        <h3 class="text-lg font-medium">Choose your email provider</h3>
+        <h3 class="text-lg font-medium">{$_('account.chooseProvider')}</h3>
         <p class="text-sm text-muted-foreground mt-1">
-          Select your provider for automatic configuration
+          {$_('account.chooseProviderHelp')}
         </p>
       </div>
 
@@ -554,7 +555,7 @@
           onclick={goBackToProviders}
         >
           <Icon icon="mdi:arrow-left" class="w-4 h-4" />
-          Change provider
+          {$_('account.changeProvider')}
         </button>
       {/if}
 
@@ -570,19 +571,19 @@
       <!-- Basic Fields -->
       <div class="grid gap-4">
         <div class="space-y-2">
-          <Label for="name">Account Name</Label>
+          <Label for="name">{$_('account.accountName')}</Label>
           <div class="flex items-center gap-3">
             <ColorPicker value={color} onchange={(c) => color = c} />
             <Input
               id="name"
               type="text"
-              placeholder="e.g., Personal, Work"
+              placeholder={$_('account.accountNamePlaceholder')}
               bind:value={name}
               class={errors.name ? 'border-destructive' : ''}
             />
           </div>
           <p class="text-xs text-muted-foreground">
-            Color is used to identify this account in unified inbox
+            {$_('account.colorHelp')}
           </p>
           {#if errors.name}
             <p class="text-sm text-destructive">{errors.name}</p>
@@ -590,16 +591,16 @@
         </div>
 
         <div class="space-y-2">
-          <Label for="displayName">Display Name</Label>
+          <Label for="displayName">{$_('account.displayName')}</Label>
           <Input
             id="displayName"
             type="text"
-            placeholder="e.g., John Smith"
+            placeholder={$_('account.displayNamePlaceholder')}
             bind:value={displayName}
             class={errors.displayName ? 'border-destructive' : ''}
           />
           <p class="text-xs text-muted-foreground">
-            Name shown to email recipients
+            {$_('account.displayNameHelp')}
           </p>
           {#if errors.displayName}
             <p class="text-sm text-destructive">{errors.displayName}</p>
@@ -607,7 +608,7 @@
         </div>
 
         <div class="space-y-2">
-          <Label for="email">Email Address</Label>
+          <Label for="email">{$_('account.emailAddress')}</Label>
           <Input
             id="email"
             type="email"
@@ -622,15 +623,15 @@
         </div>
 
         <div class="space-y-2">
-          <Label for="username">Username</Label>
+          <Label for="username">{$_('account.username')}</Label>
           <Input
             id="username"
             type="text"
-            placeholder="Usually your email address"
+            placeholder={$_('account.usernamePlaceholder')}
             bind:value={username}
           />
           <p class="text-xs text-muted-foreground">
-            Leave empty to use email address
+            {$_('account.usernameHelp')}
           </p>
         </div>
 
@@ -639,7 +640,7 @@
           {#if canUseOAuth(selectedProvider) && !editAccount}
             <!-- OAuth Provider - Show Sign In Button -->
             <div class="space-y-3">
-              <Label>Authentication</Label>
+              <Label>{$_('account.authentication')}</Label>
               
               {#if allowsPasswordFallback(selectedProvider!)}
                 <!-- Provider allows both OAuth and password -->
@@ -662,7 +663,7 @@
                     class="flex-1"
                   >
                     <Icon icon="mdi:key" class="w-4 h-4 mr-2" />
-                    App Password
+                    {$_('account.appPassword')}
                   </Button>
                 </div>
               {/if}
@@ -682,16 +683,16 @@
                       {getOAuthButtonText(selectedProvider)}
                     </Button>
                     <p class="text-xs text-muted-foreground text-center">
-                      You'll be redirected to sign in securely
+                      {$_('account.redirectToSignIn')}
                     </p>
                   {:else if oauthStore.flowState === 'pending'}
                     <!-- Waiting for OAuth callback -->
                     <div class="flex flex-col items-center gap-3 py-2">
                       <Icon icon="mdi:loading" class="w-8 h-8 animate-spin text-primary" />
                       <div class="text-center">
-                        <p class="text-sm font-medium">Waiting for authentication...</p>
+                        <p class="text-sm font-medium">{$_('account.waitingForAuth')}</p>
                         <p class="text-xs text-muted-foreground mt-1">
-                          Complete sign-in in your browser
+                          {$_('account.completeSignIn')}
                         </p>
                       </div>
                       <Button
@@ -700,7 +701,7 @@
                         size="sm"
                         onclick={cancelOAuthFlow}
                       >
-                        Cancel
+                        {$_('common.cancel')}
                       </Button>
                     </div>
                   {:else if oauthStore.flowState === 'success'}
@@ -711,7 +712,7 @@
                       </div>
                       <div class="flex-1 min-w-0">
                         <p class="text-sm font-medium text-green-600 dark:text-green-400">
-                          Connected successfully
+                          {$_('account.connectedSuccessfully')}
                         </p>
                         <p class="text-xs text-muted-foreground truncate">
                           {oauthStore.flowResult?.email}
@@ -737,7 +738,7 @@
                         </div>
                         <div class="flex-1">
                           <p class="text-sm font-medium text-destructive">
-                            Authentication failed
+                            {$_('account.authFailed')}
                           </p>
                           <p class="text-xs text-muted-foreground mt-1">
                             {oauthStore.flowError}
@@ -751,7 +752,7 @@
                         class="w-full"
                         onclick={startOAuthFlow}
                       >
-                        Try again
+                        {$_('account.tryAgain')}
                       </Button>
                     </div>
                   {/if}
@@ -762,11 +763,11 @@
               {:else}
                 <!-- Password field for app password -->
                 <div class="space-y-2">
-                  <Label for="password">App Password</Label>
+                  <Label for="password">{$_('account.appPassword')}</Label>
                   <Input
                     id="password"
                     type="password"
-                    placeholder="Enter app password"
+                    placeholder={$_('account.enterAppPassword')}
                     bind:value={password}
                     class={errors.password ? 'border-destructive' : ''}
                   />
@@ -779,16 +780,16 @@
           {:else if editAccount && editAccount.authType === 'oauth2'}
             <!-- Editing an OAuth account -->
             <div class="space-y-2">
-              <Label>Authentication</Label>
+              <Label>{$_('account.authentication')}</Label>
               <div class="rounded-lg border border-border p-4">
                 <div class="flex items-center gap-3">
                   <div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <Icon icon={getOAuthButtonIcon(selectedProvider)} class="w-5 h-5" />
                   </div>
                   <div class="flex-1">
-                    <p class="text-sm font-medium">Connected via OAuth</p>
+                    <p class="text-sm font-medium">{$_('account.oauthConnected')}</p>
                     <p class="text-xs text-muted-foreground">
-                      Sign in again to refresh credentials if needed
+                      {$_('account.signInAgainHelp')}
                     </p>
                   </div>
                 </div>
@@ -798,12 +799,12 @@
             <!-- Standard password field -->
             <div class="space-y-2">
               <Label for="password">
-                {selectedProvider?.notes?.includes('App Password') ? 'App Password' : 'Password'}
+                {selectedProvider?.notes?.includes('App Password') ? $_('account.appPassword') : $_('account.password')}
               </Label>
               <Input
                 id="password"
                 type="password"
-                placeholder={editAccount ? 'Leave empty to keep current' : 'Enter password'}
+                placeholder={editAccount ? $_('account.leaveEmptyToKeep') : $_('account.password')}
                 bind:value={password}
                 class={errors.password ? 'border-destructive' : ''}
               />
@@ -825,17 +826,17 @@
           icon={showAdvanced ? 'mdi:chevron-down' : 'mdi:chevron-right'}
           class="w-4 h-4"
         />
-        Advanced Settings
+        {$_('account.advancedSettings')}
       </button>
 
       {#if showAdvanced}
         <div class="space-y-4 pt-2 border-t border-border">
           <!-- IMAP Settings -->
           <div class="space-y-3">
-            <h4 class="text-sm font-medium">Incoming Mail (IMAP)</h4>
+            <h4 class="text-sm font-medium">{$_('account.incomingMail')}</h4>
             <div class="grid grid-cols-2 gap-3">
               <div class="space-y-2">
-                <Label for="imapHost">Server</Label>
+                <Label for="imapHost">{$_('account.server')}</Label>
                 <Input
                   id="imapHost"
                   type="text"
@@ -849,7 +850,7 @@
               </div>
               <div class="grid grid-cols-2 gap-2">
                 <div class="space-y-2">
-                  <Label for="imapPort">Port</Label>
+                  <Label for="imapPort">{$_('account.port')}</Label>
                   <Input
                     id="imapPort"
                     type="number"
@@ -858,7 +859,7 @@
                   />
                 </div>
                 <div class="space-y-2">
-                  <Label>Security</Label>
+                  <Label>{$_('account.security')}</Label>
                   <Select.Root bind:value={imapSecurity}>
                     <Select.Trigger class="h-10">
                       <Select.Value placeholder="Select">
@@ -878,10 +879,10 @@
 
           <!-- SMTP Settings -->
           <div class="space-y-3">
-            <h4 class="text-sm font-medium">Outgoing Mail (SMTP)</h4>
+            <h4 class="text-sm font-medium">{$_('account.outgoingMail')}</h4>
             <div class="grid grid-cols-2 gap-3">
               <div class="space-y-2">
-                <Label for="smtpHost">Server</Label>
+                <Label for="smtpHost">{$_('account.server')}</Label>
                 <Input
                   id="smtpHost"
                   type="text"
@@ -895,7 +896,7 @@
               </div>
               <div class="grid grid-cols-2 gap-2">
                 <div class="space-y-2">
-                  <Label for="smtpPort">Port</Label>
+                  <Label for="smtpPort">{$_('account.port')}</Label>
                   <Input
                     id="smtpPort"
                     type="number"
@@ -904,7 +905,7 @@
                   />
                 </div>
                 <div class="space-y-2">
-                  <Label>Security</Label>
+                  <Label>{$_('account.security')}</Label>
                   <Select.Root bind:value={smtpSecurity}>
                     <Select.Trigger class="h-10">
                       <Select.Value placeholder="Select">
@@ -924,7 +925,7 @@
 
           <!-- Sync Settings -->
           <div class="space-y-2">
-            <Label>Sync Period</Label>
+            <Label>{$_('account.syncPeriod')}</Label>
             <Select.Root bind:value={syncPeriodDays}>
               <Select.Trigger>
                 <Select.Value placeholder="Select">
@@ -938,13 +939,13 @@
               </Select.Content>
             </Select.Root>
             <p class="text-xs text-muted-foreground">
-              How far back to sync messages
+              {$_('account.syncPeriodHelp')}
             </p>
           </div>
 
           <!-- Check Interval Settings -->
           <div class="space-y-2">
-            <Label>Check for New Mail</Label>
+            <Label>{$_('account.checkNewMail')}</Label>
             <Select.Root bind:value={syncInterval}>
               <Select.Trigger>
                 <Select.Value placeholder="Select">
@@ -958,13 +959,13 @@
               </Select.Content>
             </Select.Root>
             <p class="text-xs text-muted-foreground">
-              How often to check for new messages (IDLE push is also used when available)
+              {$_('account.checkNewMailHelp')}
             </p>
           </div>
 
           <!-- Read Receipt Settings -->
           <div class="space-y-2">
-            <Label>Request Read Receipts</Label>
+            <Label>{$_('account.requestReadReceipts')}</Label>
             <Select.Root bind:value={readReceiptRequestPolicy}>
               <Select.Trigger>
                 <Select.Value placeholder="Select">
@@ -978,7 +979,7 @@
               </Select.Content>
             </Select.Root>
             <p class="text-xs text-muted-foreground">
-              When to request read receipts for outgoing messages
+              {$_('account.requestReadReceiptsHelp')}
             </p>
           </div>
 
@@ -997,40 +998,40 @@
                 icon={showFolderMapping ? 'mdi:chevron-down' : 'mdi:chevron-right'}
                 class="w-4 h-4"
               />
-              Folder Mapping
+              {$_('account.folderMapping')}
               {#if !editAccount}
-                <span class="text-xs text-muted-foreground">(save account first)</span>
+                <span class="text-xs text-muted-foreground">{$_('account.saveAccountFirst')}</span>
               {/if}
             </button>
 
             {#if showFolderMapping}
               <div class="space-y-3 pl-6 pt-2 border-l border-border ml-2">
                 <p class="text-xs text-muted-foreground">
-                  Map folder types to specific IMAP folders on your server.
+                  {$_('account.folderMappingHelp2')}
                 </p>
 
                 {#if loadingFolders}
                   <div class="flex items-center gap-2 text-sm text-muted-foreground">
                     <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-                    Loading folders...
+                    {$_('account.loadingFolders')}
                   </div>
                 {:else if availableFolders.length === 0}
-                  <p class="text-sm text-muted-foreground">No folders available.</p>
+                  <p class="text-sm text-muted-foreground">{$_('account.noFoldersAvailable')}</p>
                 {:else}
                   <div class="grid gap-3">
                     <!-- Sent -->
                     <div class="grid grid-cols-[100px_1fr] items-center gap-2">
-                      <Label class="text-sm">Sent:</Label>
+                      <Label class="text-sm">{$_('account.folderSent')}:</Label>
                       <Select.Root bind:value={sentFolderPath}>
                         <Select.Trigger class="h-9">
-                          <Select.Value placeholder="None">
-                            {sentFolderPath || 'None'}
+                          <Select.Value placeholder={$_('account.none')}>
+                            {sentFolderPath || $_('account.none')}
                           </Select.Value>
                         </Select.Trigger>
                         <Select.Content>
-                          <Select.Item value="" label="None" />
+                          <Select.Item value="" label={$_('account.none')} />
                           {#each availableFolders as f (f.path)}
-                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.sent === f.path ? ' (detected)' : '')} />
+                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.sent === f.path ? ' ' + $_('account.detected') : '')} />
                           {/each}
                         </Select.Content>
                       </Select.Root>
@@ -1038,17 +1039,17 @@
 
                     <!-- Drafts -->
                     <div class="grid grid-cols-[100px_1fr] items-center gap-2">
-                      <Label class="text-sm">Drafts:</Label>
+                      <Label class="text-sm">{$_('account.folderDrafts')}:</Label>
                       <Select.Root bind:value={draftsFolderPath}>
                         <Select.Trigger class="h-9">
-                          <Select.Value placeholder="None">
-                            {draftsFolderPath || 'None'}
+                          <Select.Value placeholder={$_('account.none')}>
+                            {draftsFolderPath || $_('account.none')}
                           </Select.Value>
                         </Select.Trigger>
                         <Select.Content>
-                          <Select.Item value="" label="None" />
+                          <Select.Item value="" label={$_('account.none')} />
                           {#each availableFolders as f (f.path)}
-                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.drafts === f.path ? ' (detected)' : '')} />
+                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.drafts === f.path ? ' ' + $_('account.detected') : '')} />
                           {/each}
                         </Select.Content>
                       </Select.Root>
@@ -1056,17 +1057,17 @@
 
                     <!-- Trash -->
                     <div class="grid grid-cols-[100px_1fr] items-center gap-2">
-                      <Label class="text-sm">Trash:</Label>
+                      <Label class="text-sm">{$_('account.folderTrash')}:</Label>
                       <Select.Root bind:value={trashFolderPath}>
                         <Select.Trigger class="h-9">
-                          <Select.Value placeholder="None">
-                            {trashFolderPath || 'None'}
+                          <Select.Value placeholder={$_('account.none')}>
+                            {trashFolderPath || $_('account.none')}
                           </Select.Value>
                         </Select.Trigger>
                         <Select.Content>
-                          <Select.Item value="" label="None" />
+                          <Select.Item value="" label={$_('account.none')} />
                           {#each availableFolders as f (f.path)}
-                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.trash === f.path ? ' (detected)' : '')} />
+                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.trash === f.path ? ' ' + $_('account.detected') : '')} />
                           {/each}
                         </Select.Content>
                       </Select.Root>
@@ -1074,17 +1075,17 @@
 
                     <!-- Spam/Junk -->
                     <div class="grid grid-cols-[100px_1fr] items-center gap-2">
-                      <Label class="text-sm">Spam/Junk:</Label>
+                      <Label class="text-sm">{$_('account.folderSpam')}:</Label>
                       <Select.Root bind:value={spamFolderPath}>
                         <Select.Trigger class="h-9">
-                          <Select.Value placeholder="None">
-                            {spamFolderPath || 'None'}
+                          <Select.Value placeholder={$_('account.none')}>
+                            {spamFolderPath || $_('account.none')}
                           </Select.Value>
                         </Select.Trigger>
                         <Select.Content>
-                          <Select.Item value="" label="None" />
+                          <Select.Item value="" label={$_('account.none')} />
                           {#each availableFolders as f (f.path)}
-                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.spam === f.path ? ' (detected)' : '')} />
+                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.spam === f.path ? ' ' + $_('account.detected') : '')} />
                           {/each}
                         </Select.Content>
                       </Select.Root>
@@ -1092,17 +1093,17 @@
 
                     <!-- Archive -->
                     <div class="grid grid-cols-[100px_1fr] items-center gap-2">
-                      <Label class="text-sm">Archive:</Label>
+                      <Label class="text-sm">{$_('account.folderArchive')}:</Label>
                       <Select.Root bind:value={archiveFolderPath}>
                         <Select.Trigger class="h-9">
-                          <Select.Value placeholder="None">
-                            {archiveFolderPath || 'None'}
+                          <Select.Value placeholder={$_('account.none')}>
+                            {archiveFolderPath || $_('account.none')}
                           </Select.Value>
                         </Select.Trigger>
                         <Select.Content>
-                          <Select.Item value="" label="None" />
+                          <Select.Item value="" label={$_('account.none')} />
                           {#each availableFolders as f (f.path)}
-                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.archive === f.path ? ' (detected)' : '')} />
+                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.archive === f.path ? ' ' + $_('account.detected') : '')} />
                           {/each}
                         </Select.Content>
                       </Select.Root>
@@ -1110,17 +1111,17 @@
 
                     <!-- All Mail -->
                     <div class="grid grid-cols-[100px_1fr] items-center gap-2">
-                      <Label class="text-sm">All Mail:</Label>
+                      <Label class="text-sm">{$_('account.folderAllMail')}:</Label>
                       <Select.Root bind:value={allMailFolderPath}>
                         <Select.Trigger class="h-9">
-                          <Select.Value placeholder="None">
-                            {allMailFolderPath || 'None'}
+                          <Select.Value placeholder={$_('account.none')}>
+                            {allMailFolderPath || $_('account.none')}
                           </Select.Value>
                         </Select.Trigger>
                         <Select.Content>
-                          <Select.Item value="" label="None" />
+                          <Select.Item value="" label={$_('account.none')} />
                           {#each availableFolders as f (f.path)}
-                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.all === f.path ? ' (detected)' : '')} />
+                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.all === f.path ? ' ' + $_('account.detected') : '')} />
                           {/each}
                         </Select.Content>
                       </Select.Root>
@@ -1128,17 +1129,17 @@
 
                     <!-- Starred -->
                     <div class="grid grid-cols-[100px_1fr] items-center gap-2">
-                      <Label class="text-sm">Starred:</Label>
+                      <Label class="text-sm">{$_('account.folderStarred')}:</Label>
                       <Select.Root bind:value={starredFolderPath}>
                         <Select.Trigger class="h-9">
-                          <Select.Value placeholder="None">
-                            {starredFolderPath || 'None'}
+                          <Select.Value placeholder={$_('account.none')}>
+                            {starredFolderPath || $_('account.none')}
                           </Select.Value>
                         </Select.Trigger>
                         <Select.Content>
-                          <Select.Item value="" label="None" />
+                          <Select.Item value="" label={$_('account.none')} />
                           {#each availableFolders as f (f.path)}
-                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.starred === f.path ? ' (detected)' : '')} />
+                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.starred === f.path ? ' ' + $_('account.detected') : '')} />
                           {/each}
                         </Select.Content>
                       </Select.Root>
@@ -1187,18 +1188,18 @@
           {:else}
             <Icon icon="mdi:connection" class="w-4 h-4 mr-2" />
           {/if}
-          Test Connection
+          {$_('account.testConnection')}
         </Button>
 
         <div class="flex gap-2">
           <Button type="button" variant="ghost" onclick={onCancel} disabled={submitting}>
-            Cancel
+            {$_('common.cancel')}
           </Button>
           <Button type="submit" disabled={submitting || testing}>
             {#if submitting}
               <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
             {/if}
-            {editAccount ? 'Save Changes' : 'Add Account'}
+            {editAccount ? $_('common.saveChanges') : $_('account.addAccount')}
           </Button>
         </div>
       </div>

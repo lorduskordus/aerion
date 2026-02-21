@@ -4,6 +4,7 @@
   import { Button } from '$lib/components/ui/button'
   import IdentityEditor from './IdentityEditor.svelte'
   import { addToast } from '$lib/stores/toast'
+  import { _ } from '$lib/i18n'
   // @ts-ignore - wailsjs path
   import { account } from '../../../../../wailsjs/go/models'
   // @ts-ignore - wailsjs path
@@ -35,7 +36,7 @@
       console.error('Failed to load identities:', err)
       addToast({
         type: 'error',
-        message: 'Failed to load email addresses',
+        message: $_('identity.failedToLoadAddresses'),
       })
     } finally {
       loading = false
@@ -58,14 +59,14 @@
       await UpdateIdentity(editingIdentity.id, config)
       addToast({
         type: 'success',
-        message: 'Email address updated',
+        message: $_('identity.emailUpdated'),
       })
     } else {
       // Create new
       await CreateIdentity(accountId, config)
       addToast({
         type: 'success',
-        message: 'Email address added',
+        message: $_('identity.emailAdded'),
       })
     }
     await loadIdentities()
@@ -75,7 +76,7 @@
     if (identity.isDefault) {
       addToast({
         type: 'error',
-        message: 'Cannot delete the default email address',
+        message: $_('identity.cannotDeleteDefault'),
       })
       return
     }
@@ -85,14 +86,14 @@
       await DeleteIdentity(identity.id)
       addToast({
         type: 'success',
-        message: 'Email address deleted',
+        message: $_('identity.emailDeleted'),
       })
       await loadIdentities()
     } catch (err) {
       console.error('Failed to delete identity:', err)
       addToast({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Failed to delete email address',
+        message: err instanceof Error ? err.message : $_('identity.failedToDeleteAddress'),
       })
     } finally {
       deletingId = null
@@ -106,22 +107,22 @@
       await SetDefaultIdentity(accountId, identity.id)
       addToast({
         type: 'success',
-        message: `${identity.email} is now the default`,
+        message: $_('identity.isNowDefault', { values: { email: identity.email } }),
       })
       await loadIdentities()
     } catch (err) {
       console.error('Failed to set default identity:', err)
       addToast({
         type: 'error',
-        message: 'Failed to set default email address',
+        message: $_('identity.failedToSetDefault'),
       })
     }
   }
 
   // Get a preview of the signature (first line, truncated)
   function getSignaturePreview(identity: account.Identity): string {
-    if (!identity.signatureEnabled) return 'No signature'
-    if (!identity.signatureHtml) return 'No signature'
+    if (!identity.signatureEnabled) return $_('identity.noSignature')
+    if (!identity.signatureHtml) return $_('identity.noSignature')
     
     // Strip HTML and get first line
     const temp = document.createElement('div')
@@ -132,7 +133,7 @@
     if (firstLine.length > 50) {
       return firstLine.substring(0, 50) + '...'
     }
-    return firstLine || 'Empty signature'
+    return firstLine || $_('identity.emptySignature')
   }
 </script>
 
@@ -141,15 +142,15 @@
     <div>
       <h3 class="text-sm font-medium flex items-center gap-2">
         <Icon icon="mdi:email-multiple-outline" class="w-4 h-4" />
-        Email Addresses
+        {$_('identity.emailAddresses')}
       </h3>
       <p class="text-xs text-muted-foreground mt-1">
-        Manage email addresses you can send from and their signatures
+        {$_('identity.emailAddressesHelp')}
       </p>
     </div>
     <Button size="sm" onclick={handleAddIdentity}>
       <Icon icon="mdi:plus" class="w-4 h-4 mr-1" />
-      Add Email Address
+      {$_('identity.addEmailAddress')}
     </Button>
   </div>
 
@@ -160,7 +161,7 @@
   {:else if identities.length === 0}
     <div class="text-center py-8 text-muted-foreground">
       <Icon icon="mdi:email-outline" class="w-12 h-12 mx-auto mb-2 opacity-50" />
-      <p>No email addresses configured</p>
+      <p>{$_('identity.noEmailAddresses')}</p>
     </div>
   {:else}
     <div class="space-y-2">
@@ -174,7 +175,7 @@
               {identity.isDefault 
                 ? 'border-primary bg-primary' 
                 : 'border-muted-foreground hover:border-primary'}"
-            title={identity.isDefault ? 'Default email address' : 'Set as default'}
+            title={identity.isDefault ? $_('identity.defaultAddress') : $_('identity.setAsDefaultAddress')}
           >
             {#if identity.isDefault}
               <div class="w-2 h-2 rounded-full bg-white"></div>
@@ -186,7 +187,7 @@
             <div class="flex items-center gap-2">
               <span class="font-medium text-sm truncate">{identity.email}</span>
               {#if identity.isDefault}
-                <span class="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">Default</span>
+                <span class="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">{$_('identity.default')}</span>
               {/if}
             </div>
             <div class="text-xs text-muted-foreground truncate">
@@ -205,7 +206,7 @@
               size="sm"
               onclick={() => handleEditIdentity(identity)}
               class="h-8 w-8 p-0"
-              title="Edit"
+              title={$_('common.edit')}
             >
               <Icon icon="mdi:pencil" class="w-4 h-4" />
             </Button>
@@ -215,7 +216,7 @@
               onclick={() => handleDeleteIdentity(identity)}
               disabled={identity.isDefault || deletingId === identity.id}
               class="h-8 w-8 p-0 text-destructive hover:text-destructive"
-              title={identity.isDefault ? 'Cannot delete default' : 'Delete'}
+              title={identity.isDefault ? $_('identity.cannotDeleteDefaultTitle') : $_('common.delete')}
             >
               {#if deletingId === identity.id}
                 <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
@@ -230,8 +231,7 @@
   {/if}
 
   <p class="text-xs text-muted-foreground">
-    Click the circle to set an email address as the default for new messages.
-    The default address cannot be deleted.
+    {$_('identity.defaultHelp')}
   </p>
 </div>
 
