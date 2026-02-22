@@ -431,6 +431,12 @@ func (a *App) MoveToFolder(messageIDs []string, destFolderID string) error {
 			if err := a.SyncFolder(accountID, destFolderID); err != nil && err != context.Canceled {
 				log.Warn().Err(err).Str("destFolderID", destFolderID).Msg("Failed to sync destination folder after move")
 			}
+
+			// Clean up temporary negative-UID rows left by MoveMessages.
+			// The sync above fetched the real messages with correct UIDs.
+			if err := a.messageStore.DeleteTempUIDs(destFolderID); err != nil {
+				log.Warn().Err(err).Str("destFolderID", destFolderID).Msg("Failed to clean up temp UIDs after move")
+			}
 		}
 	}()
 

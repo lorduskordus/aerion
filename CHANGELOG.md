@@ -1,5 +1,11 @@
 # CHANGELOG
 
+**v0.1.26 - 02-22-2026**
+---
+
+- Fixed delete silently failing on proton and other generic providers - [#31](https://github.com/hkdb/aerion/issues/31)
+
+
 **v0.1.25 - 02-21-2026**
 ---
 

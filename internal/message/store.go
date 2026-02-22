@@ -736,7 +736,7 @@ func (s *Store) DeleteByFolder(folderID string) error {
 
 // GetAllUIDs returns all UIDs for a folder
 func (s *Store) GetAllUIDs(folderID string) ([]uint32, error) {
-	rows, err := s.db.Query("SELECT uid FROM messages WHERE folder_id = ?", folderID)
+	rows, err := s.db.Query("SELECT uid FROM messages WHERE folder_id = ? AND uid > 0", folderID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query UIDs: %w", err)
 	}
@@ -1755,13 +1755,23 @@ func (s *Store) MoveMessages(ids []string, newFolderID string) error {
 	}
 
 	query := fmt.Sprintf(
-		"UPDATE OR IGNORE messages SET folder_id = ? WHERE id IN (%s)",
+		"UPDATE messages SET folder_id = ?, uid = -rowid WHERE id IN (%s)",
 		strings.Join(placeholders, ", "),
 	)
 
 	_, err := s.db.Exec(query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to move messages: %w", err)
+	}
+	return nil
+}
+
+// DeleteTempUIDs removes messages with temporary negative UIDs in a folder.
+// These are left over after MoveMessages assigns -rowid as a placeholder UID.
+func (s *Store) DeleteTempUIDs(folderID string) error {
+	_, err := s.db.Exec("DELETE FROM messages WHERE folder_id = ? AND uid < 0", folderID)
+	if err != nil {
+		return fmt.Errorf("failed to delete temp UID messages: %w", err)
 	}
 	return nil
 }
