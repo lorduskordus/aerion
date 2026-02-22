@@ -75,50 +75,8 @@ Although Linux is a first-class citizen here, it should also work on:
 ### 🚀 Installation
 ---
 
-Download from the release page:
-- Linux: Binary Tarball (Flatpak coming soon)
-- MacOS: .app
-- Windows: .exe
+- [Official Installation Guide](https://aerion.3df.io/docs/getting-started/installation/)
 
-For Linux ~
-
-1. Install dependency if it's not already on your system:
-
-Debian/Ubuntu:
-
-```bash
-
-sudo apt install libwebkit2gtk-4.1-0
-```
-Fedora:
-
-```bash
-sudo dnf install webkit2gtk4.1
-```
-Arch Linux:
-
-```bash
-sudo pacman -S webkit2gtk-4.1
-```
-
-2. Download the latest tarball for:
-
-- [amd64](https://github.com/hkdb/aerion/releases/latest/download/aerion-linux-amd64.tar.gz)
-- [arm64](https://github.com/hkdb/aerion/releases/latest/download/aerion-linux-arm64.tar.gz)
-
-3. Untar and install:
-
-```bash
-tar -xzvf aerion-linux-*.tar.gz
-cd aerion-linux-<arch>
-./install.sh
-# This install script will give you a choice to install it system-wide or just for the user.
-# Follow the prompts and complete the installation.
-```
-
-For more information, check the [Installation Section](https://aerion.3df.io/docs/getting-started/installation/) of the official documentation.
-
-**Note:** AppImage support has been removed due to webkit bundling incompatibilities. See `archive/AppImage/README.md` for technical details.
 
 ### 📖 Documentation
 ---
