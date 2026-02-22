@@ -59,6 +59,17 @@ body:
     validations:
       required: true
 
+  - type: input
+    id: version
+    attributes:
+      label: Aerion Version
+      description: "Find out what version you are running from Aerion at ⚙️ (settings) --> About."
+      placeholder: e.g. v0.1.25
+    validations:
+      required: true
+      pattern: "^(v|0)\\d*\\.\\d+\\.\\d+"
+      validation_message: "Version must start with 'v' or '0' and follow the format (e.g. v0.1.25 or 0.1.25)"
+
   - type: textarea
     id: description
     attributes:
