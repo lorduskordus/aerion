@@ -33,7 +33,7 @@ func (m *windowsAutostartManager) Enable() error {
 	defer key.Close()
 
 	execPath := m.execCommand()
-	value := fmt.Sprintf(`"%s" --start-hidden`, execPath)
+	value := fmt.Sprintf(`"%s"`, execPath)
 
 	if err := key.SetStringValue(registryValue, value); err != nil {
 		return fmt.Errorf("failed to set registry value: %w", err)

@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/hkdb/aerion/internal/smime"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -42,6 +43,11 @@ func (a *App) ImportSMIMECertificateFromPath(accountID, filePath, password strin
 	}
 
 	cert.AccountID = accountID
+
+	// Validate that the cert email matches the account or one of its aliases
+	if err := a.validateCertEmailForAccount(accountID, cert.Email); err != nil {
+		return nil, err
+	}
 
 	// Check if this is the first cert for this account (make it default)
 	existing, err := a.smimeStore.ListCertificates(accountID)
@@ -154,6 +160,16 @@ func (a *App) HasSMIMECertificate(accountID string) bool {
 	return err == nil && cert != nil && !cert.IsExpired
 }
 
+// GetSMIMECertificateForEmail returns the S/MIME certificate matching the given email.
+// Returns nil if no matching certificate is found.
+func (a *App) GetSMIMECertificateForEmail(accountID, email string) (*smime.Certificate, error) {
+	cert, _, err := a.smimeStore.GetCertificateByEmail(accountID, email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get certificate for email: %w", err)
+	}
+	return cert, nil
+}
+
 // shouldSignMessage determines whether a message should be S/MIME signed
 func (a *App) shouldSignMessage(accountID string, perMessageOverride bool) bool {
 	if perMessageOverride {
@@ -252,4 +268,36 @@ func (a *App) ImportRecipientCert(email, filePath string) error {
 	}
 
 	return a.smimeStore.ImportSenderCertFromFile(email, data)
+}
+
+// validateCertEmailForAccount checks that the given email matches the account email
+// or one of its identity aliases. Returns an error if no match is found.
+func (a *App) validateCertEmailForAccount(accountID, certEmail string) error {
+	if certEmail == "" {
+		return nil // No email to validate
+	}
+
+	certEmailLower := strings.ToLower(strings.TrimSpace(certEmail))
+
+	// Check account email
+	acc, err := a.accountStore.Get(accountID)
+	if err != nil {
+		return fmt.Errorf("failed to get account: %w", err)
+	}
+	if acc != nil && strings.ToLower(strings.TrimSpace(acc.Email)) == certEmailLower {
+		return nil
+	}
+
+	// Check identity emails
+	identities, err := a.accountStore.GetIdentities(accountID)
+	if err != nil {
+		return fmt.Errorf("failed to get identities: %w", err)
+	}
+	for _, id := range identities {
+		if strings.ToLower(strings.TrimSpace(id.Email)) == certEmailLower {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("certificate email %q does not match this account or any of its aliases", certEmail)
 }

@@ -4,6 +4,8 @@ import {account} from '../models';
 import {app} from '../models';
 import {smtp} from '../models';
 import {message} from '../models';
+import {pgp} from '../models';
+import {smime} from '../models';
 import {draft} from '../models';
 import {contact} from '../models';
 import {context} from '../models';
@@ -28,7 +30,11 @@ export function GetOriginalMessage():Promise<message.Message>;
 
 export function GetPGPEncryptPolicy():Promise<string>;
 
+export function GetPGPKeyForEmail(arg1:string):Promise<pgp.Key>;
+
 export function GetPGPSignPolicy():Promise<string>;
+
+export function GetSMIMECertificateForEmail(arg1:string):Promise<smime.Certificate>;
 
 export function GetSMIMEEncryptPolicy():Promise<string>;
 

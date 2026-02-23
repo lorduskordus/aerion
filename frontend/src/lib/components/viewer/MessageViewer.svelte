@@ -71,8 +71,8 @@ import { _ } from '$lib/i18n'
         fetchBodyOnDemand(id)
       }
     } catch (err) {
-      error = err instanceof Error ? err.message : String(err)
       console.error('Failed to load message:', err)
+      error = $_('viewer.failedToLoadMessage')
     } finally {
       loading = false
     }

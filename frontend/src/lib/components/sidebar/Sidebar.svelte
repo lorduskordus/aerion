@@ -9,7 +9,7 @@
   import { Button } from '$lib/components/ui/button'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { contactSourcesStore } from '$lib/stores/contactSources.svelte'
-  import { isAccountExpanded, setAccountExpanded, isUnifiedInboxExpanded, getUIStateVersion } from '$lib/stores/uiState.svelte'
+  import { isAccountExpanded, setAccountExpanded, isUnifiedInboxExpanded, isFolderCollapsed, setFolderCollapsed, getUIState, getUIStateVersion, saveUIState } from '$lib/stores/uiState.svelte'
   import { setFocusedPane } from '$lib/stores/keyboard.svelte'
   import { _ } from '$lib/i18n'
   // @ts-ignore - wailsjs path
@@ -57,6 +57,52 @@
     const newValue = !expandedAccounts[accountId]
     expandedAccounts[accountId] = newValue
     setAccountExpanded(accountId, newValue)
+  }
+
+  // Track collapsed state for folders with children (reactive, synced with persisted state)
+  let collapsedFolders = $state<Record<string, boolean>>({})
+
+  // Initialize collapsed state from persisted storage and prune stale entries
+  $effect(() => {
+    const _version = getUIStateVersion()
+
+    // Collect all folder IDs that exist in current accounts
+    const allFolderIds = new Set<string>()
+    const collectIds = (trees: folder.FolderTree[]) => {
+      for (const tree of trees) {
+        if (tree.folder) allFolderIds.add(tree.folder.id)
+        if (tree.children) collectIds(tree.children)
+      }
+    }
+    for (const acc of accountStore.accounts) {
+      collectIds(acc.folders || [])
+    }
+
+    // Read persisted collapsed state, keep only entries for existing folders
+    const persisted = getUIState().collapsedFolders
+    const newCollapsed: Record<string, boolean> = {}
+    let hasStale = false
+    for (const folderId of Object.keys(persisted)) {
+      if (allFolderIds.has(folderId)) {
+        newCollapsed[folderId] = persisted[folderId]
+      } else {
+        hasStale = true
+      }
+    }
+    collapsedFolders = newCollapsed
+
+    // Persist cleaned state if stale entries were pruned
+    if (hasStale) {
+      saveUIState({ collapsedFolders: newCollapsed })
+    }
+  })
+
+  // Toggle folder collapse
+  function toggleFolderCollapsed(folderId: string) {
+    const isCurrentlyCollapsed = collapsedFolders[folderId] !== false
+    const newValue = !isCurrentlyCollapsed
+    collapsedFolders = { ...collapsedFolders, [folderId]: newValue }
+    setFolderCollapsed(folderId, newValue)
   }
 
   interface Props {
@@ -295,7 +341,8 @@
                 folderType: tree.folder.type,
               })
             }
-            if (tree.children && tree.children.length > 0) {
+            // Skip children of collapsed folders
+            if (tree.children && tree.children.length > 0 && tree.folder && collapsedFolders[tree.folder.id] === false) {
               flattenFolders(tree.children)
             }
           }
@@ -419,6 +466,40 @@
   export function hasFocusedAccount(): boolean {
     return focusedAccountId !== null
   }
+
+  // Check if the currently selected folder has children
+  export function hasSelectedFolderWithChildren(): boolean {
+    if (!selectedFolderId || selectionSource !== 'account') return false
+    return folderHasChildren(selectedFolderId)
+  }
+
+  // Toggle collapse for the currently selected folder
+  export function toggleSelectedFolderCollapse(): void {
+    if (!selectedFolderId || selectionSource !== 'account') return
+    if (!folderHasChildren(selectedFolderId)) return
+    toggleFolderCollapsed(selectedFolderId)
+  }
+
+  // Check if a folder has children by searching the account folder trees
+  function folderHasChildren(folderId: string): boolean {
+    for (const acc of accountStore.accounts) {
+      const found = findTreeNode(acc.folders || [], folderId)
+      if (found) return (found.children && found.children.length > 0) || false
+    }
+    return false
+  }
+
+  // Find a FolderTree node by folder ID
+  function findTreeNode(trees: folder.FolderTree[], folderId: string): folder.FolderTree | null {
+    for (const tree of trees) {
+      if (tree.folder?.id === folderId) return tree
+      if (tree.children) {
+        const found = findTreeNode(tree.children, folderId)
+        if (found) return found
+      }
+    }
+    return null
+  }
 </script>
 
 <div class="flex flex-col h-full {isFlashing ? 'pane-focus-flash' : ''}">
@@ -492,8 +573,10 @@
           isExpanded={expandedAccounts[accWithFolders.account.id] ?? true}
           syncProgress={accountStore.getSyncProgress(accWithFolders.account.id)}
           syncError={accountStore.getSyncError(accWithFolders.account.id)}
+          {collapsedFolders}
           onFolderSelect={handleFolderSelect}
           onToggleExpanded={() => toggleAccountExpanded(accWithFolders.account.id)}
+          onToggleFolderCollapse={toggleFolderCollapsed}
           onEdit={() => openEditAccount(accWithFolders.account)}
           onDelete={() => openDeleteAccount(accWithFolders.account)}
           onSync={() => {

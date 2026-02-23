@@ -154,6 +154,42 @@ func (s *Store) SetDefaultKey(accountID, keyID string) error {
 	return tx.Commit()
 }
 
+// GetKeyByEmail returns the key matching a specific email for an account.
+// Returns nil (not an error) if no matching key exists.
+func (s *Store) GetKeyByEmail(accountID, email string) (*Key, string, error) {
+	key := &Key{}
+	var publicKeyArmored string
+	var createdAtKey, expiresAtKey sql.NullTime
+
+	err := s.db.QueryRow(`
+		SELECT id, account_id, email, key_id, fingerprint, user_id,
+			algorithm, key_size, created_at_key, expires_at_key, public_key_armored,
+			is_default, created_at
+		FROM pgp_keys
+		WHERE account_id = ? AND LOWER(email) = LOWER(?)`, accountID, email,
+	).Scan(
+		&key.ID, &key.AccountID, &key.Email, &key.KeyID, &key.Fingerprint, &key.UserID,
+		&key.Algorithm, &key.KeySize, &createdAtKey, &expiresAtKey,
+		&publicKeyArmored, &key.IsDefault, &key.CreatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, "", nil
+	}
+	if err != nil {
+		return nil, "", err
+	}
+
+	if createdAtKey.Valid {
+		key.CreatedAtKey = &createdAtKey.Time
+	}
+	if expiresAtKey.Valid {
+		key.ExpiresAtKey = &expiresAtKey.Time
+		key.IsExpired = time.Now().After(expiresAtKey.Time)
+	}
+
+	return key, publicKeyArmored, nil
+}
+
 // GetDefaultKey returns the default signing key for an account
 func (s *Store) GetDefaultKey(accountID string) (*Key, string, error) {
 	key := &Key{}

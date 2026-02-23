@@ -42,8 +42,16 @@ export function GetPGPEncryptPolicy() {
   return window['go']['app']['ComposerApp']['GetPGPEncryptPolicy']();
 }
 
+export function GetPGPKeyForEmail(arg1) {
+  return window['go']['app']['ComposerApp']['GetPGPKeyForEmail'](arg1);
+}
+
 export function GetPGPSignPolicy() {
   return window['go']['app']['ComposerApp']['GetPGPSignPolicy']();
+}
+
+export function GetSMIMECertificateForEmail(arg1) {
+  return window['go']['app']['ComposerApp']['GetSMIMECertificateForEmail'](arg1);
 }
 
 export function GetSMIMEEncryptPolicy() {

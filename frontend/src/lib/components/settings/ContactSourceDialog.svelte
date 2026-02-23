@@ -157,7 +157,8 @@
       // Listen for OAuth error
       EventsOn('contact-source-oauth:error', (data: { error: string }) => {
         oauthInProgress = false
-        addToast({ type: 'error', message: $_('toast.oauthFailed', { values: { error: data.error } }) })
+        console.error('OAuth failed:', data.error)
+        addToast({ type: 'error', message: $_('toast.oauthFailed') })
       })
 
       // Listen for OAuth cancelled
@@ -220,7 +221,7 @@
       }
     } catch (err) {
       console.error('Discovery failed:', err)
-      discoveryError = $_('contactSource.discoveryFailed', { values: { error: String(err) } })
+      discoveryError = $_('contactSource.discoveryFailed')
     } finally {
       discovering = false
     }
@@ -242,7 +243,8 @@
       await contactSourcesStore.startOAuthFlow(sourceType)
     } catch (err) {
       oauthInProgress = false
-      addToast({ type: 'error', message: $_('toast.failedToStartOAuth', { values: { error: String(err) } }) })
+      console.error('Failed to start OAuth:', err)
+      addToast({ type: 'error', message: $_('toast.failedToStartOAuth') })
     }
   }
 
@@ -319,7 +321,7 @@
       onClose?.()
     } catch (err) {
       console.error('Failed to save:', err)
-      addToast({ type: 'error', message: $_('toast.failedToSave', { values: { error: String(err) } }) })
+      addToast({ type: 'error', message: $_('toast.failedToSave') })
     } finally {
       saving = false
     }

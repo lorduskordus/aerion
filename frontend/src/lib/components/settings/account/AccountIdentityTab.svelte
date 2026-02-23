@@ -93,7 +93,7 @@
       console.error('Failed to delete identity:', err)
       addToast({
         type: 'error',
-        message: err instanceof Error ? err.message : $_('identity.failedToDeleteAddress'),
+        message: $_('toast.failedToDeleteIdentity'),
       })
     } finally {
       deletingId = null

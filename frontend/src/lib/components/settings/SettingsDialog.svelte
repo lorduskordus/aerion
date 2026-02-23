@@ -121,7 +121,7 @@
       console.error('Failed to save settings:', err)
       addToast({
         type: 'error',
-        message: $_('toast.failedToSaveSettings', { values: { error: String(err) } }),
+        message: $_('toast.failedToSaveSettings'),
       })
     } finally {
       saving = false

@@ -1,5 +1,17 @@
 # CHANGELOG
 
+**v0.1.27 - 02-23-2026**
+---
+
+- Made IMAP folders with sub-folders collapsible
+- Identity aware PGP and S/MIME
+- Improved guard rails for PGP and S/MIME import, sign, encrypt, and decrypt
+- Added multi-language support for missing dynamic message translations
+- Proper flatpak implementation of autostart on login - [#33](https://github.com/hkdb/aerion/issues/33)
+- Fixed nested IMAP folders fetching - [#34](https://github.com/hkdb/aerion/issues/34)
+- Fixed empty or encrypted body preview in message list
+
+
 **v0.1.26 - 02-22-2026**
 ---
 

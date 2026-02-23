@@ -17,6 +17,8 @@ import {
 } from '../../../wailsjs/go/app/App'
 // @ts-ignore - wailsjs runtime
 import { EventsOn, EventsOff } from '../../../wailsjs/runtime/runtime'
+import { get } from 'svelte/store'
+import { _ } from '$lib/i18n'
 import { addToast } from './toast'
 
 export type OAuthFlowState = 'idle' | 'pending' | 'success' | 'error' | 'cancelled'
@@ -104,7 +106,7 @@ class OAuthStore {
       // Show toast notification to user
       addToast({
         type: 'error',
-        message: `${accountName}: OAuth token expired. Please re-authorize in account settings.`,
+        message: get(_)('toast.oauthExpired', { values: { name: accountName } }),
         duration: 10000, // Show for 10 seconds
       })
     })

@@ -27,10 +27,17 @@ func NewSigner(store *Store, credStore *credentials.Store, log zerolog.Logger) *
 	}
 }
 
-// SignMessage wraps a raw RFC 822 message in a PGP/MIME multipart/signed structure
-func (s *Signer) SignMessage(accountID string, rawMsg []byte) ([]byte, error) {
-	// Get the default key for this account
-	key, _, err := s.store.GetDefaultKey(accountID)
+// SignMessage wraps a raw RFC 822 message in a PGP/MIME multipart/signed structure.
+// fromEmail selects the key matching the sender identity; falls back to the account default.
+func (s *Signer) SignMessage(accountID, fromEmail string, rawMsg []byte) ([]byte, error) {
+	// Try identity-specific key first, fall back to account default
+	key, _, err := s.store.GetKeyByEmail(accountID, fromEmail)
+	if err != nil {
+		return nil, fmt.Errorf("failed to look up PGP key for %s: %w", fromEmail, err)
+	}
+	if key == nil {
+		key, _, err = s.store.GetDefaultKey(accountID)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("no default PGP key for account: %w", err)
 	}

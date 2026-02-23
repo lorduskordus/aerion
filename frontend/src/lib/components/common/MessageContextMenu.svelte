@@ -130,7 +130,8 @@
       const description = await Undo()
       toasts.success($_('toast.undone', { values: { description } }))
     } catch (err) {
-      toasts.error($_('toast.undoFailed', { values: { error: String(err) } }))
+      console.error('Undo failed:', err)
+      toasts.error($_('toast.undoFailed'))
     }
   }
 
@@ -159,7 +160,8 @@
       toasts.success($_('toast.archived'), [{ label: $_('common.undo'), onClick: handleUndo }])
       onActionComplete?.(true)
     } catch (err) {
-      toasts.error($_('toast.failedToArchive', { values: { error: String(err) } }))
+      console.error('Archive failed:', err)
+      toasts.error($_('toast.failedToArchive'))
     }
   }
 
@@ -172,7 +174,8 @@
         toasts.success($_('toast.movedToTrash'), [{ label: $_('common.undo'), onClick: handleUndo }])
         onActionComplete?.(true)
       } catch (err) {
-        toasts.error($_('toast.failedToDelete', { values: { error: String(err) } }))
+        console.error('Delete failed:', err)
+        toasts.error($_('toast.failedToDelete'))
       }
     }
   }
@@ -184,7 +187,8 @@
       showDeleteConfirm = false
       onActionComplete?.(true)
     } catch (err) {
-      toasts.error($_('toast.failedToDelete', { values: { error: String(err) } }))
+      console.error('Permanent delete failed:', err)
+      toasts.error($_('toast.failedToDelete'))
       showDeleteConfirm = false
     }
   }
@@ -202,7 +206,8 @@
       }
       onActionComplete?.(true)
     } catch (err) {
-      toasts.error($_(isSpamFolder ? 'toast.failedToMarkAsNotSpam' : 'toast.failedToMarkAsSpam', { values: { error: String(err) } }))
+      console.error('Spam toggle failed:', err)
+      toasts.error($_(isSpamFolder ? 'toast.failedToMarkAsNotSpam' : 'toast.failedToMarkAsSpam'))
     }
   }
 
@@ -217,7 +222,8 @@
       }
       onActionComplete?.()
     } catch (err) {
-      toasts.error($_('toast.failedToUpdateStar', { values: { error: String(err) } }))
+      console.error('Star toggle failed:', err)
+      toasts.error($_('toast.failedToUpdateStar'))
     }
   }
 
@@ -232,7 +238,8 @@
       }
       onActionComplete?.()
     } catch (err) {
-      toasts.error($_('toast.failedToUpdateReadStatus', { values: { error: String(err) } }))
+      console.error('Read status toggle failed:', err)
+      toasts.error($_('toast.failedToUpdateReadStatus'))
     }
   }
 
@@ -242,7 +249,8 @@
       toasts.success($_('toast.movedTo', { values: { folder: folderName } }), [{ label: $_('common.undo'), onClick: handleUndo }])
       onActionComplete?.(true)
     } catch (err) {
-      toasts.error($_('toast.failedToMove', { values: { error: String(err) } }))
+      console.error('Move failed:', err)
+      toasts.error($_('toast.failedToMove'))
     }
   }
 
@@ -252,7 +260,8 @@
       toasts.success($_('toast.copyingTo', { values: { folder: folderName } }))
       // Note: CopyToFolder syncs in background and emits messages:copied event
     } catch (err) {
-      toasts.error($_('toast.failedToCopy', { values: { error: String(err) } }))
+      console.error('Copy failed:', err)
+      toasts.error($_('toast.failedToCopy'))
     }
   }
 </script>

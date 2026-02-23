@@ -364,9 +364,17 @@
         <p class="truncate {densityClasses.text[density]} text-muted-foreground">
           {@html highlightedSnippet}
         </p>
-      {:else}
+      {:else if conversation.snippet}
         <p class="truncate {densityClasses.text[density]} text-muted-foreground">
-          {conversation.snippet || ''}
+          {conversation.snippet}
+        </p>
+      {:else if conversation.isEncrypted}
+        <p class="truncate {densityClasses.text[density]} text-muted-foreground italic">
+          {$_('messageList.encryptedContent')}
+        </p>
+      {:else}
+        <p class="truncate {densityClasses.text[density]} text-muted-foreground italic">
+          {$_('messageList.noContent')}
         </p>
       {/if}
     </div>

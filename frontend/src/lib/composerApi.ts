@@ -10,7 +10,7 @@
  */
 
 // @ts-ignore - Wails generated imports
-import { smtp, account, contact, app, draft } from '../../wailsjs/go/models'
+import { smtp, account, contact, app, draft, smime, pgp } from '../../wailsjs/go/models'
 
 /**
  * Interface for composer API operations.
@@ -41,6 +41,9 @@ export interface ComposerApi {
   /** Check if account has a valid default S/MIME certificate */
   hasSMIMECertificate: (accountId: string) => Promise<boolean>
 
+  /** Get the S/MIME certificate matching a specific email (for identity-aware bar visibility) */
+  getSMIMECertificateForEmail: (accountId: string, email: string) => Promise<smime.Certificate | null>
+
   /** Get the S/MIME signing policy for an account */
   getSMIMESignPolicy: (accountId: string) => Promise<string>
 
@@ -58,6 +61,9 @@ export interface ComposerApi {
 
   /** Check if account has a valid default PGP key */
   hasPGPKey: (accountId: string) => Promise<boolean>
+
+  /** Get the PGP key matching a specific email (for identity-aware bar visibility) */
+  getPGPKeyForEmail: (accountId: string, email: string) => Promise<pgp.Key | null>
 
   /** Get the PGP signing policy for an account */
   getPGPSignPolicy: (accountId: string) => Promise<string>
@@ -145,6 +151,11 @@ export function createMainWindowApi(): ComposerApi {
       return HasSMIMECertificate(accountId)
     },
 
+    getSMIMECertificateForEmail: async (accountId: string, email: string) => {
+      const { GetSMIMECertificateForEmail } = await import('../../wailsjs/go/app/App.js')
+      return GetSMIMECertificateForEmail(accountId, email)
+    },
+
     getSMIMESignPolicy: async (accountId: string) => {
       const { GetSMIMESignPolicy } = await import('../../wailsjs/go/app/App.js')
       return GetSMIMESignPolicy(accountId)
@@ -173,6 +184,11 @@ export function createMainWindowApi(): ComposerApi {
     hasPGPKey: async (accountId: string) => {
       const { HasPGPKey } = await import('../../wailsjs/go/app/App.js')
       return HasPGPKey(accountId)
+    },
+
+    getPGPKeyForEmail: async (accountId: string, email: string) => {
+      const { GetPGPKeyForEmail } = await import('../../wailsjs/go/app/App.js')
+      return GetPGPKeyForEmail(accountId, email)
     },
 
     getPGPSignPolicy: async (accountId: string) => {
@@ -276,6 +292,11 @@ export function createComposerWindowApi(accountId: string): ComposerApi {
       return HasSMIMECertificate()
     },
 
+    getSMIMECertificateForEmail: async (_accountId: string, email: string) => {
+      const { GetSMIMECertificateForEmail } = await import('../../wailsjs/go/app/ComposerApp.js')
+      return GetSMIMECertificateForEmail(email)
+    },
+
     getSMIMESignPolicy: async (_accountId: string) => {
       const { GetSMIMESignPolicy } = await import('../../wailsjs/go/app/ComposerApp.js')
       // ComposerApp.GetSMIMESignPolicy doesn't take accountId (it's set in config)
@@ -305,6 +326,11 @@ export function createComposerWindowApi(accountId: string): ComposerApi {
     hasPGPKey: async (_accountId: string) => {
       const { HasPGPKey } = await import('../../wailsjs/go/app/ComposerApp.js')
       return HasPGPKey()
+    },
+
+    getPGPKeyForEmail: async (_accountId: string, email: string) => {
+      const { GetPGPKeyForEmail } = await import('../../wailsjs/go/app/ComposerApp.js')
+      return GetPGPKeyForEmail(email)
     },
 
     getPGPSignPolicy: async (_accountId: string) => {

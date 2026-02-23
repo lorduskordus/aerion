@@ -154,9 +154,6 @@ type App struct {
 	// Autostart manager
 	autostartMgr platform.AutostartManager
 
-	// Start hidden flag (set by main from --start-hidden CLI flag)
-	StartHiddenFlag bool
-
 	// Window hidden state (background mode)
 	windowHidden bool
 }

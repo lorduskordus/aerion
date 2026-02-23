@@ -10,7 +10,7 @@
 
 .PHONY: all build build-linux dev generate clean test lint help \
         install uninstall install-linux uninstall-linux \
-        install-darwin uninstall-darwin build-windows-installer flatpak
+        install-darwin uninstall-darwin build-windows-installer flatpak flatpak-dev
 
 # Load environment variables from .env files
 # .env.local takes precedence over .env
@@ -67,6 +67,11 @@ build-linux:
 flatpak:
 	@echo "Building Flatpak..."
 	./build/flatpak/build-local.sh
+
+# Build Flatpak from local source (for development/testing)
+flatpak-dev:
+	@echo "Building Flatpak from local source..."
+	./build/flatpak/build-flatpak.sh
 
 # Run in development mode with hot reload
 dev:
@@ -212,6 +217,7 @@ help:
 	@echo "  make build        - Build production binary"
 	@echo "  make build-linux  - Build for Linux with production tags"
 	@echo "  make flatpak      - Build Flatpak package (recommended for Linux)"
+	@echo "  make flatpak-dev  - Build Flatpak from local source (for testing)"
 	@echo "  make dev          - Run in development mode with hot reload"
 	@echo "  make generate     - Generate Wails TypeScript bindings"
 	@echo ""

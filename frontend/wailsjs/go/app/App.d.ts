@@ -12,9 +12,9 @@ import {smtp} from '../models';
 import {imap} from '../models';
 import {settings} from '../models';
 import {pgp} from '../models';
+import {smime} from '../models';
 import {appstate} from '../models';
 import {sync} from '../models';
-import {smime} from '../models';
 import {draft} from '../models';
 
 export function AcceptCertificate(arg1:string,arg2:certificate.CertificateInfo,arg3:boolean):Promise<void>;
@@ -181,6 +181,8 @@ export function GetOAuthStatus(arg1:string):Promise<app.OAuthStatus>;
 
 export function GetPGPEncryptPolicy(arg1:string):Promise<string>;
 
+export function GetPGPKeyForEmail(arg1:string,arg2:string):Promise<pgp.Key>;
+
 export function GetPGPKeyServers():Promise<Array<pgp.KeyServer>>;
 
 export function GetPGPSignPolicy(arg1:string):Promise<string>;
@@ -190,6 +192,8 @@ export function GetPendingMailto():Promise<app.MailtoData>;
 export function GetReadReceiptResponsePolicy():Promise<string>;
 
 export function GetRunBackground():Promise<boolean>;
+
+export function GetSMIMECertificateForEmail(arg1:string,arg2:string):Promise<smime.Certificate>;
 
 export function GetSMIMEEncryptPolicy(arg1:string):Promise<string>;
 

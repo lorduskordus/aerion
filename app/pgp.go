@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/hkdb/aerion/internal/pgp"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -42,6 +43,11 @@ func (a *App) ImportPGPKeyFromPath(accountID, filePath, passphrase string) (*pgp
 	}
 
 	key.AccountID = accountID
+
+	// Validate that the key email matches the account or one of its aliases
+	if err := a.validateKeyEmailForAccount(accountID, key.Email); err != nil {
+		return nil, err
+	}
 
 	// Check if this is the first key for this account (make it default)
 	existing, err := a.pgpStore.ListKeys(accountID)
@@ -161,6 +167,16 @@ func (a *App) DeletePGPSenderKey(keyID string) error {
 func (a *App) HasPGPKey(accountID string) bool {
 	key, _, err := a.pgpStore.GetDefaultKey(accountID)
 	return err == nil && key != nil && !key.IsExpired
+}
+
+// GetPGPKeyForEmail returns the PGP key matching the given email.
+// Returns nil if no matching key is found.
+func (a *App) GetPGPKeyForEmail(accountID, email string) (*pgp.Key, error) {
+	key, _, err := a.pgpStore.GetKeyByEmail(accountID, email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get key for email: %w", err)
+	}
+	return key, nil
 }
 
 // shouldPGPSignMessage determines whether a message should be PGP signed
@@ -333,4 +349,36 @@ func (a *App) AddPGPKeyServer(url string) error {
 // RemovePGPKeyServer removes a key server by ID
 func (a *App) RemovePGPKeyServer(id int) error {
 	return a.pgpStore.RemoveKeyServer(id)
+}
+
+// validateKeyEmailForAccount checks that the given email matches the account email
+// or one of its identity aliases. Returns an error if no match is found.
+func (a *App) validateKeyEmailForAccount(accountID, keyEmail string) error {
+	if keyEmail == "" {
+		return nil // No email to validate
+	}
+
+	keyEmailLower := strings.ToLower(strings.TrimSpace(keyEmail))
+
+	// Check account email
+	acc, err := a.accountStore.Get(accountID)
+	if err != nil {
+		return fmt.Errorf("failed to get account: %w", err)
+	}
+	if acc != nil && strings.ToLower(strings.TrimSpace(acc.Email)) == keyEmailLower {
+		return nil
+	}
+
+	// Check identity emails
+	identities, err := a.accountStore.GetIdentities(accountID)
+	if err != nil {
+		return fmt.Errorf("failed to get identities: %w", err)
+	}
+	for _, id := range identities {
+		if strings.ToLower(strings.TrimSpace(id.Email)) == keyEmailLower {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("key email %q does not match this account or any of its aliases", keyEmail)
 }

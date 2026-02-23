@@ -19,6 +19,7 @@ export interface UIState {
   // Sidebar section expand/collapse states
   expandedAccounts: Record<string, boolean>  // accountId -> isExpanded (default: true)
   unifiedInboxExpanded: boolean              // Unified Inbox section (default: true)
+  collapsedFolders: Record<string, boolean>  // folderId -> isCollapsed (default: true/collapsed, false = explicitly expanded)
 }
 
 // Pane width constraints
@@ -40,6 +41,7 @@ const defaultState: UIState = {
   listWidth: 420,
   expandedAccounts: {},
   unifiedInboxExpanded: true,
+  collapsedFolders: {},
 }
 
 // Current state (in-memory cache)
@@ -75,6 +77,7 @@ export async function loadUIState(): Promise<UIState> {
         // Sidebar expand/collapse states
         expandedAccounts: state.expandedAccounts || {},
         unifiedInboxExpanded: state.unifiedInboxExpanded !== false, // default true
+        collapsedFolders: state.collapsedFolders || {},
       }
     }
   } catch (err) {
@@ -122,6 +125,7 @@ export function saveUIState(updates: Partial<UIState>): void {
         listWidth: currentState.listWidth,
         expandedAccounts: currentState.expandedAccounts,
         unifiedInboxExpanded: currentState.unifiedInboxExpanded,
+        collapsedFolders: currentState.collapsedFolders,
       }
       await SaveUIState(backendState)
     } catch (err) {
@@ -149,6 +153,17 @@ export function isUnifiedInboxExpanded(): boolean {
 // Helper to set unified inbox expanded state
 export function setUnifiedInboxExpanded(expanded: boolean): void {
   saveUIState({ unifiedInboxExpanded: expanded })
+}
+
+// Helper to check if a folder is collapsed (defaults to true/collapsed if not set)
+export function isFolderCollapsed(folderId: string): boolean {
+  return currentState.collapsedFolders[folderId] !== false
+}
+
+// Helper to set folder collapsed state
+export function setFolderCollapsed(folderId: string, collapsed: boolean): void {
+  const newCollapsedFolders = { ...currentState.collapsedFolders, [folderId]: collapsed }
+  saveUIState({ collapsedFolders: newCollapsedFolders })
 }
 
 // Get current state (synchronous)

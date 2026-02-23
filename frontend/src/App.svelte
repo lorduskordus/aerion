@@ -567,7 +567,7 @@
       console.error(`Failed to prepare ${mode}:`, err)
       addToast({
         type: 'error',
-        message: $_('toast.failedToPrepare', { values: { mode, error: String(err) } }),
+        message: $_('toast.failedToPrepare', { values: { mode } }),
       })
       // Fallback: open blank composer
       composerAccountId = accountId
@@ -881,10 +881,13 @@
           sidebarRef?.selectNextFolder()
           return
         case 'Enter':
-          // Toggle expand/collapse for focused account header
+          // Toggle expand/collapse for focused account header or selected folder with children
           if (sidebarRef?.hasFocusedAccount()) {
             e.preventDefault()
             sidebarRef.toggleFocusedAccount()
+          } else if (sidebarRef?.hasSelectedFolderWithChildren()) {
+            e.preventDefault()
+            sidebarRef.toggleSelectedFolderCollapse()
           }
           return
       }
@@ -967,6 +970,9 @@
         if (focusedPane === 'sidebar' && sidebarRef?.hasFocusedAccount()) {
           e.preventDefault()
           sidebarRef.toggleFocusedAccount()
+        } else if (focusedPane === 'sidebar' && sidebarRef?.hasSelectedFolderWithChildren()) {
+          e.preventDefault()
+          sidebarRef.toggleSelectedFolderCollapse()
         } else if (focusedPane === 'messageList') {
           e.preventDefault()
           messageListRef?.openSelected()
@@ -987,6 +993,8 @@
         e.preventDefault()
         if (focusedPane === 'sidebar' && sidebarRef?.hasFocusedAccount()) {
           sidebarRef.toggleFocusedAccount()
+        } else if (focusedPane === 'sidebar' && sidebarRef?.hasSelectedFolderWithChildren()) {
+          sidebarRef.toggleSelectedFolderCollapse()
         } else if (focusedPane === 'messageList') {
           messageListRef?.toggleCheck()
         }
@@ -1048,7 +1056,8 @@
       messageListRef?.clearChecked()
       messageListRef?.handleActionComplete(true)
     } catch (err) {
-      addToast({ type: 'error', message: $_('toast.failedToArchive', { values: { error: String(err) } }) })
+      console.error('Archive failed:', err)
+      addToast({ type: 'error', message: $_('toast.failedToArchive') })
     }
   }
 
@@ -1070,7 +1079,8 @@
       messageListRef?.handleActionComplete(true)
     } catch (err) {
       const isSpamFolder = selectedFolderType === 'spam'
-      addToast({ type: 'error', message: $_(isSpamFolder ? 'toast.failedToMarkAsNotSpam' : 'toast.failedToMarkAsSpam', { values: { error: String(err) } }) })
+      console.error('Spam toggle failed:', err)
+      addToast({ type: 'error', message: $_(isSpamFolder ? 'toast.failedToMarkAsNotSpam' : 'toast.failedToMarkAsSpam') })
     }
   }
 
@@ -1081,7 +1091,8 @@
       messageListRef?.clearChecked()
       messageListRef?.handleActionComplete()
     } catch (err) {
-      addToast({ type: 'error', message: $_('toast.failedToMarkAsRead', { values: { error: String(err) } }) })
+      console.error('Mark as read failed:', err)
+      addToast({ type: 'error', message: $_('toast.failedToMarkAsRead') })
     }
   }
 
@@ -1092,7 +1103,8 @@
       messageListRef?.clearChecked()
       messageListRef?.handleActionComplete()
     } catch (err) {
-      addToast({ type: 'error', message: $_('toast.failedToMarkAsUnread', { values: { error: String(err) } }) })
+      console.error('Mark as unread failed:', err)
+      addToast({ type: 'error', message: $_('toast.failedToMarkAsUnread') })
     }
   }
 
@@ -1108,7 +1120,8 @@
       messageListRef?.clearChecked()
       messageListRef?.handleActionComplete()
     } catch (err) {
-      addToast({ type: 'error', message: $_('toast.failedToUpdateStar', { values: { error: String(err) } }) })
+      console.error('Star toggle failed:', err)
+      addToast({ type: 'error', message: $_('toast.failedToUpdateStar') })
     }
   }
 
@@ -1118,7 +1131,8 @@
       addToast({ type: 'success', message: $_('toast.undone', { values: { description } }) })
       messageListRef?.handleActionComplete()
     } catch (err) {
-      addToast({ type: 'error', message: $_('toast.undoFailed', { values: { error: String(err) } }) })
+      console.error('Undo failed:', err)
+      addToast({ type: 'error', message: $_('toast.undoFailed') })
     }
   }
 </script>

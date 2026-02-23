@@ -166,7 +166,7 @@
       importPassword = ''
       await loadData()
     } catch (err) {
-      importError = err instanceof Error ? err.message : String(err)
+      importError = mapImportError(err, 'cert')
     } finally {
       importing = false
     }
@@ -185,10 +185,8 @@
       addToast({ type: 'success', message: $_('security.certRemoved') })
       await loadData()
     } catch (err) {
-      addToast({
-        type: 'error',
-        message: err instanceof Error ? err.message : $_('security.failedToRemoveCert'),
-      })
+      console.error('Failed to remove certificate:', err)
+      addToast({ type: 'error', message: $_('security.failedToRemoveCert') })
     }
   }
 
@@ -198,10 +196,8 @@
       addToast({ type: 'success', message: $_('security.defaultCertUpdated') })
       await loadData()
     } catch (err) {
-      addToast({
-        type: 'error',
-        message: err instanceof Error ? err.message : $_('security.failedToSetDefaultCert'),
-      })
+      console.error('Failed to set default certificate:', err)
+      addToast({ type: 'error', message: $_('security.failedToSetDefaultCert') })
     }
   }
 
@@ -210,10 +206,8 @@
       await SetSMIMESignPolicy(accountId, policy)
       signPolicy = policy
     } catch (err) {
-      addToast({
-        type: 'error',
-        message: err instanceof Error ? err.message : $_('security.failedToUpdateSignPolicy'),
-      })
+      console.error('Failed to update signing policy:', err)
+      addToast({ type: 'error', message: $_('security.failedToUpdateSignPolicy') })
     }
   }
 
@@ -222,10 +216,8 @@
       await SetSMIMEEncryptPolicy(accountId, policy)
       encryptPolicy = policy
     } catch (err) {
-      addToast({
-        type: 'error',
-        message: err instanceof Error ? err.message : $_('security.failedToUpdateEncryptPolicy'),
-      })
+      console.error('Failed to update encryption policy:', err)
+      addToast({ type: 'error', message: $_('security.failedToUpdateEncryptPolicy') })
     }
   }
 
@@ -257,7 +249,7 @@
       recipientImportEmail = ''
       await loadData()
     } catch (err) {
-      recipientImportError = err instanceof Error ? err.message : String(err)
+      recipientImportError = mapImportError(err, 'recipientCert')
     } finally {
       recipientImporting = false
     }
@@ -276,10 +268,8 @@
       addToast({ type: 'success', message: $_('security.senderCertRemoved') })
       await loadData()
     } catch (err) {
-      addToast({
-        type: 'error',
-        message: err instanceof Error ? err.message : $_('security.failedToRemoveSenderCert'),
-      })
+      console.error('Failed to remove sender certificate:', err)
+      addToast({ type: 'error', message: $_('security.failedToRemoveSenderCert') })
     }
   }
 
@@ -308,7 +298,7 @@
       pgpImportPassphrase = ''
       await loadData()
     } catch (err) {
-      pgpImportError = err instanceof Error ? err.message : String(err)
+      pgpImportError = mapImportError(err, 'key')
     } finally {
       pgpImporting = false
     }
@@ -327,7 +317,8 @@
       addToast({ type: 'success', message: $_('security.pgpKeyRemoved') })
       await loadData()
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : $_('security.failedToRemovePGPKey') })
+      console.error('Failed to remove PGP key:', err)
+      addToast({ type: 'error', message: $_('security.failedToRemovePGPKey') })
     }
   }
 
@@ -337,7 +328,8 @@
       addToast({ type: 'success', message: $_('security.defaultPGPKeyUpdated') })
       await loadData()
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : $_('security.failedToSetDefaultPGPKey') })
+      console.error('Failed to set default PGP key:', err)
+      addToast({ type: 'error', message: $_('security.failedToSetDefaultPGPKey') })
     }
   }
 
@@ -346,7 +338,8 @@
       await SetPGPSignPolicy(accountId, policy)
       pgpSignPolicy = policy
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : $_('security.failedToUpdatePGPSignPolicy') })
+      console.error('Failed to update PGP signing policy:', err)
+      addToast({ type: 'error', message: $_('security.failedToUpdatePGPSignPolicy') })
     }
   }
 
@@ -355,7 +348,8 @@
       await SetPGPEncryptPolicy(accountId, policy)
       pgpEncryptPolicy = policy
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : $_('security.failedToUpdatePGPEncryptPolicy') })
+      console.error('Failed to update PGP encryption policy:', err)
+      addToast({ type: 'error', message: $_('security.failedToUpdatePGPEncryptPolicy') })
     }
   }
 
@@ -386,7 +380,7 @@
       pgpRecipientImportEmail = ''
       await loadData()
     } catch (err) {
-      pgpRecipientImportError = err instanceof Error ? err.message : String(err)
+      pgpRecipientImportError = mapImportError(err, 'recipientKey')
     } finally {
       pgpRecipientImporting = false
     }
@@ -405,7 +399,8 @@
       addToast({ type: 'success', message: $_('security.recipientPGPKeyRemoved') })
       await loadData()
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : $_('security.failedToRemoveRecipientPGPKey') })
+      console.error('Failed to remove recipient PGP key:', err)
+      addToast({ type: 'error', message: $_('security.failedToRemoveRecipientPGPKey') })
     }
   }
 
@@ -419,7 +414,8 @@
       newKeyServerURL = ''
       await loadData()
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : $_('security.failedToAddKeyServer') })
+      console.error('Failed to add key server:', err)
+      addToast({ type: 'error', message: $_('security.failedToAddKeyServer') })
     } finally {
       addingKeyServer = false
     }
@@ -431,7 +427,8 @@
       addToast({ type: 'success', message: $_('security.keyServerRemoved') })
       await loadData()
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : $_('security.failedToRemoveKeyServer') })
+      console.error('Failed to remove key server:', err)
+      addToast({ type: 'error', message: $_('security.failedToRemoveKeyServer') })
     }
   }
 
@@ -448,7 +445,8 @@
         addToast({ type: 'info', message: $_('security.pgpKeyNotFound', { values: { email: keyLookupEmail.trim() } }) })
       }
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : $_('security.keyLookupFailed') })
+      console.error('Failed to look up PGP key:', err)
+      addToast({ type: 'error', message: $_('security.keyLookupFailed') })
     } finally {
       keyLookupLoading = false
     }
@@ -461,6 +459,20 @@
       return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
     } catch {
       return 'N/A'
+    }
+  }
+
+  function mapImportError(err: unknown, type: 'cert' | 'key' | 'recipientCert' | 'recipientKey'): string {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`Import ${type} error:`, msg)
+    if (msg.includes('does not match this account')) {
+      return type.includes('key') ? $_('security.keyEmailMismatch') : $_('security.certEmailMismatch')
+    }
+    switch (type) {
+      case 'cert': return $_('security.certImportFailed')
+      case 'key': return $_('security.keyImportFailed')
+      case 'recipientCert': return $_('security.recipientCertImportFailed')
+      case 'recipientKey': return $_('security.recipientKeyImportFailed')
     }
   }
 
@@ -483,9 +495,9 @@
       >
         <Icon icon={pgpCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'} class="w-4 h-4 flex-shrink-0" />
         <Icon icon="mdi:key-outline" class="w-4 h-4" />
-        PGP
+        {$_('security.pgp')}
         {#if pgpKeys.length > 0}
-          <span class="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">{pgpKeys.length} key{pgpKeys.length !== 1 ? 's' : ''}</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">{$_('security.keysCount', { values: { count: pgpKeys.length } })}</span>
         {/if}
       </button>
 
@@ -719,9 +731,9 @@
       >
         <Icon icon={smimeCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'} class="w-4 h-4 flex-shrink-0" />
         <Icon icon="mdi:shield-lock-outline" class="w-4 h-4" />
-        S/MIME
+        {$_('security.smime')}
         {#if certificates.length > 0}
-          <span class="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">{certificates.length} cert{certificates.length !== 1 ? 's' : ''}</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">{$_('security.certsCount', { values: { count: certificates.length } })}</span>
         {/if}
       </button>
 

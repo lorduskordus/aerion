@@ -353,8 +353,8 @@
       }
       totalCount = count
     } catch (err) {
-      error = err instanceof Error ? err.message : String(err)
-      console.error('Failed to load conversations:', err)
+      console.error('Failed to load messages:', err)
+      error = $_('viewer.failedToLoadMessages')
     } finally {
       loading = false
     }
@@ -373,8 +373,8 @@
       offset = 0
       await loadConversations()
     } catch (err) {
-      error = err instanceof Error ? err.message : String(err)
       console.error('Failed to sync folder:', err)
+      error = $_('viewer.failedToLoadMessages')
     }
     // No need to manage syncing state - account store handles it via events
   }
@@ -410,8 +410,8 @@
       offset = 0
       await loadConversations()
     } catch (err) {
-      error = err instanceof Error ? err.message : String(err)
       console.error('Failed to force re-sync folder:', err)
+      error = $_('viewer.failedToLoadMessages')
     }
   }
 
@@ -481,8 +481,8 @@
         selectedThreadId = searchResults[0].threadId
       }
     } catch (err) {
-      error = err instanceof Error ? err.message : String(err)
       console.error('Search failed:', err)
+      error = $_('viewer.failedToLoadMessages')
     } finally {
       isSearching = false
     }
@@ -518,8 +518,8 @@
         searchOffset = newOffset
       }
     } catch (err) {
-      error = err instanceof Error ? err.message : String(err)
       console.error('Load more search results failed:', err)
+      error = $_('viewer.failedToLoadMessages')
     } finally {
       isSearching = false
     }
@@ -595,7 +595,8 @@
         selectedThreadId = items[0].threadId
       }
     } catch (err) {
-      error = err instanceof Error ? err.message : String(err)
+      console.error('Server search failed:', err)
+      error = $_('viewer.failedToLoadMessages')
     } finally {
       isServerSearching = false
     }
@@ -711,7 +712,8 @@
         onConversationSelect?.(msg.threadId || msg.id, realFolderId, realAccountId)
       }
     } catch (err) {
-      error = err instanceof Error ? err.message : String(err)
+      console.error('Failed to fetch server message:', err)
+      error = $_('viewer.failedToLoadMessages')
     }
   }
 
@@ -1038,7 +1040,8 @@
       const description = await Undo()
       toasts.success($_('toast.undone', { values: { description } }))
     } catch (err) {
-      toasts.error($_('toast.undoFailed', { values: { error: String(err) } }))
+      console.error('Undo failed:', err)
+      toasts.error($_('toast.undoFailed'))
     }
   }
 
@@ -1049,7 +1052,8 @@
       clearChecked()
       handleActionComplete(true)
     } catch (err) {
-      toasts.error($_('toast.failedToDelete', { values: { error: String(err) } }))
+      console.error('Permanent delete failed:', err)
+      toasts.error($_('toast.failedToDelete'))
     }
     showDeleteConfirm = false
     pendingDeleteIds = []
@@ -1063,7 +1067,8 @@
       clearChecked()
       handleActionComplete(true)
     } catch (err) {
-      toasts.error($_('toast.failedToEmptyTrash', { values: { error: String(err) } }))
+      console.error('Empty trash failed:', err)
+      toasts.error($_('toast.failedToEmptyTrash'))
     }
     showEmptyTrashConfirm = false
   }
@@ -1083,7 +1088,8 @@
         handleActionComplete(true)
       })
       .catch((err) => {
-        toasts.error($_('toast.failedToDelete', { values: { error: String(err) } }))
+        console.error('Delete failed:', err)
+        toasts.error($_('toast.failedToDelete'))
       })
   }
 

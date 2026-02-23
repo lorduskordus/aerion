@@ -29,9 +29,16 @@ func NewEncryptor(store *Store, credStore *credentials.Store, log zerolog.Logger
 
 // EncryptBytes encrypts raw data using the sender's own S/MIME certificate (encrypt-to-self).
 // Used for encrypting draft body data at rest.
-func (enc *Encryptor) EncryptBytes(accountID string, data []byte) ([]byte, error) {
-	// Get sender's own certificate
-	_, certPEM, err := enc.store.GetDefaultCertificate(accountID)
+// fromEmail selects the certificate matching the sender identity; falls back to the account default.
+func (enc *Encryptor) EncryptBytes(accountID, fromEmail string, data []byte) ([]byte, error) {
+	// Get sender's own certificate (identity-specific, then default)
+	_, certPEM, err := enc.store.GetCertificateByEmail(accountID, fromEmail)
+	if err != nil {
+		return nil, fmt.Errorf("failed to look up certificate for %s: %w", fromEmail, err)
+	}
+	if certPEM == "" {
+		_, certPEM, err = enc.store.GetDefaultCertificate(accountID)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("no default certificate for account: %w", err)
 	}
@@ -53,9 +60,16 @@ func (enc *Encryptor) EncryptBytes(accountID string, data []byte) ([]byte, error
 
 // EncryptMessageToSelf encrypts an RFC 822 message using only the sender's own certificate.
 // Used for encrypting draft messages before syncing to IMAP.
-func (enc *Encryptor) EncryptMessageToSelf(accountID string, rawMsg []byte) ([]byte, error) {
-	// Get sender's own certificate
-	_, certPEM, err := enc.store.GetDefaultCertificate(accountID)
+// fromEmail selects the certificate matching the sender identity; falls back to the account default.
+func (enc *Encryptor) EncryptMessageToSelf(accountID, fromEmail string, rawMsg []byte) ([]byte, error) {
+	// Get sender's own certificate (identity-specific, then default)
+	_, certPEM, err := enc.store.GetCertificateByEmail(accountID, fromEmail)
+	if err != nil {
+		return nil, fmt.Errorf("failed to look up certificate for %s: %w", fromEmail, err)
+	}
+	if certPEM == "" {
+		_, certPEM, err = enc.store.GetDefaultCertificate(accountID)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("no default certificate for account: %w", err)
 	}
@@ -130,8 +144,9 @@ func (enc *Encryptor) EncryptMessageToSelf(accountID string, rawMsg []byte) ([]b
 
 // EncryptMessage encrypts an RFC 822 message for the given recipients using S/MIME.
 // The sender's own certificate is included so they can decrypt their own sent mail.
+// fromEmail selects the certificate matching the sender identity for encrypt-to-self.
 // Returns the encrypted RFC 822 message.
-func (enc *Encryptor) EncryptMessage(accountID string, recipientEmails []string, rawMsg []byte) ([]byte, error) {
+func (enc *Encryptor) EncryptMessage(accountID, fromEmail string, recipientEmails []string, rawMsg []byte) ([]byte, error) {
 	// Collect recipient certificates
 	certPEMs, err := enc.store.GetSenderCertPEMs(recipientEmails)
 	if err != nil {
@@ -160,8 +175,12 @@ func (enc *Encryptor) EncryptMessage(accountID string, recipientEmails []string,
 	}
 
 	// Include sender's own certificate so they can decrypt their own sent mail
-	senderCert, senderPEM, err := enc.store.GetDefaultCertificate(accountID)
-	if err == nil && senderCert != nil {
+	// Try identity-specific cert first, fall back to account default
+	senderCert, senderPEM, _ := enc.store.GetCertificateByEmail(accountID, fromEmail)
+	if senderCert == nil {
+		senderCert, senderPEM, _ = enc.store.GetDefaultCertificate(accountID)
+	}
+	if senderCert != nil {
 		ownCert, parseErr := parseCertificateFromPEM(senderPEM)
 		if parseErr == nil {
 			recipientCerts = append(recipientCerts, ownCert)

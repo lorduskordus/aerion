@@ -144,6 +144,10 @@
       .filter(email => email && recipientPGPKeyStatus[email] === false)
   })
 
+  // Identity-aware cert/key info (for display in security bars)
+  let smimeCertFingerprint = $state<string>('')  // First 8 hex chars of fingerprint
+  let pgpKeyId = $state<string>('')  // Last 8 hex chars of fingerprint (short key ID)
+
   // Security mode for keyboard shortcuts (Alt+P / Alt+S activate, then s/e toggle sign/encrypt)
   let securityMode = $state<'pgp' | 'smime' | null>(null)
 
@@ -235,10 +239,8 @@
         recipientCertStatus = await api.checkRecipientCerts(allEmails)
       }
     } catch (err) {
-      addToast({
-        type: 'error',
-        message: err instanceof Error ? err.message : $_('composer.failedToImportCert'),
-      })
+      console.error('Failed to import recipient cert:', err)
+      addToast({ type: 'error', message: $_('composer.failedToImportCert') })
     }
   }
 
@@ -254,10 +256,8 @@
         recipientPGPKeyStatus = await api.checkRecipientPGPKeys(allEmails)
       }
     } catch (err) {
-      addToast({
-        type: 'error',
-        message: err instanceof Error ? err.message : $_('composer.failedToImportPGPKey'),
-      })
+      console.error('Failed to import recipient PGP key:', err)
+      addToast({ type: 'error', message: $_('composer.failedToImportPGPKey') })
     }
   }
 
@@ -550,43 +550,12 @@
       console.error('Failed to load account settings:', err)
     }
 
-    // Load S/MIME signing/encryption availability
-    try {
-      const hasCert = await api.hasSMIMECertificate(accountId)
-      if (hasCert) {
-        showSignOption = true
-        showEncryptOption = true
-        const [signPolicy, encryptPolicy] = await Promise.all([
-          api.getSMIMESignPolicy(accountId),
-          api.getSMIMEEncryptPolicy(accountId),
-        ])
-        signMessage = signPolicy === 'always'
-        encryptMessage = encryptPolicy === 'always'
+    // Load S/MIME and PGP availability for the selected identity's email
+    {
+      const selectedIdentity = identities.find(i => i.id === selectedIdentityId)
+      if (selectedIdentity) {
+        await updateSecurityForIdentity(selectedIdentity.email)
       }
-    } catch (err) {
-      console.error('Failed to load S/MIME settings:', err)
-    }
-
-    // Load PGP signing/encryption availability
-    try {
-      const hasKey = await api.hasPGPKey(accountId)
-      if (hasKey) {
-        showPGPSignOption = true
-        showPGPEncryptOption = true
-        const [pgpSignPolicy, pgpEncryptPolicy] = await Promise.all([
-          api.getPGPSignPolicy(accountId),
-          api.getPGPEncryptPolicy(accountId),
-        ])
-        // Only enable PGP defaults if S/MIME is not already active (mutual exclusivity)
-        if (!signMessage) {
-          pgpSignMessage = pgpSignPolicy === 'always'
-        }
-        if (!encryptMessage) {
-          pgpEncryptMessage = pgpEncryptPolicy === 'always'
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load PGP settings:', err)
     }
 
     // Initialize TipTap editor
@@ -679,6 +648,72 @@
     editor.commands.setContent(newContent)
   }
 
+  // Update security bar visibility based on the selected identity's email
+  async function loadSMIMEForEmail(email: string) {
+    const cert = await api.getSMIMECertificateForEmail(accountId, email)
+    if (!cert || cert.isExpired) {
+      signMessage = false
+      encryptMessage = false
+      return
+    }
+
+    showSignOption = true
+    showEncryptOption = true
+    smimeCertFingerprint = cert.fingerprint ? cert.fingerprint.substring(0, 8).toUpperCase() : ''
+
+    const [signPolicy, encryptPolicy] = await Promise.all([
+      api.getSMIMESignPolicy(accountId),
+      api.getSMIMEEncryptPolicy(accountId),
+    ])
+    signMessage = signPolicy === 'always'
+    encryptMessage = encryptPolicy === 'always'
+  }
+
+  async function loadPGPForEmail(email: string) {
+    const key = await api.getPGPKeyForEmail(accountId, email)
+    if (!key || key.isExpired) {
+      pgpSignMessage = false
+      pgpEncryptMessage = false
+      return
+    }
+
+    showPGPSignOption = true
+    showPGPEncryptOption = true
+    pgpKeyId = key.fingerprint ? key.fingerprint.slice(-8).toUpperCase() : ''
+
+    const [pgpSignPolicy, pgpEncryptPolicy] = await Promise.all([
+      api.getPGPSignPolicy(accountId),
+      api.getPGPEncryptPolicy(accountId),
+    ])
+    // Only enable PGP defaults if S/MIME is not already active (mutual exclusivity)
+    pgpSignMessage = !signMessage && pgpSignPolicy === 'always'
+    pgpEncryptMessage = !encryptMessage && pgpEncryptPolicy === 'always'
+  }
+
+  async function updateSecurityForIdentity(email: string) {
+    // Reset all security state
+    showSignOption = false
+    showEncryptOption = false
+    showPGPSignOption = false
+    showPGPEncryptOption = false
+    signMessage = false
+    encryptMessage = false
+    pgpSignMessage = false
+    pgpEncryptMessage = false
+    smimeCertFingerprint = ''
+    pgpKeyId = ''
+
+    if (!email) return
+
+    try { await loadSMIMEForEmail(email) } catch (err) {
+      console.error('Failed to load S/MIME settings:', err)
+    }
+
+    try { await loadPGPForEmail(email) } catch (err) {
+      console.error('Failed to load PGP settings:', err)
+    }
+  }
+
   // Handle identity change from the From dropdown
   function handleIdentityChange(newIdentityId: string) {
     if (newIdentityId === selectedIdentityId) return
@@ -687,6 +722,9 @@
     selectedIdentityId = newIdentityId
 
     if (!editor || !newIdentity) return
+
+    // Update security bars for the new identity
+    updateSecurityForIdentity(newIdentity.email)
 
     // Remove old signature and apply new one
     const content = removeSignatureFromContent(editor.getHTML())
@@ -886,7 +924,7 @@
       console.error('Failed to send message:', err)
       addToast({
         type: 'error',
-        message: $_('composer.failedToSend', { values: { error: String(err) } }),
+        message: $_('composer.failedToSend'),
       })
     } finally {
       sending = false
@@ -1419,6 +1457,10 @@
         <div class="flex items-center gap-1.5">
           <Icon icon="mdi:lock-outline" class="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
           <span class="text-muted-foreground font-medium">PGP</span>
+          {#if pgpKeyId}
+            <span class="text-muted-foreground">|</span>
+            <span class="text-muted-foreground font-mono">{pgpKeyId}</span>
+          {/if}
         </div>
         <div class="flex items-center gap-3 ml-auto">
           {#if securityMode === 'pgp'}
@@ -1444,6 +1486,10 @@
         <div class="flex items-center gap-1.5">
           <Icon icon="mdi:shield-outline" class="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
           <span class="text-muted-foreground font-medium">S/MIME</span>
+          {#if smimeCertFingerprint}
+            <span class="text-muted-foreground">|</span>
+            <span class="text-muted-foreground font-mono">{smimeCertFingerprint}</span>
+          {/if}
         </div>
         <div class="flex items-center gap-3 ml-auto">
           {#if securityMode === 'smime'}

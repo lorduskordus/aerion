@@ -647,9 +647,12 @@ func (c *ComposerApp) SendMessage(msg smtp.ComposeMessage) error {
 		return fmt.Errorf("failed to build message: %w", err)
 	}
 
+	// The sender's email determines which cert/key to use
+	fromEmail := msg.From.Address
+
 	// S/MIME signing (if configured for this account/message)
 	if c.shouldSignMessage(msg.SignMessage) {
-		signedMsg, signErr := c.smimeSigner.SignMessage(c.config.AccountID, rawMsg)
+		signedMsg, signErr := c.smimeSigner.SignMessage(c.config.AccountID, fromEmail, rawMsg)
 		if signErr != nil {
 			return fmt.Errorf("failed to sign message: %w", signErr)
 		}
@@ -659,7 +662,7 @@ func (c *ComposerApp) SendMessage(msg smtp.ComposeMessage) error {
 
 	// S/MIME encryption (if configured for this account/message)
 	if c.shouldEncryptMessage(msg.EncryptMessage) {
-		encryptedMsg, encErr := c.smimeEncryptor.EncryptMessage(c.config.AccountID, msg.AllRecipients(), rawMsg)
+		encryptedMsg, encErr := c.smimeEncryptor.EncryptMessage(c.config.AccountID, fromEmail, msg.AllRecipients(), rawMsg)
 		if encErr != nil {
 			return fmt.Errorf("failed to encrypt message: %w", encErr)
 		}
@@ -669,7 +672,7 @@ func (c *ComposerApp) SendMessage(msg smtp.ComposeMessage) error {
 
 	// PGP signing (mutually exclusive with S/MIME)
 	if !msg.SignMessage && c.shouldPGPSignMessage(msg.PGPSignMessage) {
-		signedMsg, signErr := c.pgpSigner.SignMessage(c.config.AccountID, rawMsg)
+		signedMsg, signErr := c.pgpSigner.SignMessage(c.config.AccountID, fromEmail, rawMsg)
 		if signErr != nil {
 			return fmt.Errorf("failed to PGP sign message: %w", signErr)
 		}
@@ -679,7 +682,7 @@ func (c *ComposerApp) SendMessage(msg smtp.ComposeMessage) error {
 
 	// PGP encryption (mutually exclusive with S/MIME)
 	if !msg.EncryptMessage && c.shouldPGPEncryptMessage(msg.PGPEncryptMessage) {
-		encryptedMsg, encErr := c.pgpEncryptor.EncryptMessage(c.config.AccountID, msg.AllRecipients(), rawMsg)
+		encryptedMsg, encErr := c.pgpEncryptor.EncryptMessage(c.config.AccountID, fromEmail, msg.AllRecipients(), rawMsg)
 		if encErr != nil {
 			return fmt.Errorf("failed to PGP encrypt message: %w", encErr)
 		}
@@ -882,6 +885,9 @@ func (c *ComposerApp) SaveDraft(msg smtp.ComposeMessage, existingDraftID string)
 	var pgpEncryptedBody []byte
 	var attachmentsData []byte
 
+	// The sender's email determines which cert/key to use for encrypt-to-self
+	draftFromEmail := msg.From.Address
+
 	if msg.EncryptMessage {
 		// S/MIME encrypt-to-self
 		payload := draftBodyPayload{BodyHTML: msg.HTMLBody, BodyText: msg.TextBody, Attachments: msg.Attachments}
@@ -890,7 +896,7 @@ func (c *ComposerApp) SaveDraft(msg smtp.ComposeMessage, existingDraftID string)
 			return nil, fmt.Errorf("failed to serialize draft body: %w", jsonErr)
 		}
 
-		enc, encErr := c.smimeEncryptor.EncryptBytes(c.config.AccountID, jsonBytes)
+		enc, encErr := c.smimeEncryptor.EncryptBytes(c.config.AccountID, draftFromEmail, jsonBytes)
 		if encErr != nil {
 			log.Warn().Err(encErr).Msg("Failed to encrypt draft body, saving unencrypted")
 		} else {
@@ -907,7 +913,7 @@ func (c *ComposerApp) SaveDraft(msg smtp.ComposeMessage, existingDraftID string)
 			return nil, fmt.Errorf("failed to serialize draft body: %w", jsonErr)
 		}
 
-		enc, encErr := c.pgpEncryptor.EncryptBytes(c.config.AccountID, jsonBytes)
+		enc, encErr := c.pgpEncryptor.EncryptBytes(c.config.AccountID, draftFromEmail, jsonBytes)
 		if encErr != nil {
 			log.Warn().Err(encErr).Msg("Failed to PGP encrypt draft body, saving unencrypted")
 		} else {
@@ -1118,10 +1124,13 @@ func (c *ComposerApp) syncDraftToIMAP(localDraft *draft.Draft, msg smtp.ComposeM
 		return
 	}
 
+	// The sender's email determines which cert/key to use
+	syncFromEmail := msg.From.Address
+
 	// Sign then encrypt draft for IMAP sync (mirrors send flow)
 	// S/MIME signing
 	if localDraft.SignMessage {
-		signedMsg, signErr := c.smimeSigner.SignMessage(c.config.AccountID, rawMsg)
+		signedMsg, signErr := c.smimeSigner.SignMessage(c.config.AccountID, syncFromEmail, rawMsg)
 		if signErr != nil {
 			log.Warn().Err(signErr).Msg("Failed to S/MIME sign draft for IMAP sync, continuing unsigned")
 		} else {
@@ -1131,7 +1140,7 @@ func (c *ComposerApp) syncDraftToIMAP(localDraft *draft.Draft, msg smtp.ComposeM
 	}
 	// S/MIME encryption
 	if localDraft.Encrypted {
-		encryptedMsg, encErr := c.smimeEncryptor.EncryptMessageToSelf(c.config.AccountID, rawMsg)
+		encryptedMsg, encErr := c.smimeEncryptor.EncryptMessageToSelf(c.config.AccountID, syncFromEmail, rawMsg)
 		if encErr != nil {
 			log.Error().Err(encErr).Msg("Failed to S/MIME encrypt draft for IMAP sync")
 			c.draftStore.UpdateSyncStatus(localDraft.ID, draft.SyncStatusFailed, 0, "", encErr.Error())
@@ -1143,7 +1152,7 @@ func (c *ComposerApp) syncDraftToIMAP(localDraft *draft.Draft, msg smtp.ComposeM
 	}
 	// PGP signing (mutually exclusive with S/MIME)
 	if !localDraft.SignMessage && localDraft.PGPSignMessage {
-		signedMsg, signErr := c.pgpSigner.SignMessage(c.config.AccountID, rawMsg)
+		signedMsg, signErr := c.pgpSigner.SignMessage(c.config.AccountID, syncFromEmail, rawMsg)
 		if signErr != nil {
 			log.Warn().Err(signErr).Msg("Failed to PGP sign draft for IMAP sync, continuing unsigned")
 		} else {
@@ -1153,7 +1162,7 @@ func (c *ComposerApp) syncDraftToIMAP(localDraft *draft.Draft, msg smtp.ComposeM
 	}
 	// PGP encryption (mutually exclusive with S/MIME)
 	if !localDraft.Encrypted && localDraft.PGPEncrypted {
-		encryptedMsg, encErr := c.pgpEncryptor.EncryptMessageToSelf(c.config.AccountID, rawMsg)
+		encryptedMsg, encErr := c.pgpEncryptor.EncryptMessageToSelf(c.config.AccountID, syncFromEmail, rawMsg)
 		if encErr != nil {
 			log.Error().Err(encErr).Msg("Failed to PGP encrypt draft for IMAP sync")
 			c.draftStore.UpdateSyncStatus(localDraft.ID, draft.SyncStatusFailed, 0, "", encErr.Error())
@@ -1276,9 +1285,12 @@ func (c *ComposerApp) draftToComposeMessage(d *draft.Draft) *smtp.ComposeMessage
 	pgpEncryptMessage := false
 	var attachments []smtp.Attachment
 
+	// Resolve the identity email for decryption
+	draftIdentityEmail := c.getDraftIdentityEmail(d)
+
 	// S/MIME encrypted draft
 	if d.Encrypted && len(d.EncryptedBody) > 0 {
-		decrypted, err := c.smimeDecryptor.DecryptBytes(d.AccountID, d.EncryptedBody)
+		decrypted, err := c.smimeDecryptor.DecryptBytes(d.AccountID, draftIdentityEmail, d.EncryptedBody)
 		if err != nil {
 			log := logging.WithComponent("composer")
 			log.Error().Err(err).Str("draftID", d.ID).Msg("Failed to decrypt S/MIME draft body")
@@ -1298,7 +1310,7 @@ func (c *ComposerApp) draftToComposeMessage(d *draft.Draft) *smtp.ComposeMessage
 
 	// PGP encrypted draft (mutually exclusive with S/MIME)
 	if !d.Encrypted && d.PGPEncrypted && len(d.PGPEncryptedBody) > 0 {
-		decrypted, err := c.pgpDecryptor.DecryptBytes(d.AccountID, d.PGPEncryptedBody)
+		decrypted, err := c.pgpDecryptor.DecryptBytes(d.AccountID, draftIdentityEmail, d.PGPEncryptedBody)
 		if err != nil {
 			log := logging.WithComponent("composer")
 			log.Error().Err(err).Str("draftID", d.ID).Msg("Failed to decrypt PGP draft body")
@@ -1442,6 +1454,16 @@ func (c *ComposerApp) HasSMIMECertificate() bool {
 	return err == nil && cert != nil && !cert.IsExpired
 }
 
+// GetSMIMECertificateForEmail returns the S/MIME certificate matching the given email.
+// Returns nil if no matching certificate is found.
+func (c *ComposerApp) GetSMIMECertificateForEmail(email string) (*smime.Certificate, error) {
+	cert, _, err := c.smimeStore.GetCertificateByEmail(c.config.AccountID, email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get certificate for email: %w", err)
+	}
+	return cert, nil
+}
+
 // GetSMIMESignPolicy returns the signing policy for the account.
 func (c *ComposerApp) GetSMIMESignPolicy() (string, error) {
 	return c.smimeStore.GetSignPolicy(c.config.AccountID)
@@ -1505,6 +1527,16 @@ func (c *ComposerApp) ImportRecipientCert(email, filePath string) error {
 func (c *ComposerApp) HasPGPKey() bool {
 	key, _, err := c.pgpStore.GetDefaultKey(c.config.AccountID)
 	return err == nil && key != nil && !key.IsExpired
+}
+
+// GetPGPKeyForEmail returns the PGP key matching the given email.
+// Returns nil if no matching key is found.
+func (c *ComposerApp) GetPGPKeyForEmail(email string) (*pgp.Key, error) {
+	key, _, err := c.pgpStore.GetKeyByEmail(c.config.AccountID, email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get key for email: %w", err)
+	}
+	return key, nil
 }
 
 // GetPGPSignPolicy returns the PGP signing policy for the account.
@@ -1687,6 +1719,27 @@ func (c *ComposerApp) shouldEncryptMessage(perMessageOverride bool) bool {
 	}
 
 	return c.HasSMIMECertificate()
+}
+
+// getDraftIdentityEmail returns the email address for the draft's identity.
+// Falls back to the account email if the identity cannot be resolved.
+func (c *ComposerApp) getDraftIdentityEmail(d *draft.Draft) string {
+	if d.IdentityID != "" {
+		identities, err := c.accountStore.GetIdentities(d.AccountID)
+		if err == nil {
+			for _, id := range identities {
+				if id.ID == d.IdentityID {
+					return id.Email
+				}
+			}
+		}
+	}
+	// Fall back to account email
+	acc, err := c.accountStore.Get(d.AccountID)
+	if err == nil && acc != nil {
+		return acc.Email
+	}
+	return ""
 }
 
 // parseIntID parses a string ID to int64.

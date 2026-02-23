@@ -78,6 +78,7 @@ func (s *Store) GetUIState() (*UIState, error) {
 			ListWidth:            420,
 			ExpandedAccounts:     make(map[string]bool),
 			UnifiedInboxExpanded: true,
+			CollapsedFolders:     make(map[string]bool),
 		}, nil
 	}
 
@@ -89,12 +90,16 @@ func (s *Store) GetUIState() (*UIState, error) {
 			ListWidth:            420,
 			ExpandedAccounts:     make(map[string]bool),
 			UnifiedInboxExpanded: true,
+			CollapsedFolders:     make(map[string]bool),
 		}, nil
 	}
 
-	// Ensure map is initialized (for older saved states)
+	// Ensure maps are initialized (for older saved states)
 	if state.ExpandedAccounts == nil {
 		state.ExpandedAccounts = make(map[string]bool)
+	}
+	if state.CollapsedFolders == nil {
+		state.CollapsedFolders = make(map[string]bool)
 	}
 
 	return &state, nil

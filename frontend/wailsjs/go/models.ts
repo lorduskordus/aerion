@@ -565,6 +565,7 @@ export namespace appstate {
 	    listWidth: number;
 	    expandedAccounts: Record<string, boolean>;
 	    unifiedInboxExpanded: boolean;
+	    collapsedFolders: Record<string, boolean>;
 	
 	    static createFrom(source: any = {}) {
 	        return new UIState(source);
@@ -583,6 +584,7 @@ export namespace appstate {
 	        this.listWidth = source["listWidth"];
 	        this.expandedAccounts = source["expandedAccounts"];
 	        this.unifiedInboxExpanded = source["unifiedInboxExpanded"];
+	        this.collapsedFolders = source["collapsedFolders"];
 	    }
 	}
 
@@ -1209,6 +1211,7 @@ export namespace message {
 	    latestDate: any;
 	    participants: Address[];
 	    messageIds: string[];
+	    isEncrypted: boolean;
 	    messages?: Message[];
 	    accountId?: string;
 	    accountName?: string;
@@ -1231,6 +1234,7 @@ export namespace message {
 	        this.latestDate = this.convertValues(source["latestDate"], null);
 	        this.participants = this.convertValues(source["participants"], Address);
 	        this.messageIds = source["messageIds"];
+	        this.isEncrypted = source["isEncrypted"];
 	        this.messages = this.convertValues(source["messages"], Message);
 	        this.accountId = source["accountId"];
 	        this.accountName = source["accountName"];
@@ -1268,6 +1272,7 @@ export namespace message {
 	    latestDate: any;
 	    participants: Address[];
 	    messageIds: string[];
+	    isEncrypted: boolean;
 	    messages?: Message[];
 	    accountId?: string;
 	    accountName?: string;
@@ -1295,6 +1300,7 @@ export namespace message {
 	        this.latestDate = this.convertValues(source["latestDate"], null);
 	        this.participants = this.convertValues(source["participants"], Address);
 	        this.messageIds = source["messageIds"];
+	        this.isEncrypted = source["isEncrypted"];
 	        this.messages = this.convertValues(source["messages"], Message);
 	        this.accountId = source["accountId"];
 	        this.accountName = source["accountName"];

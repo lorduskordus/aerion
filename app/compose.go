@@ -58,9 +58,12 @@ func (a *App) SendMessage(accountID string, msg smtp.ComposeMessage) error {
 		return fmt.Errorf("failed to build message: %w", err)
 	}
 
+	// The sender's email determines which cert/key to use
+	fromEmail := msg.From.Address
+
 	// S/MIME signing (if configured for this account/message)
 	if a.shouldSignMessage(accountID, msg.SignMessage) {
-		signedMsg, signErr := a.smimeSigner.SignMessage(accountID, rawMsg)
+		signedMsg, signErr := a.smimeSigner.SignMessage(accountID, fromEmail, rawMsg)
 		if signErr != nil {
 			return fmt.Errorf("failed to sign message: %w", signErr)
 		}
@@ -70,7 +73,7 @@ func (a *App) SendMessage(accountID string, msg smtp.ComposeMessage) error {
 
 	// S/MIME encryption (if configured for this account/message) — sign-then-encrypt per RFC 5751
 	if a.shouldEncryptMessage(accountID, msg.EncryptMessage) {
-		encryptedMsg, encErr := a.smimeEncryptor.EncryptMessage(accountID, msg.AllRecipients(), rawMsg)
+		encryptedMsg, encErr := a.smimeEncryptor.EncryptMessage(accountID, fromEmail, msg.AllRecipients(), rawMsg)
 		if encErr != nil {
 			return fmt.Errorf("failed to encrypt message: %w", encErr)
 		}
@@ -80,7 +83,7 @@ func (a *App) SendMessage(accountID string, msg smtp.ComposeMessage) error {
 
 	// PGP signing (mutually exclusive with S/MIME — only if S/MIME sign was not applied)
 	if !msg.SignMessage && a.shouldPGPSignMessage(accountID, msg.PGPSignMessage) {
-		signedMsg, signErr := a.pgpSigner.SignMessage(accountID, rawMsg)
+		signedMsg, signErr := a.pgpSigner.SignMessage(accountID, fromEmail, rawMsg)
 		if signErr != nil {
 			return fmt.Errorf("failed to PGP sign message: %w", signErr)
 		}
@@ -90,7 +93,7 @@ func (a *App) SendMessage(accountID string, msg smtp.ComposeMessage) error {
 
 	// PGP encryption (mutually exclusive with S/MIME — only if S/MIME encrypt was not applied)
 	if !msg.EncryptMessage && a.shouldPGPEncryptMessage(accountID, msg.PGPEncryptMessage) {
-		encryptedMsg, encErr := a.pgpEncryptor.EncryptMessage(accountID, msg.AllRecipients(), rawMsg)
+		encryptedMsg, encErr := a.pgpEncryptor.EncryptMessage(accountID, fromEmail, msg.AllRecipients(), rawMsg)
 		if encErr != nil {
 			return fmt.Errorf("failed to PGP encrypt message: %w", encErr)
 		}

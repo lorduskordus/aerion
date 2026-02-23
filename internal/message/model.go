@@ -130,6 +130,7 @@ type Conversation struct {
 	LatestDate     time.Time  `json:"latestDate"`
 	Participants   []Address  `json:"participants"`
 	MessageIDs     []string   `json:"messageIds"`         // Message IDs for context menu actions
+	IsEncrypted    bool       `json:"isEncrypted"`        // Any message in thread is encrypted (S/MIME or PGP)
 	Messages       []*Message `json:"messages,omitempty"` // Only populated when fetching full conversation
 
 	// For unified inbox view - populated when querying across accounts

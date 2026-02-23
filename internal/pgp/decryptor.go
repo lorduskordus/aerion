@@ -32,9 +32,10 @@ func NewDecryptor(store *Store, credStore *credentials.Store, log zerolog.Logger
 
 // DecryptBytes decrypts raw PGP-encrypted data using the account's PGP private key.
 // Used for decrypting encrypted draft body data.
-func (d *Decryptor) DecryptBytes(accountID string, encryptedData []byte) ([]byte, error) {
-	// Build keyring from all account keys
-	keyring, err := d.buildPrivateKeyring(accountID)
+// recipientEmail narrows the key search to the matching identity; falls back to all keys.
+func (d *Decryptor) DecryptBytes(accountID, recipientEmail string, encryptedData []byte) ([]byte, error) {
+	// Try identity-specific key first, fall back to all account keys
+	keyring, err := d.buildKeyringForEmail(accountID, recipientEmail)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build keyring: %w", err)
 	}
@@ -62,9 +63,10 @@ func (d *Decryptor) DecryptBytes(accountID string, encryptedData []byte) ([]byte
 }
 
 // DecryptMessage decrypts a PGP/MIME encrypted message (RFC 3156).
+// recipientEmail narrows the key search to the matching identity; falls back to all keys.
 // Returns the decrypted bytes (may be multipart/signed if sign-then-encrypt),
 // a boolean indicating whether the message was encrypted, and any error.
-func (d *Decryptor) DecryptMessage(accountID string, raw []byte) ([]byte, bool, error) {
+func (d *Decryptor) DecryptMessage(accountID, recipientEmail string, raw []byte) ([]byte, bool, error) {
 	// Parse the message to find Content-Type
 	headerEnd := bytes.Index(raw, []byte("\r\n\r\n"))
 	bodyStart := headerEnd + 4
@@ -121,8 +123,8 @@ func (d *Decryptor) DecryptMessage(accountID string, raw []byte) ([]byte, bool, 
 		return nil, true, fmt.Errorf("failed to read encrypted data: %w", err)
 	}
 
-	// Build keyring from all account keys
-	keyring, err := d.buildPrivateKeyring(accountID)
+	// Try identity-specific key first, fall back to all account keys
+	keyring, err := d.buildKeyringForEmail(accountID, recipientEmail)
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to build keyring: %w", err)
 	}
@@ -148,6 +150,24 @@ func (d *Decryptor) DecryptMessage(accountID string, raw []byte) ([]byte, bool, 
 
 	d.log.Info().Str("accountID", accountID).Msg("Successfully decrypted PGP message")
 	return decrypted, true, nil
+}
+
+// buildKeyringForEmail builds a keyring preferring the key matching recipientEmail, falling back to all keys.
+func (d *Decryptor) buildKeyringForEmail(accountID, recipientEmail string) (openpgp.EntityList, error) {
+	if recipientEmail != "" {
+		key, _, err := d.store.GetKeyByEmail(accountID, recipientEmail)
+		if err == nil && key != nil {
+			armoredPrivate, keyErr := d.credStore.GetPGPPrivateKey(key.ID)
+			if keyErr == nil {
+				entities, parseErr := ParseArmoredKey(string(armoredPrivate))
+				if parseErr == nil && len(entities) > 0 {
+					return entities, nil
+				}
+			}
+		}
+		d.log.Debug().Str("email", recipientEmail).Msg("No identity-specific PGP key found, falling back to all keys")
+	}
+	return d.buildPrivateKeyring(accountID)
 }
 
 // buildPrivateKeyring creates an openpgp.EntityList from all private keys for an account

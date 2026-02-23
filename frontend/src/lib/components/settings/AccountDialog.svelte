@@ -187,7 +187,7 @@
       console.error('Failed to save account:', err)
       addToast({
         type: 'error',
-        message: $_('toast.failedToSaveAccount', { values: { error: err instanceof Error ? err.message : String(err) } }),
+        message: $_('toast.failedToSaveAccount'),
       })
     } finally {
       saving = false
@@ -265,7 +265,7 @@
       reauthorizeSuccess = false
       addToast({
         type: 'error',
-        message: $_('toast.failedToReauthorize', { values: { error: err instanceof Error ? err.message : String(err) } }),
+        message: $_('toast.failedToReauthorize'),
         duration: 8000,
       })
     } finally {

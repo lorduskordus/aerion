@@ -63,6 +63,9 @@ func (a *App) SaveDraft(accountID string, msg smtp.ComposeMessage, existingDraft
 	var pgpEncryptedBody []byte
 	var attachmentsData []byte
 
+	// The sender's email determines which cert/key to use for encrypt-to-self
+	fromEmail := msg.From.Address
+
 	if msg.EncryptMessage {
 		// S/MIME encrypt-to-self
 		payload := draftBodyPayload{BodyHTML: msg.HTMLBody, BodyText: msg.TextBody, Attachments: msg.Attachments}
@@ -71,7 +74,7 @@ func (a *App) SaveDraft(accountID string, msg smtp.ComposeMessage, existingDraft
 			return nil, fmt.Errorf("failed to serialize draft body: %w", jsonErr)
 		}
 
-		enc, encErr := a.smimeEncryptor.EncryptBytes(accountID, jsonBytes)
+		enc, encErr := a.smimeEncryptor.EncryptBytes(accountID, fromEmail, jsonBytes)
 		if encErr != nil {
 			log.Warn().Err(encErr).Msg("Failed to encrypt draft body, saving unencrypted")
 		} else {
@@ -88,7 +91,7 @@ func (a *App) SaveDraft(accountID string, msg smtp.ComposeMessage, existingDraft
 			return nil, fmt.Errorf("failed to serialize draft body: %w", jsonErr)
 		}
 
-		enc, encErr := a.pgpEncryptor.EncryptBytes(accountID, jsonBytes)
+		enc, encErr := a.pgpEncryptor.EncryptBytes(accountID, fromEmail, jsonBytes)
 		if encErr != nil {
 			log.Warn().Err(encErr).Msg("Failed to PGP encrypt draft body, saving unencrypted")
 		} else {
@@ -218,10 +221,13 @@ func (a *App) syncDraftToIMAP(localDraft *draft.Draft, msg smtp.ComposeMessage) 
 		return
 	}
 
+	// The sender's email determines which cert/key to use
+	draftFromEmail := msg.From.Address
+
 	// Sign then encrypt draft for IMAP sync (mirrors send flow)
 	// S/MIME signing
 	if localDraft.SignMessage {
-		signedMsg, signErr := a.smimeSigner.SignMessage(localDraft.AccountID, rawMsg)
+		signedMsg, signErr := a.smimeSigner.SignMessage(localDraft.AccountID, draftFromEmail, rawMsg)
 		if signErr != nil {
 			log.Warn().Err(signErr).Msg("Failed to sign draft for IMAP sync, continuing unsigned")
 		} else {
@@ -231,7 +237,7 @@ func (a *App) syncDraftToIMAP(localDraft *draft.Draft, msg smtp.ComposeMessage) 
 	}
 	// S/MIME encryption
 	if localDraft.Encrypted {
-		encryptedMsg, encErr := a.smimeEncryptor.EncryptMessageToSelf(localDraft.AccountID, rawMsg)
+		encryptedMsg, encErr := a.smimeEncryptor.EncryptMessageToSelf(localDraft.AccountID, draftFromEmail, rawMsg)
 		if encErr != nil {
 			log.Error().Err(encErr).Msg("Failed to encrypt draft for IMAP sync")
 			a.draftStore.UpdateSyncStatus(localDraft.ID, draft.SyncStatusFailed, 0, "", encErr.Error())
@@ -243,7 +249,7 @@ func (a *App) syncDraftToIMAP(localDraft *draft.Draft, msg smtp.ComposeMessage) 
 	}
 	// PGP signing (mutually exclusive with S/MIME)
 	if !localDraft.SignMessage && localDraft.PGPSignMessage {
-		signedMsg, signErr := a.pgpSigner.SignMessage(localDraft.AccountID, rawMsg)
+		signedMsg, signErr := a.pgpSigner.SignMessage(localDraft.AccountID, draftFromEmail, rawMsg)
 		if signErr != nil {
 			log.Warn().Err(signErr).Msg("Failed to PGP sign draft for IMAP sync, continuing unsigned")
 		} else {
@@ -253,7 +259,7 @@ func (a *App) syncDraftToIMAP(localDraft *draft.Draft, msg smtp.ComposeMessage) 
 	}
 	// PGP encryption (mutually exclusive with S/MIME)
 	if !localDraft.Encrypted && localDraft.PGPEncrypted {
-		encryptedMsg, encErr := a.pgpEncryptor.EncryptMessageToSelf(localDraft.AccountID, rawMsg)
+		encryptedMsg, encErr := a.pgpEncryptor.EncryptMessageToSelf(localDraft.AccountID, draftFromEmail, rawMsg)
 		if encErr != nil {
 			log.Error().Err(encErr).Msg("Failed to PGP encrypt draft for IMAP sync")
 			a.draftStore.UpdateSyncStatus(localDraft.ID, draft.SyncStatusFailed, 0, "", encErr.Error())
@@ -346,9 +352,12 @@ func (a *App) draftToComposeMessage(d *draft.Draft) *smtp.ComposeMessage {
 	pgpEncryptMessage := false
 	var attachments []smtp.Attachment
 
+	// Determine the identity email for decryption
+	draftIdentityEmail := a.getDraftIdentityEmail(d)
+
 	// S/MIME encrypted draft
 	if d.Encrypted && len(d.EncryptedBody) > 0 {
-		decrypted, err := a.smimeDecryptor.DecryptBytes(d.AccountID, d.EncryptedBody)
+		decrypted, err := a.smimeDecryptor.DecryptBytes(d.AccountID, draftIdentityEmail, d.EncryptedBody)
 		if err != nil {
 			log := logging.WithComponent("app")
 			log.Error().Err(err).Str("draftID", d.ID).Msg("Failed to decrypt S/MIME draft body")
@@ -368,7 +377,7 @@ func (a *App) draftToComposeMessage(d *draft.Draft) *smtp.ComposeMessage {
 
 	// PGP encrypted draft (mutually exclusive with S/MIME)
 	if !d.Encrypted && d.PGPEncrypted && len(d.PGPEncryptedBody) > 0 {
-		decrypted, err := a.pgpDecryptor.DecryptBytes(d.AccountID, d.PGPEncryptedBody)
+		decrypted, err := a.pgpDecryptor.DecryptBytes(d.AccountID, draftIdentityEmail, d.PGPEncryptedBody)
 		if err != nil {
 			log := logging.WithComponent("app")
 			log.Error().Err(err).Str("draftID", d.ID).Msg("Failed to decrypt PGP draft body")
@@ -408,6 +417,27 @@ func (a *App) draftToComposeMessage(d *draft.Draft) *smtp.ComposeMessage {
 		PGPSignMessage:    d.PGPSignMessage,
 		PGPEncryptMessage: pgpEncryptMessage,
 	}
+}
+
+// getDraftIdentityEmail returns the email address for the draft's identity.
+// Falls back to the account email if the identity cannot be resolved.
+func (a *App) getDraftIdentityEmail(d *draft.Draft) string {
+	if d.IdentityID != "" {
+		identities, err := a.accountStore.GetIdentities(d.AccountID)
+		if err == nil {
+			for _, id := range identities {
+				if id.ID == d.IdentityID {
+					return id.Email
+				}
+			}
+		}
+	}
+	// Fall back to account email
+	acc, err := a.accountStore.Get(d.AccountID)
+	if err == nil && acc != nil {
+		return acc.Email
+	}
+	return ""
 }
 
 // DeleteDraft deletes a draft from local DB and IMAP

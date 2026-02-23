@@ -30,9 +30,16 @@ func NewEncryptor(store *Store, credStore *credentials.Store, log zerolog.Logger
 
 // EncryptBytes encrypts raw data using the sender's own PGP public key (encrypt-to-self).
 // Used for encrypting draft body data at rest.
-func (enc *Encryptor) EncryptBytes(accountID string, data []byte) ([]byte, error) {
-	// Get sender's own key
-	_, pubArmored, err := enc.store.GetDefaultKey(accountID)
+// fromEmail selects the key matching the sender identity; falls back to the account default.
+func (enc *Encryptor) EncryptBytes(accountID, fromEmail string, data []byte) ([]byte, error) {
+	// Get sender's own key (identity-specific, then default)
+	_, pubArmored, err := enc.store.GetKeyByEmail(accountID, fromEmail)
+	if err != nil {
+		return nil, fmt.Errorf("failed to look up PGP key for %s: %w", fromEmail, err)
+	}
+	if pubArmored == "" {
+		_, pubArmored, err = enc.store.GetDefaultKey(accountID)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("no default PGP key for account: %w", err)
 	}
@@ -60,7 +67,8 @@ func (enc *Encryptor) EncryptBytes(accountID string, data []byte) ([]byte, error
 
 // EncryptMessage encrypts an RFC 822 message for the given recipients using PGP/MIME (RFC 3156).
 // The sender's own key is included so they can decrypt their own sent mail.
-func (enc *Encryptor) EncryptMessage(accountID string, recipientEmails []string, rawMsg []byte) ([]byte, error) {
+// fromEmail selects the key matching the sender identity for encrypt-to-self.
+func (enc *Encryptor) EncryptMessage(accountID, fromEmail string, recipientEmails []string, rawMsg []byte) ([]byte, error) {
 	var recipientEntities openpgp.EntityList
 
 	// Collect recipient public keys (if any)
@@ -92,8 +100,12 @@ func (enc *Encryptor) EncryptMessage(accountID string, recipientEmails []string,
 	}
 
 	// Include sender's own key so they can decrypt their own sent mail
-	_, senderArmored, err := enc.store.GetDefaultKey(accountID)
-	if err == nil && senderArmored != "" {
+	// Try identity-specific key first, fall back to account default
+	_, senderArmored, _ := enc.store.GetKeyByEmail(accountID, fromEmail)
+	if senderArmored == "" {
+		_, senderArmored, _ = enc.store.GetDefaultKey(accountID)
+	}
+	if senderArmored != "" {
 		senderEntities, parseErr := ParseArmoredKey(senderArmored)
 		if parseErr == nil {
 			recipientEntities = append(recipientEntities, senderEntities...)
@@ -192,8 +204,9 @@ func (enc *Encryptor) EncryptMessage(accountID string, recipientEmails []string,
 
 // EncryptMessageToSelf encrypts an RFC 822 message using only the sender's own key.
 // Used for encrypting draft messages before syncing to IMAP.
-func (enc *Encryptor) EncryptMessageToSelf(accountID string, rawMsg []byte) ([]byte, error) {
-	return enc.EncryptMessage(accountID, nil, rawMsg)
+// fromEmail selects the key matching the sender identity; falls back to the account default.
+func (enc *Encryptor) EncryptMessageToSelf(accountID, fromEmail string, rawMsg []byte) ([]byte, error) {
+	return enc.EncryptMessage(accountID, fromEmail, nil, rawMsg)
 }
 
 // generateEncryptedBoundary creates a random MIME boundary for encrypted messages

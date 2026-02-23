@@ -39,7 +39,8 @@
       open = false
       onClose?.()
     } catch (err) {
-      error = err instanceof Error ? err.message : String(err)
+      console.error('Failed to delete account:', err)
+      error = $_('toast.failedToDelete')
     } finally {
       deleting = false
     }

@@ -29,7 +29,8 @@
       const description = await Undo()
       toasts.success($_('toast.undone', { values: { description } }))
     } catch (err) {
-      toasts.error($_('toast.undoFailed', { values: { error: String(err) } }))
+      console.error('Undo failed:', err)
+      toasts.error($_('toast.undoFailed'))
     }
   }
 
@@ -38,7 +39,8 @@
       await MarkAllFolderMessagesAsRead(folderId)
       toasts.success($_('toast.markedAllAsRead'), [{ label: $_('common.undo'), onClick: handleUndo }])
     } catch (err) {
-      toasts.error($_('toast.failedToMarkAllAsRead', { values: { error: String(err) } }))
+      console.error('Mark all as read failed:', err)
+      toasts.error($_('toast.failedToMarkAllAsRead'))
     }
   }
 
@@ -47,7 +49,8 @@
       await MarkAllFolderMessagesAsUnread(folderId)
       toasts.success($_('toast.markedAllAsUnread'), [{ label: $_('common.undo'), onClick: handleUndo }])
     } catch (err) {
-      toasts.error($_('toast.failedToMarkAllAsUnread', { values: { error: String(err) } }))
+      console.error('Mark all as unread failed:', err)
+      toasts.error($_('toast.failedToMarkAllAsUnread'))
     }
   }
 </script>

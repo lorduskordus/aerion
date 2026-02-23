@@ -34,9 +34,16 @@ func NewSigner(store *Store, credStore *credentials.Store, log zerolog.Logger) *
 
 // SignMessage wraps a raw RFC 822 message in a multipart/signed structure
 // with a CMS detached signature (clear signing).
-func (s *Signer) SignMessage(accountID string, rawMsg []byte) ([]byte, error) {
-	// Get the default certificate for this account
-	cert, certChainPEM, err := s.store.GetDefaultCertificate(accountID)
+// fromEmail selects the certificate matching the sender identity; falls back to the account default.
+func (s *Signer) SignMessage(accountID, fromEmail string, rawMsg []byte) ([]byte, error) {
+	// Try identity-specific certificate first, fall back to account default
+	cert, certChainPEM, err := s.store.GetCertificateByEmail(accountID, fromEmail)
+	if err != nil {
+		return nil, fmt.Errorf("failed to look up certificate for %s: %w", fromEmail, err)
+	}
+	if cert == nil {
+		cert, certChainPEM, err = s.store.GetDefaultCertificate(accountID)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("no default certificate for account: %w", err)
 	}

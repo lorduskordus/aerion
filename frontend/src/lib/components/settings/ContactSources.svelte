@@ -41,7 +41,8 @@
       await contactSourcesStore.syncSource(sourceId)
       addToast({ type: 'success', message: $_('toast.contactSourceSynced') })
     } catch (err) {
-      addToast({ type: 'error', message: $_('toast.syncFailed', { values: { error: err instanceof Error ? err.message : String(err) } }) })
+      console.error('Contact source sync failed:', err)
+      addToast({ type: 'error', message: $_('toast.syncFailed') })
     } finally {
       syncingSourceId = null
     }
@@ -61,7 +62,8 @@
       showDeleteConfirm = false
       deletingSource = null
     } catch (err) {
-      addToast({ type: 'error', message: $_('toast.failedToDeleteContactSource', { values: { error: err instanceof Error ? err.message : String(err) } }) })
+      console.error('Failed to delete contact source:', err)
+      addToast({ type: 'error', message: $_('toast.failedToDeleteContactSource') })
     } finally {
       isDeleting = false
     }

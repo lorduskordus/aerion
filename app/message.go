@@ -184,6 +184,9 @@ func (a *App) ProcessSMIMEMessage(messageID string) (*SMIMEViewResult, error) {
 		return nil, fmt.Errorf("message not found: %s", messageID)
 	}
 
+	// Determine the recipient identity email for targeted decryption
+	recipientEmail := a.findRecipientIdentityEmail(msg)
+
 	// Load raw S/MIME body
 	rawBody, err := a.messageStore.GetSMIMERawBody(messageID)
 	if err != nil {
@@ -198,7 +201,7 @@ func (a *App) ProcessSMIMEMessage(messageID string) (*SMIMEViewResult, error) {
 
 	// Step 1: Decrypt if encrypted
 	if msg.SMIMEEncrypted {
-		decrypted, isEncrypted, decErr := a.smimeDecryptor.DecryptMessage(msg.AccountID, rawBody)
+		decrypted, isEncrypted, decErr := a.smimeDecryptor.DecryptMessage(msg.AccountID, recipientEmail, rawBody)
 		if decErr != nil {
 			log.Warn().Err(decErr).Str("messageID", messageID).Msg("S/MIME decryption failed")
 			return &SMIMEViewResult{
@@ -300,6 +303,9 @@ func (a *App) ProcessPGPMessage(messageID string) (*PGPViewResult, error) {
 		return nil, fmt.Errorf("message not found: %s", messageID)
 	}
 
+	// Determine the recipient identity email for targeted decryption
+	recipientEmail := a.findRecipientIdentityEmail(msg)
+
 	// Load raw PGP body
 	rawBody, err := a.messageStore.GetPGPRawBody(messageID)
 	if err != nil {
@@ -314,7 +320,7 @@ func (a *App) ProcessPGPMessage(messageID string) (*PGPViewResult, error) {
 
 	// Step 1: Decrypt if encrypted
 	if msg.PGPEncrypted {
-		decrypted, isEncrypted, decErr := a.pgpDecryptor.DecryptMessage(msg.AccountID, rawBody)
+		decrypted, isEncrypted, decErr := a.pgpDecryptor.DecryptMessage(msg.AccountID, recipientEmail, rawBody)
 		if decErr != nil {
 			log.Warn().Err(decErr).Str("messageID", messageID).Msg("PGP decryption failed")
 			return &PGPViewResult{
@@ -374,6 +380,39 @@ func buildInlineAttachmentMap(atts []*message.Attachment) map[string]string {
 		result[att.ContentID] = "data:" + ct + ";base64," + b64
 	}
 	return result
+}
+
+// findRecipientIdentityEmail returns the identity email that was a recipient of the message.
+// Used for targeted decryption — matches the message's To/Cc against the account's identities.
+func (a *App) findRecipientIdentityEmail(msg *message.Message) string {
+	identities, err := a.accountStore.GetIdentities(msg.AccountID)
+	if err != nil || len(identities) == 0 {
+		return ""
+	}
+
+	// Build a set of identity emails (lowercased)
+	identityEmails := make(map[string]string) // lowercase -> original
+	for _, id := range identities {
+		identityEmails[strings.ToLower(strings.TrimSpace(id.Email))] = id.Email
+	}
+
+	// Check To, Cc, and Bcc lists for a matching identity
+	for _, list := range []string{msg.ToList, msg.CcList, msg.BccList} {
+		addrs := parseAddressList(list)
+		for _, addr := range addrs {
+			if email, ok := identityEmails[strings.ToLower(strings.TrimSpace(addr.Address))]; ok {
+				return email
+			}
+		}
+	}
+
+	// Fall back to account email
+	acc, err := a.accountStore.Get(msg.AccountID)
+	if err == nil && acc != nil {
+		return acc.Email
+	}
+
+	return ""
 }
 
 // buildDecryptedAttachmentList builds metadata for the frontend attachment list.

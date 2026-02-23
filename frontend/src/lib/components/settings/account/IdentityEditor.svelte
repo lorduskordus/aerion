@@ -116,7 +116,7 @@
       onClose?.()
     } catch (err) {
       console.error('Failed to save identity:', err)
-      errors.general = err instanceof Error ? err.message : String(err)
+      errors.general = $_('identity.saveFailed')
     } finally {
       saving = false
     }

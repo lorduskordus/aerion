@@ -3,6 +3,7 @@ package sync
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	gosync "sync"
 
@@ -81,6 +82,22 @@ func (e *Engine) SyncFolders(ctx context.Context, accountID string) error {
 	// Fetch STATUS for all folders in parallel
 	results := e.fetchFolderStatusParallel(ctx, accountID, mailboxes)
 
+	// Sort results by path depth so parents are processed before children.
+	// IMAP LIST does not guarantee ordering, so a child may appear before its parent.
+	sort.SliceStable(results, func(i, j int) bool {
+		iDelim := results[i].mailbox.Delimiter
+		jDelim := results[j].mailbox.Delimiter
+		iDepth := 1
+		jDepth := 1
+		if iDelim != "" {
+			iDepth = strings.Count(results[i].mailbox.Name, iDelim) + 1
+		}
+		if jDelim != "" {
+			jDepth = strings.Count(results[j].mailbox.Name, jDelim) + 1
+		}
+		return iDepth < jDepth
+	})
+
 	// Track which paths we've seen and process results
 	seenPaths := make(map[string]bool)
 	processed := 0
@@ -114,6 +131,18 @@ func (e *Engine) SyncFolders(ctx context.Context, accountID string) error {
 			// Update existing folder
 			existing.Name = extractFolderName(mb.Name, mb.Delimiter)
 			existing.Type = folderType
+
+			// Recompute parent (self-healing for broken parent links)
+			if mb.Delimiter != "" {
+				parts := strings.Split(mb.Name, mb.Delimiter)
+				if len(parts) > 1 {
+					parentPath := strings.Join(parts[:len(parts)-1], mb.Delimiter)
+					if parent, ok := localByPath[parentPath]; ok {
+						existing.ParentID = parent.ID
+					}
+				}
+			}
+
 			if status != nil {
 				existing.UIDValidity = status.UIDValidity
 				existing.UIDNext = status.UIDNext

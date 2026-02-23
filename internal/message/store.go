@@ -96,6 +96,7 @@ func (s *Store) ListConversationsUnifiedInbox(offset, limit int, sortOrder strin
 			MAX(CASE WHEN m.is_starred = 1 THEN 1 ELSE 0 END) as is_starred,
 			MAX(m.date) as latest_date,
 			GROUP_CONCAT(m.id) as message_ids,
+			MAX(CASE WHEN m.smime_encrypted = 1 OR m.pgp_encrypted = 1 THEN 1 ELSE 0 END) as is_encrypted,
 			a.id as account_id,
 			a.name as account_name,
 			a.color as account_color,
@@ -131,6 +132,7 @@ func (s *Store) ListConversationsUnifiedInbox(offset, limit int, sortOrder strin
 			&c.IsStarred,
 			&latestDateStr,
 			&messageIDsStr,
+			&c.IsEncrypted,
 			&c.AccountID,
 			&c.AccountName,
 			&c.AccountColor,
@@ -1183,7 +1185,8 @@ func (s *Store) ListConversationsByFolder(folderID string, offset, limit int, so
 			MAX(CASE WHEN has_attachments = 1 THEN 1 ELSE 0 END) as has_attachments,
 			MAX(CASE WHEN is_starred = 1 THEN 1 ELSE 0 END) as is_starred,
 			MAX(date) as latest_date,
-			GROUP_CONCAT(id) as message_ids
+			GROUP_CONCAT(id) as message_ids,
+			MAX(CASE WHEN smime_encrypted = 1 OR pgp_encrypted = 1 THEN 1 ELSE 0 END) as is_encrypted
 		FROM messages
 		WHERE folder_id = ?
 		GROUP BY COALESCE(thread_id, id)
@@ -1214,6 +1217,7 @@ func (s *Store) ListConversationsByFolder(folderID string, offset, limit int, so
 			&c.IsStarred,
 			&latestDateStr,
 			&messageIDsStr,
+			&c.IsEncrypted,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan conversation: %w", err)
@@ -1968,7 +1972,8 @@ func (s *Store) SearchConversations(folderID, query string, offset, limit int) (
 			MAX(CASE WHEN m.has_attachments = 1 THEN 1 ELSE 0 END) as has_attachments,
 			MAX(CASE WHEN m.is_starred = 1 THEN 1 ELSE 0 END) as is_starred,
 			MAX(m.date) as latest_date,
-			GROUP_CONCAT(m.id) as message_ids
+			GROUP_CONCAT(m.id) as message_ids,
+			MAX(CASE WHEN m.smime_encrypted = 1 OR m.pgp_encrypted = 1 THEN 1 ELSE 0 END) as is_encrypted
 		FROM messages m
 		JOIN messages_fts fts ON m.rowid = fts.rowid
 		WHERE m.folder_id = ? AND messages_fts MATCH ?
@@ -2002,6 +2007,7 @@ func (s *Store) SearchConversations(folderID, query string, offset, limit int) (
 			&c.IsStarred,
 			&latestDateStr,
 			&messageIDsStr,
+			&c.IsEncrypted,
 		)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to scan search result: %w", err)
@@ -2078,6 +2084,7 @@ func (s *Store) SearchConversationsUnifiedInbox(query string, offset, limit int)
 			MAX(CASE WHEN m.is_starred = 1 THEN 1 ELSE 0 END) as is_starred,
 			MAX(m.date) as latest_date,
 			GROUP_CONCAT(m.id) as message_ids,
+			MAX(CASE WHEN m.smime_encrypted = 1 OR m.pgp_encrypted = 1 THEN 1 ELSE 0 END) as is_encrypted,
 			a.id as account_id,
 			a.name as account_name,
 			a.color as account_color,
@@ -2119,6 +2126,7 @@ func (s *Store) SearchConversationsUnifiedInbox(query string, offset, limit int)
 			&c.IsStarred,
 			&latestDateStr,
 			&messageIDsStr,
+			&c.IsEncrypted,
 			&c.AccountID,
 			&c.AccountName,
 			&c.AccountColor,

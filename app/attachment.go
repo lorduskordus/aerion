@@ -325,6 +325,9 @@ func (a *App) SaveAllAttachments(messageID string) (string, error) {
 // decryptMessageBody decrypts an encrypted message's raw body and returns the inner plaintext bytes.
 // Handles both S/MIME and PGP, and unwraps any inner signature layer.
 func (a *App) decryptMessageBody(msg *message.Message) ([]byte, error) {
+	// Determine the recipient identity email for targeted decryption
+	recipientEmail := a.findRecipientIdentityEmail(msg)
+
 	// Try S/MIME first
 	if msg.HasSMIME {
 		rawBody, err := a.messageStore.GetSMIMERawBody(msg.ID)
@@ -337,7 +340,7 @@ func (a *App) decryptMessageBody(msg *message.Message) ([]byte, error) {
 
 		innerBytes := rawBody
 		if msg.SMIMEEncrypted {
-			decrypted, _, decErr := a.smimeDecryptor.DecryptMessage(msg.AccountID, rawBody)
+			decrypted, _, decErr := a.smimeDecryptor.DecryptMessage(msg.AccountID, recipientEmail, rawBody)
 			if decErr != nil {
 				return nil, fmt.Errorf("S/MIME decryption failed: %w", decErr)
 			}
@@ -368,7 +371,7 @@ func (a *App) decryptMessageBody(msg *message.Message) ([]byte, error) {
 
 		innerBytes := rawBody
 		if msg.PGPEncrypted {
-			decrypted, _, decErr := a.pgpDecryptor.DecryptMessage(msg.AccountID, rawBody)
+			decrypted, _, decErr := a.pgpDecryptor.DecryptMessage(msg.AccountID, recipientEmail, rawBody)
 			if decErr != nil {
 				return nil, fmt.Errorf("PGP decryption failed: %w", decErr)
 			}

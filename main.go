@@ -30,7 +30,6 @@ var (
 	messageID   = flag.String("message-id", "", "Original message ID for reply/forward")
 	draftID     = flag.String("draft-id", "", "Draft ID to resume editing")
 	dbusNotify  = flag.Bool("dbus-notify", false, "Use direct D-Bus notifications instead of portal (Linux only)")
-	startHidden = flag.Bool("start-hidden", false, "Start with window hidden (background mode)")
 )
 
 // DebugMode returns whether debug logging is enabled
@@ -145,7 +144,6 @@ func runMainMode(mailtoData *app.MailtoData) {
 	// Create an instance of the app structure
 	application := app.NewApp(DebugMode, *dbusNotify)
 	application.SingleInstanceLock = lock
-	application.StartHiddenFlag = *startHidden
 
 	// Store mailto data if provided (will be used after startup)
 	if mailtoData != nil {

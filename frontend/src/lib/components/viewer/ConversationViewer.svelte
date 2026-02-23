@@ -387,8 +387,8 @@
         processPGPMessages(conversation.messages)
       }
     } catch (err) {
-      error = err instanceof Error ? err.message : String(err)
       console.error('Failed to load conversation:', err)
+      error = $_('viewer.failedToLoad')
     } finally {
       loading = false
       // Scroll to bottom to show the latest message
@@ -623,7 +623,8 @@
       ])
       onActionComplete?.(true)
     } catch (err) {
-      toasts.error($_('toast.failedToArchive', { values: { error: String(err) } }))
+      console.error('Archive failed:', err)
+      toasts.error($_('toast.failedToArchive'))
     }
   }
 
@@ -643,7 +644,8 @@
         ])
         onActionComplete?.(true)
       } catch (err) {
-        toasts.error($_('toast.failedToDelete', { values: { error: String(err) } }))
+        console.error('Delete failed:', err)
+        toasts.error($_('toast.failedToDelete'))
       }
     }
   }
@@ -658,7 +660,8 @@
       showDeleteConfirm = false
       onActionComplete?.(true)
     } catch (err) {
-      toasts.error($_('toast.failedToDelete', { values: { error: String(err) } }))
+      console.error('Permanent delete failed:', err)
+      toasts.error($_('toast.failedToDelete'))
       showDeleteConfirm = false
     }
   }
@@ -675,7 +678,8 @@
         focusedMessageId = null
         // Will auto-reload via messages:deleted event
       } catch (err) {
-        toasts.error($_('toast.failedToDelete', { values: { error: String(err) } }))
+        console.error('Permanent delete failed:', err)
+        toasts.error($_('toast.failedToDelete'))
       }
     } else {
       // Move to trash (undoable)
@@ -687,7 +691,8 @@
         focusedMessageId = null
         // Will auto-reload via messages:deleted event
       } catch (err) {
-        toasts.error($_('toast.failedToDelete', { values: { error: String(err) } }))
+        console.error('Delete failed:', err)
+        toasts.error($_('toast.failedToDelete'))
       }
     }
   }
@@ -712,7 +717,8 @@
       }
       onActionComplete?.(true)
     } catch (err) {
-      toasts.error($_(isSpamFolder ? 'toast.failedToMarkAsNotSpam' : 'toast.failedToMarkAsSpam', { values: { error: String(err) } }))
+      console.error('Spam toggle failed:', err)
+      toasts.error($_(isSpamFolder ? 'toast.failedToMarkAsNotSpam' : 'toast.failedToMarkAsSpam'))
     }
   }
 
@@ -732,7 +738,8 @@
         toasts.success($_('toast.starred'))
       }
     } catch (err) {
-      toasts.error($_('toast.failedToUpdateStar', { values: { error: String(err) } }))
+      console.error('Star toggle failed:', err)
+      toasts.error($_('toast.failedToUpdateStar'))
     }
   }
 
@@ -752,7 +759,8 @@
         toasts.success($_('toast.markedAsRead'))
       }
     } catch (err) {
-      toasts.error($_('toast.failedToUpdateReadStatus', { values: { error: String(err) } }))
+      console.error('Read status toggle failed:', err)
+      toasts.error($_('toast.failedToUpdateReadStatus'))
     }
   }
 
@@ -766,7 +774,8 @@
       }
       onActionComplete?.()
     } catch (err) {
-      toasts.error($_('toast.undoFailed', { values: { error: String(err) } }))
+      console.error('Undo failed:', err)
+      toasts.error($_('toast.undoFailed'))
     }
   }
 

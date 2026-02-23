@@ -136,6 +136,34 @@ func (s *Store) SetDefaultCertificate(accountID, certID string) error {
 	return tx.Commit()
 }
 
+// GetCertificateByEmail returns the certificate matching a specific email for an account.
+// Returns nil (not an error) if no matching certificate exists.
+func (s *Store) GetCertificateByEmail(accountID, email string) (*Certificate, string, error) {
+	cert := &Certificate{}
+	var certChainPEM string
+
+	err := s.db.QueryRow(`
+		SELECT id, account_id, email, subject, issuer, serial_number,
+			fingerprint, not_before, not_after, cert_chain_pem, is_default, created_at
+		FROM smime_certificates
+		WHERE account_id = ? AND LOWER(email) = LOWER(?)`, accountID, email,
+	).Scan(
+		&cert.ID, &cert.AccountID, &cert.Email, &cert.Subject, &cert.Issuer,
+		&cert.SerialNumber, &cert.Fingerprint, &cert.NotBefore, &cert.NotAfter,
+		&certChainPEM, &cert.IsDefault, &cert.CreatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, "", nil
+	}
+	if err != nil {
+		return nil, "", err
+	}
+
+	cert.IsExpired = time.Now().After(cert.NotAfter)
+	cert.IsSelfSigned = cert.Subject == cert.Issuer
+	return cert, certChainPEM, nil
+}
+
 // GetDefaultCertificate returns the default signing certificate for an account
 func (s *Store) GetDefaultCertificate(accountID string) (*Certificate, string, error) {
 	cert := &Certificate{}

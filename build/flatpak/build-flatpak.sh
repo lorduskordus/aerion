@@ -1,17 +1,18 @@
 #!/bin/bash
-# Build Aerion Flatpak locally
+# Build Aerion Flatpak for local development/testing.
+# Builds the binary on the host, then packages it into a Flatpak.
 
 set -e
 
 # Change to project root
 cd "$(dirname "$0")/../.."
 
-echo "=== Aerion Flatpak Builder ==="
+echo "=== Aerion Flatpak Dev Builder ==="
 echo ""
 
 # Check if flatpak-builder is installed
 if ! command -v flatpak-builder &> /dev/null; then
-    echo "❌ flatpak-builder is not installed"
+    echo "flatpak-builder is not installed"
     echo ""
     echo "Install it with:"
     echo "  Fedora:        sudo dnf install flatpak-builder"
@@ -20,79 +21,56 @@ if ! command -v flatpak-builder &> /dev/null; then
     exit 1
 fi
 
+# Add flathub remote if not present
+echo "Checking Flathub remote..."
+if ! flatpak remote-list | grep -q "flathub"; then
+    echo "Flathub remote not found. Adding..."
+    flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
+fi
+
 # Check if runtimes are installed
 echo "Checking for required runtimes..."
 if ! flatpak list --runtime | grep -q "org.gnome.Platform.*49"; then
-    echo "⚠️  GNOME Platform 49 not found"
-    echo "Installing..."
-    flatpak install -y flathub org.gnome.Platform//49 org.gnome.Sdk//49
+    echo "GNOME Platform 49 not found. Installing..."
+    flatpak install -y --user flathub org.gnome.Platform//49 org.gnome.Sdk//49
 fi
 
-if ! flatpak list | grep -q "org.freedesktop.Sdk.Extension.golang"; then
-    echo "⚠️  Go SDK extension not found"
-    echo "Installing..."
-    flatpak install -y flathub org.freedesktop.Sdk.Extension.golang
-fi
-
-if ! flatpak list | grep -q "org.freedesktop.Sdk.Extension.node20"; then
-    echo "⚠️  Node.js 20 SDK extension not found"
-    echo "Installing..."
-    flatpak install -y flathub org.freedesktop.Sdk.Extension.node20
-fi
-
-echo "✅ All runtimes installed"
+echo "All runtimes installed"
 echo ""
 
 # Check for OAuth credentials
 if [ -z "$GOOGLE_CLIENT_ID" ] && [ -z "$MICROSOFT_CLIENT_ID" ]; then
-    echo "⚠️  Warning: No OAuth credentials found"
+    echo "Warning: No OAuth credentials found"
     echo "Gmail and Outlook OAuth will not work in the built app"
     echo ""
-    echo "To include OAuth credentials, set environment variables before running:"
-    echo "  export GOOGLE_CLIENT_ID='your-client-id'"
-    echo "  export GOOGLE_CLIENT_SECRET='your-client-secret'"
-    echo "  export MICROSOFT_CLIENT_ID='your-microsoft-client-id'"
-    echo ""
-    read -p "Continue without OAuth credentials? [y/N] " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 1
-    fi
 fi
 
-# Validate metainfo if appstream-util is available
-if command -v appstream-util &> /dev/null; then
-    echo "Validating AppStream metadata..."
-    if appstream-util validate build/flatpak/io.github.hkdb.Aerion.metainfo.xml 2>&1 | grep -q "FAILED"; then
-        echo "⚠️  AppStream validation warnings (non-fatal):"
-        appstream-util validate build/flatpak/io.github.hkdb.Aerion.metainfo.xml 2>&1 | grep -v "Validation was successful" || true
-    else
-        echo "✅ AppStream metadata valid"
-    fi
-    echo ""
-fi
+# Build the binary on the host
+echo "Building Aerion binary on host..."
+make build-linux
 
-# Clean previous build
-echo "Cleaning previous build..."
-rm -rf .flatpak-builder build-dir
-
-# Build
+# Package into Flatpak using the dev manifest (packaging only, no compilation)
 echo ""
-echo "Building Flatpak..."
-echo "This will take several minutes on first build..."
+echo "Packaging into Flatpak..."
 echo ""
 
-flatpak-builder --force-clean --user --install-deps-from=flathub build-dir build/flatpak/io.github.hkdb.Aerion-source.yml
+flatpak-builder --force-clean --user --install-deps-from=flathub \
+    --repo=repo build-dir build/flatpak/io.github.hkdb.Aerion-dev.yml
 
-# Install
+# Create bundle for distribution/testing on other machines
 echo ""
-echo "Installing Flatpak..."
-flatpak-builder --user --install --force-clean build-dir build/flatpak/io.github.hkdb.Aerion-source.yml
+echo "Creating .flatpak bundle..."
+mkdir -p build/bin
+
+flatpak build-bundle repo build/bin/Aerion-dev.flatpak io.github.hkdb.Aerion
 
 echo ""
-echo "✅ Build complete!"
+echo "Build complete!"
 echo ""
-echo "Run with: flatpak run io.github.hkdb.Aerion"
-echo "Or search for 'Aerion' in your application menu"
+echo "Flatpak bundle: build/bin/Aerion-dev.flatpak"
 echo ""
-echo "To uninstall: flatpak uninstall --user io.github.hkdb.Aerion"
+echo "To install on a target machine:"
+echo "  flatpak install --user Aerion-dev.flatpak"
+echo ""
+echo "To run:"
+echo "  flatpak run io.github.hkdb.Aerion"

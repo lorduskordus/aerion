@@ -3,7 +3,7 @@
   // @ts-ignore - wailsjs path
   import { account, folder } from '../../../../wailsjs/go/models'
   import type { SyncProgress } from '$lib/stores/accounts.svelte'
-  import FolderContextMenu from './FolderContextMenu.svelte'
+  import FolderTreeItem from './FolderTreeItem.svelte'
   import { _ } from '$lib/i18n'
 
   interface Props {
@@ -23,6 +23,8 @@
     onEdit?: () => void
     onDelete?: () => void
     onSync?: () => void
+    collapsedFolders?: Record<string, boolean>
+    onToggleFolderCollapse?: (folderId: string) => void
   }
 
   let {
@@ -42,34 +44,15 @@
     onEdit,
     onDelete,
     onSync,
+    collapsedFolders = {},
+    onToggleFolderCollapse,
   }: Props = $props()
   
-  // Check if a folder is selected in this account tree (not in unified section)
-  function isFolderSelected(folderId: string): boolean {
-    return selectionSource === 'account' && selectedFolderId === folderId
-  }
-
   let showMenu = $state(false)
 
   // Toggle expand/collapse via callback
   function toggleExpanded() {
     onToggleExpanded?.()
-  }
-
-  // Folder type to icon mapping
-  const folderIcons: Record<string, string> = {
-    inbox: 'mdi:inbox',
-    sent: 'mdi:send',
-    drafts: 'mdi:file-document-edit-outline',
-    trash: 'mdi:delete-outline',
-    archive: 'mdi:archive-outline',
-    spam: 'mdi:alert-octagon-outline',
-    all: 'mdi:email-multiple-outline',
-    folder: 'mdi:folder-outline',
-  }
-
-  function getFolderIcon(type: string): string {
-    return folderIcons[type] || folderIcons.folder
   }
 
   function selectFolder(f: folder.Folder) {
@@ -216,66 +199,14 @@
         </div>
       {:else}
         {#each folders as tree (tree.folder?.id ?? 'unknown')}
-          {#if tree.folder}
-            <FolderContextMenu folderId={tree.folder.id}>
-              <button
-                class="w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors {isFolderSelected(tree.folder.id)
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'text-foreground hover:bg-muted/50'}"
-                data-sidebar-item="folder"
-                data-folder-id={tree.folder.id}
-                onclick={() => selectFolder(tree.folder!)}
-              >
-                <Icon
-                  icon={getFolderIcon(tree.folder.type)}
-                  class="w-4 h-4 flex-shrink-0"
-                />
-                <span class="truncate flex-1 text-left">{tree.folder.name}</span>
-                {#if tree.folder.unreadCount > 0}
-                  <span
-                    class="px-1.5 py-0.5 text-xs font-medium rounded-full bg-primary text-primary-foreground"
-                  >
-                    {tree.folder.unreadCount}
-                  </span>
-                {/if}
-              </button>
-            </FolderContextMenu>
-
-            <!-- Nested folders -->
-            {#if tree.children && tree.children.length > 0}
-              <div class="ml-4">
-                {#each tree.children as childTree (childTree.folder?.id ?? 'unknown')}
-                  {#if childTree.folder}
-                    <FolderContextMenu folderId={childTree.folder.id}>
-                      <button
-                        class="w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors {isFolderSelected(childTree.folder.id)
-                          ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-foreground hover:bg-muted/50'}"
-                        data-sidebar-item="folder"
-                        data-folder-id={childTree.folder.id}
-                        onclick={() => selectFolder(childTree.folder!)}
-                      >
-                        <Icon
-                          icon={getFolderIcon(childTree.folder.type)}
-                          class="w-4 h-4 flex-shrink-0"
-                        />
-                        <span class="truncate flex-1 text-left"
-                          >{childTree.folder.name}</span
-                        >
-                        {#if childTree.folder.unreadCount > 0}
-                          <span
-                            class="px-1.5 py-0.5 text-xs font-medium rounded-full bg-primary text-primary-foreground"
-                          >
-                            {childTree.folder.unreadCount}
-                          </span>
-                        {/if}
-                      </button>
-                    </FolderContextMenu>
-                  {/if}
-                {/each}
-              </div>
-            {/if}
-          {/if}
+          <FolderTreeItem
+            {tree}
+            {selectedFolderId}
+            {selectionSource}
+            {collapsedFolders}
+            onFolderSelect={(f) => selectFolder(f)}
+            onToggleCollapse={(folderId) => onToggleFolderCollapse?.(folderId)}
+          />
         {/each}
       {/if}
     </div>

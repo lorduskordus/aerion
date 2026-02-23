@@ -42,7 +42,7 @@ For a complete, real-world example of a translated locale file, refer to `fronte
   - Some placeholders contain localized relative time strings from date-fns (e.g., `{time}` may render as "2 minutes ago" or "2 分鐘前")
   - Example: English `"synced": "Synced {time}"` → Chinese `"synced": "{time}同步"` (time goes before the verb in Chinese)
 - Do not translate JSON keys (left side of `:`)
-- The file has ~900 keys organized by namespace: `common`, `sidebar`, `messageList`, `viewer`, `composer`, `contextMenu`, `toast`, `responsive`, `settings`, `settingsAbout`, `settingsAccounts`, `settingsGeneral`, `editor`, `account`, `identity`, `security`, `contactSource`, `certificate`, `terms`, `dialog`, `date`, `aria`, `window`, `attachment`, `search`, `sort`, `oauth`
+- The file has ~900+ keys organized by namespace: `common`, `sidebar`, `messageList`, `viewer`, `composer`, `contextMenu`, `toast`, `responsive`, `settings`, `settingsAbout`, `settingsAccounts`, `settingsGeneral`, `editor`, `account`, `identity`, `security`, `contactSource`, `certificate`, `terms`, `dialog`, `date`, `aria`, `window`, `attachment`, `search`, `sort`, `oauth`
 
 ### 2. Register the Locale
 
@@ -148,10 +148,10 @@ No backend changes are needed. The language setting is stored via the existing `
 | `common` | Shared buttons and labels (Save, Cancel, Delete, etc.) |
 | `sidebar` | Sidebar navigation (Compose, All Inboxes, folder names) |
 | `messageList` | Message list UI (select all, no messages, loading) |
-| `viewer` | Message viewer (reply, forward, attachments, S/MIME/PGP banners) |
+| `viewer` | Message viewer (reply, forward, attachments, error states, S/MIME/PGP banners) |
 | `composer` | Email composer (To, Cc, Subject, Send, formatting) |
 | `contextMenu` | Right-click context menus (Reply, Archive, Mark as Read) |
-| `toast` | Toast notification messages |
+| `toast` | Toast notification messages (clean translated messages without raw error details) |
 | `responsive` | Responsive layout labels (back, folders) |
 | `settings` | Settings dialog tabs and titles |
 | `settingsAbout` | About tab in settings |
@@ -159,7 +159,7 @@ No backend changes are needed. The language setting is stored via the existing `
 | `settingsGeneral` | General settings tab (theme, density, read receipts) |
 | `editor` | TipTap editor toolbar labels |
 | `account` | Account dialog and management |
-| `identity` | Identity editor (name, email, signature) |
+| `identity` | Identity editor (email address management, display names, signatures) |
 | `security` | S/MIME and PGP security settings |
 | `contactSource` | CardDAV contact source management |
 | `certificate` | TLS certificate trust dialog |
@@ -172,3 +172,22 @@ No backend changes are needed. The language setting is stored via the existing `
 | `search` | Search UI |
 | `sort` | Sort options (newest first, oldest first) |
 | `oauth` | OAuth flow UI |
+
+## Key Conventions
+
+- **Error/failure messages**: Use clean, translated messages. Do not include raw error details or `{error}` interpolation tokens in failure messages — keep them user-friendly (e.g., `"Failed to save."` not `"Failed to save: {error}"`).
+- **Placeholder tokens**: `{placeholder}` tokens are used for dynamic values. Common tokens include:
+  - `{name}` — account or contact source name
+  - `{email}` / `{emails}` — email address(es)
+  - `{count}` — numeric count (messages, attachments, etc.)
+  - `{mode}` — composer mode (reply, forward, etc.)
+  - `{time}` — relative time string (from date-fns, already localized)
+  - `{folder}` — folder name
+  - `{percentage}` — sync progress percentage
+  - `{version}` — app version string
+  - `{provider}` — OAuth provider name (Google, Microsoft)
+  - `{query}` — search query text
+  - `{domain}` / `{sender}` — email domain or sender address
+  - `{description}` — undo action description
+  - `{filename}` — attachment filename
+- **Token positioning**: Reposition tokens to match your language's grammar — don't assume English word order is correct for your language.

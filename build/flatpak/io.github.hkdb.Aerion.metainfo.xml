@@ -128,6 +128,19 @@
   </provides>
 
   <releases>
+    <release version="0.1.27" date="2026-02-23">
+      <description>
+        <ul>
+          <li>Made IMAP folders with sub-folders collapsible</li>
+          <li>Identity aware PGP and S/MIME</li>
+          <li>Improved guard rails for PGP and S/MIME import, sign, encrypt, and decrypt</li>
+          <li>Added multi-language support for missing dynamic message translations</li>
+          <li>Proper flatpak implementation of autostart on login - #33</li>
+          <li>Fixed nested IMAP folders fetching - #34</li>
+          <li>Fixed empty or encrypted body preview in message list</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.26" date="2026-02-22">
       <description>
         <ul>

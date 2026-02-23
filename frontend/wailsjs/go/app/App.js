@@ -330,6 +330,10 @@ export function GetPGPEncryptPolicy(arg1) {
   return window['go']['app']['App']['GetPGPEncryptPolicy'](arg1);
 }
 
+export function GetPGPKeyForEmail(arg1, arg2) {
+  return window['go']['app']['App']['GetPGPKeyForEmail'](arg1, arg2);
+}
+
 export function GetPGPKeyServers() {
   return window['go']['app']['App']['GetPGPKeyServers']();
 }
@@ -348,6 +352,10 @@ export function GetReadReceiptResponsePolicy() {
 
 export function GetRunBackground() {
   return window['go']['app']['App']['GetRunBackground']();
+}
+
+export function GetSMIMECertificateForEmail(arg1, arg2) {
+  return window['go']['app']['App']['GetSMIMECertificateForEmail'](arg1, arg2);
 }
 
 export function GetSMIMEEncryptPolicy(arg1) {

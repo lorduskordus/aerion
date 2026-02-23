@@ -19,7 +19,6 @@ const (
 	<key>ProgramArguments</key>
 	<array>
 		<string>%s</string>
-		<string>--start-hidden</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>

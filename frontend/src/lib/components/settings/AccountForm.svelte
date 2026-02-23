@@ -445,9 +445,10 @@
         testResult = { success: false, message: result.error || $_('account.connectionFailed') }
       }
     } catch (err) {
+      console.error('Connection test failed:', err)
       testResult = {
         success: false,
-        message: err instanceof Error ? err.message : String(err),
+        message: $_('account.connectionTestFailed'),
       }
     } finally {
       testing = false
@@ -505,9 +506,10 @@
         oauthStore.reset()
       }
     } catch (err) {
+      console.error('Account save failed:', err)
       testResult = {
         success: false,
-        message: err instanceof Error ? err.message : String(err),
+        message: $_('account.saveFailed'),
       }
     } finally {
       submitting = false
@@ -741,7 +743,7 @@
                             {$_('account.authFailed')}
                           </p>
                           <p class="text-xs text-muted-foreground mt-1">
-                            {oauthStore.flowError}
+                            {$_('account.authFailed')}
                           </p>
                         </div>
                       </div>

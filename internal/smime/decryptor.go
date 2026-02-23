@@ -32,13 +32,23 @@ func NewDecryptor(store *Store, credStore *credentials.Store, log zerolog.Logger
 
 // DecryptBytes decrypts raw PKCS#7 DER data using the account's S/MIME private key.
 // Used for decrypting encrypted draft body data.
-func (d *Decryptor) DecryptBytes(accountID string, encryptedData []byte) ([]byte, error) {
+// recipientEmail narrows the key search to the matching identity; falls back to trying all keys.
+func (d *Decryptor) DecryptBytes(accountID, recipientEmail string, encryptedData []byte) ([]byte, error) {
 	p7, err := pkcs7.Parse(encryptedData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse PKCS#7 data: %w", err)
 	}
 
-	// List all certificates for this account and try decryption with each
+	// Try identity-specific certificate first
+	if recipientEmail != "" {
+		decrypted, err := d.tryDecryptWithEmail(p7, accountID, recipientEmail)
+		if err == nil {
+			return decrypted, nil
+		}
+		d.log.Debug().Err(err).Str("email", recipientEmail).Msg("Identity-specific decryption failed, trying all certs")
+	}
+
+	// Fall back to trying all certificates for this account
 	certs, err := d.store.ListCertificates(accountID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list certificates: %w", err)
@@ -47,19 +57,16 @@ func (d *Decryptor) DecryptBytes(accountID string, encryptedData []byte) ([]byte
 	for _, cert := range certs {
 		_, certChainPEM, getErr := d.store.GetCertificate(cert.ID)
 		if getErr != nil {
-			d.log.Debug().Err(getErr).Str("certID", cert.ID).Msg("Failed to get certificate for decryption")
 			continue
 		}
 
 		x509Cert, parseErr := parseCertificateFromPEM(certChainPEM)
 		if parseErr != nil {
-			d.log.Debug().Err(parseErr).Str("certID", cert.ID).Msg("Failed to parse certificate PEM")
 			continue
 		}
 
 		privateKeyPEM, keyErr := d.credStore.GetSMIMEPrivateKey(cert.ID)
 		if keyErr != nil {
-			d.log.Debug().Err(keyErr).Str("certID", cert.ID).Msg("Failed to get private key")
 			continue
 		}
 
@@ -70,13 +77,11 @@ func (d *Decryptor) DecryptBytes(accountID string, encryptedData []byte) ([]byte
 
 		privateKey, keyParseErr := x509.ParsePKCS8PrivateKey(block.Bytes)
 		if keyParseErr != nil {
-			d.log.Debug().Err(keyParseErr).Str("certID", cert.ID).Msg("Failed to parse private key")
 			continue
 		}
 
 		decrypted, decryptErr := p7.Decrypt(x509Cert, privateKey)
 		if decryptErr != nil {
-			d.log.Debug().Err(decryptErr).Str("certID", cert.ID).Msg("Decryption failed with this key, trying next")
 			continue
 		}
 
@@ -86,10 +91,44 @@ func (d *Decryptor) DecryptBytes(accountID string, encryptedData []byte) ([]byte
 	return nil, fmt.Errorf("no matching private key found for decryption")
 }
 
+// tryDecryptWithEmail attempts decryption using the certificate matching the given email.
+func (d *Decryptor) tryDecryptWithEmail(p7 *pkcs7.PKCS7, accountID, email string) ([]byte, error) {
+	cert, certChainPEM, err := d.store.GetCertificateByEmail(accountID, email)
+	if err != nil {
+		return nil, err
+	}
+	if cert == nil {
+		return nil, fmt.Errorf("no certificate for email %s", email)
+	}
+
+	x509Cert, err := parseCertificateFromPEM(certChainPEM)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse certificate: %w", err)
+	}
+
+	privateKeyPEM, err := d.credStore.GetSMIMEPrivateKey(cert.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get private key: %w", err)
+	}
+
+	block, _ := pem.Decode(privateKeyPEM)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode private key PEM")
+	}
+
+	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+
+	return p7.Decrypt(x509Cert, privateKey)
+}
+
 // DecryptMessage decrypts an S/MIME encrypted message.
+// recipientEmail narrows the key search to the matching identity; falls back to trying all keys.
 // Returns the decrypted bytes (may be multipart/signed if sign-then-encrypt),
 // a boolean indicating whether the message was encrypted, and any error.
-func (d *Decryptor) DecryptMessage(accountID string, raw []byte) ([]byte, bool, error) {
+func (d *Decryptor) DecryptMessage(accountID, recipientEmail string, raw []byte) ([]byte, bool, error) {
 	// Parse the message to find Content-Type
 	headerEnd := bytes.Index(raw, []byte("\r\n\r\n"))
 	bodyStart := headerEnd + 4
@@ -142,31 +181,35 @@ func (d *Decryptor) DecryptMessage(accountID string, raw []byte) ([]byte, bool, 
 		}
 	}
 
-	// List all certificates for this account and try decryption with each
+	// Try identity-specific certificate first
+	if recipientEmail != "" {
+		decrypted, decErr := d.tryDecryptWithEmail(p7, accountID, recipientEmail)
+		if decErr == nil {
+			d.log.Info().Str("email", recipientEmail).Msg("Successfully decrypted S/MIME message with identity cert")
+			return decrypted, true, nil
+		}
+		d.log.Debug().Err(decErr).Str("email", recipientEmail).Msg("Identity-specific decryption failed, trying all certs")
+	}
+
+	// Fall back to trying all certificates for this account
 	certs, err := d.store.ListCertificates(accountID)
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to list certificates: %w", err)
 	}
 
 	for _, cert := range certs {
-		// Get the certificate chain PEM
 		_, certChainPEM, getErr := d.store.GetCertificate(cert.ID)
 		if getErr != nil {
-			d.log.Debug().Err(getErr).Str("certID", cert.ID).Msg("Failed to get certificate for decryption")
 			continue
 		}
 
-		// Parse the leaf certificate
 		x509Cert, parseErr := parseCertificateFromPEM(certChainPEM)
 		if parseErr != nil {
-			d.log.Debug().Err(parseErr).Str("certID", cert.ID).Msg("Failed to parse certificate PEM")
 			continue
 		}
 
-		// Get the private key
 		privateKeyPEM, keyErr := d.credStore.GetSMIMEPrivateKey(cert.ID)
 		if keyErr != nil {
-			d.log.Debug().Err(keyErr).Str("certID", cert.ID).Msg("Failed to get private key")
 			continue
 		}
 
@@ -177,14 +220,11 @@ func (d *Decryptor) DecryptMessage(accountID string, raw []byte) ([]byte, bool, 
 
 		privateKey, keyParseErr := x509.ParsePKCS8PrivateKey(block.Bytes)
 		if keyParseErr != nil {
-			d.log.Debug().Err(keyParseErr).Str("certID", cert.ID).Msg("Failed to parse private key")
 			continue
 		}
 
-		// Try decryption
 		decrypted, decryptErr := p7.Decrypt(x509Cert, privateKey)
 		if decryptErr != nil {
-			d.log.Debug().Err(decryptErr).Str("certID", cert.ID).Msg("Decryption failed with this key, trying next")
 			continue
 		}
 
