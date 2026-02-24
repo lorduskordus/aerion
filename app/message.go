@@ -92,23 +92,24 @@ func (a *App) FetchMessageBody(messageID string) (*message.Message, error) {
 
 // GetConversations returns conversations (threaded messages) for a folder with pagination
 // sortOrder can be "newest" (default) or "oldest"
-func (a *App) GetConversations(accountID, folderID string, offset, limit int, sortOrder string) ([]*message.Conversation, error) {
-	return a.messageStore.ListConversationsByFolder(folderID, offset, limit, sortOrder)
+// filter can be "" (all), "unread", "starred", or "attachments"
+func (a *App) GetConversations(accountID, folderID string, offset, limit int, sortOrder, filter string) ([]*message.Conversation, error) {
+	return a.messageStore.ListConversationsByFolder(folderID, offset, limit, sortOrder, filter)
 }
 
 // GetConversationCount returns the total conversation count for a folder
-func (a *App) GetConversationCount(accountID, folderID string) (int, error) {
-	return a.messageStore.CountConversationsByFolder(folderID)
+func (a *App) GetConversationCount(accountID, folderID, filter string) (int, error) {
+	return a.messageStore.CountConversationsByFolder(folderID, filter)
 }
 
 // GetUnifiedInboxConversations returns conversations from all inbox folders across all accounts
-func (a *App) GetUnifiedInboxConversations(offset, limit int, sortOrder string) ([]*message.Conversation, error) {
-	return a.messageStore.ListConversationsUnifiedInbox(offset, limit, sortOrder)
+func (a *App) GetUnifiedInboxConversations(offset, limit int, sortOrder, filter string) ([]*message.Conversation, error) {
+	return a.messageStore.ListConversationsUnifiedInbox(offset, limit, sortOrder, filter)
 }
 
 // GetUnifiedInboxCount returns the total conversation count across all inbox folders
-func (a *App) GetUnifiedInboxCount() (int, error) {
-	return a.messageStore.CountConversationsUnifiedInbox()
+func (a *App) GetUnifiedInboxCount(filter string) (int, error) {
+	return a.messageStore.CountConversationsUnifiedInbox(filter)
 }
 
 // GetUnifiedInboxUnreadCount returns the total unread count across all inbox folders

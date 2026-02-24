@@ -88,6 +88,25 @@
   let isSearching = $state(false)
   let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
+  // Filter state
+  let filterMode = $state<string>('')  // '' | 'unread' | 'starred' | 'attachments'
+
+  const filterLabel = $derived((() => {
+    switch (filterMode) {
+      case 'unread': return $_('messageList.filterUnread')
+      case 'starred': return $_('messageList.filterStarred')
+      case 'attachments': return $_('messageList.filterAttachments')
+      default: return ''
+    }
+  })())
+
+  const filterOptions = $derived([
+    { value: '', label: $_('messageList.filterAll') },
+    { value: 'unread', label: $_('messageList.filterUnread'), separator: true },
+    { value: 'starred', label: $_('messageList.filterStarred') },
+    { value: 'attachments', label: $_('messageList.filterAttachments') },
+  ])
+
   // Server search state
   let serverSearchMode = $state(false)
   let serverSearchResults = $state<any[]>([])
@@ -169,11 +188,14 @@
 
     // Listen for FTS indexing status changes
     EventsOn('fts:indexing', (data: { status: string }) => {
-      if (data.status === 'completed') {
-        indexComplete = true
-        isIndexing = false
-      } else if (data.status === 'started') {
-        isIndexing = true
+      switch (data.status) {
+        case 'completed':
+          indexComplete = true
+          isIndexing = false
+          break
+        case 'started':
+          isIndexing = true
+          break
       }
     })
 
@@ -218,35 +240,36 @@
     const currentAccount = isUnifiedView ? 'unified' : accountId
     const currentFolder = isUnifiedView ? 'inbox' : folderId
 
-    if (isUnifiedView || (accountId && folderId)) {
-      // Only reset and reload if folder actually changed
-      if (currentAccount !== prevAccountId || currentFolder !== prevFolderId) {
-        prevAccountId = currentAccount
-        prevFolderId = currentFolder
-        offset = 0
-        checkedThreadIds = new Set()
-        lastClickedIndex = null
-        // Clear search state when folder changes
-        showSearch = false
-        searchQuery = ''
-        searchResults = []
-        searchTotalCount = 0
-        searchOffset = 0
-        serverSearchMode = false
-        serverSearchResults = []
-        serverSearchCount = 0
-        serverSearchTotalCount = 0
-        lastServerQuery = ''
-        loadConversations()
-        checkFTSIndexStatus()
-      }
-    } else {
+    if (!isUnifiedView && (!accountId || !folderId)) {
       prevAccountId = null
       prevFolderId = null
       conversations = []
       totalCount = 0
       checkedThreadIds = new Set()
+      return
     }
+
+    // Only reset and reload if folder actually changed
+    if (currentAccount === prevAccountId && currentFolder === prevFolderId) return
+
+    prevAccountId = currentAccount
+    prevFolderId = currentFolder
+    offset = 0
+    checkedThreadIds = new Set()
+    lastClickedIndex = null
+    // Clear search state when folder changes
+    showSearch = false
+    searchQuery = ''
+    searchResults = []
+    searchTotalCount = 0
+    searchOffset = 0
+    serverSearchMode = false
+    serverSearchResults = []
+    serverSearchCount = 0
+    serverSearchTotalCount = 0
+    lastServerQuery = ''
+    loadConversations()
+    checkFTSIndexStatus()
   })
 
   // Compute selected message IDs from all checked conversations (for multi-select context menu)
@@ -297,59 +320,50 @@
     const limit = customLimit ?? PAGE_SIZE
 
     try {
-      let convList: message.Conversation[]
-      let count: number
+      const [convList, count] = isUnifiedView
+        ? await Promise.all([
+            GetUnifiedInboxConversations(currentOffset, limit, getMessageListSortOrder(), filterMode),
+            GetUnifiedInboxCount(filterMode),
+          ])
+        : await Promise.all([
+            GetConversations(accountId!, folderId!, currentOffset, limit, getMessageListSortOrder(), filterMode),
+            GetConversationCount(accountId!, folderId!, filterMode),
+          ])
 
-      if (isUnifiedView) {
-        // Load from unified inbox
-        [convList, count] = await Promise.all([
-          GetUnifiedInboxConversations(currentOffset, limit, getMessageListSortOrder()),
-          GetUnifiedInboxCount(),
-        ])
-      } else {
-        // Load from specific folder
-        [convList, count] = await Promise.all([
-          GetConversations(accountId!, folderId!, currentOffset, limit, getMessageListSortOrder()),
-          GetConversationCount(accountId!, folderId!),
-        ])
+      if (currentOffset !== 0) {
+        conversations = [...conversations, ...(convList || [])]
+        totalCount = count
+        return
       }
 
-      if (currentOffset === 0) {
-        conversations = convList || []
+      conversations = convList || []
 
-        // Apply any flag changes that arrived while we were loading.
-        // This fixes the race where MarkAsRead fires before the new array is ready.
-        if (pendingFlagChanges.length > 0) {
-          for (const change of pendingFlagChanges) {
-            for (const c of conversations) {
-              const affectedCount = (c.messageIds || []).filter(
-                (id: string) => change.messageIds.includes(id)
-              ).length
-              if (affectedCount > 0) {
-                const delta = change.isRead ? -affectedCount : affectedCount
-                c.unreadCount = Math.max(0, (c.unreadCount || 0) + delta)
-              }
+      // Apply any flag changes that arrived while we were loading.
+      // This fixes the race where MarkAsRead fires before the new array is ready.
+      if (pendingFlagChanges.length > 0) {
+        for (const change of pendingFlagChanges) {
+          for (const c of conversations) {
+            const affectedCount = (c.messageIds || []).filter(
+              (id: string) => change.messageIds.includes(id)
+            ).length
+            if (affectedCount > 0) {
+              const delta = change.isRead ? -affectedCount : affectedCount
+              c.unreadCount = Math.max(0, (c.unreadCount || 0) + delta)
             }
           }
-          pendingFlagChanges = []
         }
+        pendingFlagChanges = []
+      }
 
-        // Check if we switched to a different folder
-        const folderChanged = lastLoadedFolderId !== folderId
-        lastLoadedFolderId = folderId
+      // Check if we switched to a different folder
+      const folderChanged = lastLoadedFolderId !== folderId
+      lastLoadedFolderId = folderId
 
-        // Auto-select first message on folder navigation or initial load
-        if (conversations.length > 0) {
-          // If folder changed, always auto-select first message
-          // If same folder (refresh), keep existing selection
-          if (folderChanged || !selectedThreadId) {
-            selectedThreadId = conversations[0].threadId
-          }
-        } else {
-          selectedThreadId = null
-        }
-      } else {
-        conversations = [...conversations, ...(convList || [])]
+      // Auto-select first message on folder navigation or initial load
+      if (conversations.length === 0) {
+        selectedThreadId = null
+      } else if (folderChanged || !selectedThreadId) {
+        selectedThreadId = conversations[0].threadId
       }
       totalCount = count
     } catch (err) {
@@ -394,9 +408,9 @@
   export async function toggleFolderSync() {
     if (syncing) {
       await cancelFolderSync()
-    } else {
-      await syncFolder()
+      return
     }
+    await syncFolder()
   }
 
   // Force re-sync folder (clears bodies & attachments, then re-fetches)
@@ -456,22 +470,19 @@
     searchOffset = 0  // Reset offset for new search
 
     try {
-      let results: any[]
-      let count: number
+      let results: any[] = []
+      let count = 0
 
       if (isUnifiedView) {
-        [results, count] = await Promise.all([
-          SearchUnifiedInbox(query, 0, PAGE_SIZE),
-          GetSearchCountUnifiedInbox(query),
+        ;[results, count] = await Promise.all([
+          SearchUnifiedInbox(query, 0, PAGE_SIZE, filterMode),
+          GetSearchCountUnifiedInbox(query, filterMode),
         ])
       } else if (accountId && folderId) {
-        [results, count] = await Promise.all([
-          SearchConversations(accountId, folderId, query, 0, PAGE_SIZE),
-          GetSearchCount(accountId, folderId, query),
+        ;[results, count] = await Promise.all([
+          SearchConversations(accountId, folderId, query, 0, PAGE_SIZE, filterMode),
+          GetSearchCount(accountId, folderId, query, filterMode),
         ])
-      } else {
-        results = []
-        count = 0
       }
 
       searchResults = results || []
@@ -503,14 +514,11 @@
     const newOffset = searchOffset + PAGE_SIZE
 
     try {
-      let results: any[]
-
+      let results: any[] = []
       if (isUnifiedView) {
-        results = await SearchUnifiedInbox(query, newOffset, PAGE_SIZE)
+        results = await SearchUnifiedInbox(query, newOffset, PAGE_SIZE, filterMode)
       } else if (accountId && folderId) {
-        results = await SearchConversations(accountId, folderId, query, newOffset, PAGE_SIZE)
-      } else {
-        results = []
+        results = await SearchConversations(accountId, folderId, query, newOffset, PAGE_SIZE, filterMode)
       }
 
       if (results && results.length > 0) {
@@ -568,14 +576,18 @@
       serverSearchMode = true
       lastServerQuery = query
       performServerSearch()
-    } else if (query !== lastServerQuery) {
+      return
+    }
+
+    if (query !== lastServerQuery) {
       // Server mode, query changed → re-search
       lastServerQuery = query
       performServerSearch()
-    } else {
-      // Server mode, same query → toggle back to local
-      serverSearchMode = false
+      return
     }
+
+    // Server mode, same query → toggle back to local
+    serverSearchMode = false
   }
 
   // Perform IMAP server-side search. limit=0 means no limit (show all).
@@ -628,9 +640,9 @@
     if (showSearch) {
       // Focus input after it appears
       setTimeout(() => searchInputRef?.focus(), 50)
-    } else {
-      clearSearch()
+      return
     }
+    clearSearch()
   }
 
   // Check if we're in search mode with results
@@ -648,10 +660,19 @@
       : totalCount
   )
 
+  function toggleSetEntry(set: Set<string>, key: string) {
+    if (set.has(key)) {
+      set.delete(key)
+      return
+    }
+    set.add(key)
+  }
+
   function selectConversation(threadId: string, index: number, event?: MouseEvent) {
-    // Handle multi-select with Shift/Ctrl/Cmd
+    lastClickedIndex = index
+
+    // Shift+click: range select
     if (event?.shiftKey) {
-      // Range select from lastClickedIndex (or current if none) to current
       const start = lastClickedIndex !== null ? Math.min(lastClickedIndex, index) : index
       const end = lastClickedIndex !== null ? Math.max(lastClickedIndex, index) : index
       const newChecked = new Set(checkedThreadIds)
@@ -659,35 +680,32 @@
         newChecked.add(activeList[i].threadId)
       }
       checkedThreadIds = newChecked
-      // Don't change selectedThreadId or notify parent - keep current view
-    } else if (event?.ctrlKey || event?.metaKey) {
-      // Toggle single checkbox without changing selection
-      const newChecked = new Set(checkedThreadIds)
-      if (newChecked.has(threadId)) {
-        newChecked.delete(threadId)
-      } else {
-        newChecked.add(threadId)
-      }
-      checkedThreadIds = newChecked
-      // Don't change selectedThreadId - keep current view
-    } else {
-      // Normal click - select for viewing, clear checks (don't auto-check)
-      checkedThreadIds = new Set()
-      selectedThreadId = threadId
-
-      // For unified view or search, use real folderId and accountId from conversation data
-      const conversation = activeList[index] as any
-      const realFolderId = (isUnifiedView || isSearchMode) && conversation.folderId ? conversation.folderId : folderId!
-      const realAccountId = (isUnifiedView || isSearchMode) && conversation.accountId ? conversation.accountId : accountId!
-
-      // If this is a non-local server result, fetch it first
-      if (serverSearchMode && conversation._isLocal === false && conversation._uid) {
-        fetchAndSelectServerResult(conversation, realFolderId, realAccountId)
-      } else {
-        onConversationSelect?.(threadId, realFolderId, realAccountId)
-      }
+      return
     }
-    lastClickedIndex = index
+
+    // Ctrl/Cmd+click: toggle single checkbox without changing selection
+    if (event?.ctrlKey || event?.metaKey) {
+      const newChecked = new Set(checkedThreadIds)
+      toggleSetEntry(newChecked, threadId)
+      checkedThreadIds = newChecked
+      return
+    }
+
+    // Normal click - select for viewing, clear checks
+    checkedThreadIds = new Set()
+    selectedThreadId = threadId
+
+    // For unified view or search, use real folderId and accountId from conversation data
+    const conversation = activeList[index] as any
+    const realFolderId = (isUnifiedView || isSearchMode) && conversation.folderId ? conversation.folderId : folderId!
+    const realAccountId = (isUnifiedView || isSearchMode) && conversation.accountId ? conversation.accountId : accountId!
+
+    // If this is a non-local server result, fetch it first
+    if (serverSearchMode && conversation._isLocal === false && conversation._uid) {
+      fetchAndSelectServerResult(conversation, realFolderId, realAccountId)
+      return
+    }
+    onConversationSelect?.(threadId, realFolderId, realAccountId)
   }
 
   // Fetch a non-local server result, save locally, update the result, then select
@@ -719,11 +737,7 @@
 
   function handleCheck(threadId: string, isChecked: boolean) {
     const newChecked = new Set(checkedThreadIds)
-    if (isChecked) {
-      newChecked.add(threadId)
-    } else {
-      newChecked.delete(threadId)
-    }
+    isChecked ? newChecked.add(threadId) : newChecked.delete(threadId)
     checkedThreadIds = newChecked
   }
 
@@ -790,6 +804,18 @@
     } catch (err) {
       console.error('Failed to save sort order:', err)
     }
+  }
+
+  // Set filter mode and reload
+  function setFilter(mode: string) {
+    filterMode = mode
+    offset = 0
+    if (isSearchMode) {
+      searchOffset = 0
+      performSearch()
+      return
+    }
+    loadConversations()
   }
 
   // Calculate total unread count
@@ -925,11 +951,7 @@
   export function toggleCheck() {
     if (!selectedThreadId) return
     const newChecked = new Set(checkedThreadIds)
-    if (newChecked.has(selectedThreadId)) {
-      newChecked.delete(selectedThreadId)
-    } else {
-      newChecked.add(selectedThreadId)
-    }
+    toggleSetEntry(newChecked, selectedThreadId)
     checkedThreadIds = newChecked
     lastClickedIndex = getSelectedIndex()
   }
@@ -1226,6 +1248,44 @@
       >
         <Icon icon={showSearch ? 'mdi:close' : 'mdi:magnify'} class="w-5 h-5 text-muted-foreground" />
       </button>
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger
+          class="p-2 rounded-md hover:bg-muted transition-colors {filterMode ? 'bg-muted' : ''}"
+          title={$_('messageList.filter')}
+        >
+          <Icon
+            icon={filterMode ? 'mdi:filter' : 'mdi:filter-outline'}
+            class="w-5 h-5 {filterMode ? 'text-primary' : 'text-muted-foreground'}"
+          />
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content
+            side="bottom"
+            align="end"
+            sideOffset={4}
+            class={cn(
+              'z-50 min-w-[180px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md',
+              'data-[state=open]:animate-in data-[state=closed]:animate-out',
+              'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+              'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+              'data-[side=bottom]:slide-in-from-top-2'
+            )}
+          >
+            {#each filterOptions as opt}
+              {#if opt.separator}
+                <DropdownMenu.Separator class="-mx-1 my-1 h-px bg-border" />
+              {/if}
+              <DropdownMenu.Item
+                onSelect={() => setFilter(opt.value)}
+                class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent focus:text-accent-foreground"
+              >
+                <Icon icon="mdi:check" class="w-4 h-4 mr-2 {filterMode === opt.value ? '' : 'invisible'}" />
+                {opt.label}
+              </DropdownMenu.Item>
+            {/each}
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
       <button
         class="p-2 rounded-md hover:bg-muted transition-colors"
         title={getMessageListSortOrder() === 'newest' ? $_('messageList.showingNewest') : $_('messageList.showingOldest')}
@@ -1238,6 +1298,20 @@
       </button>
     </div>
   </div>
+
+  <!-- Active filter chip -->
+  {#if filterMode}
+    <div class="flex items-center gap-2 px-4 py-1.5 border-b border-border bg-muted/30">
+      <span class="text-xs text-muted-foreground">{$_('messageList.filterLabel')}:</span>
+      <button
+        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+        onclick={() => setFilter('')}
+      >
+        {filterLabel}
+        <Icon icon="mdi:close" class="w-3 h-3" />
+      </button>
+    </div>
+  {/if}
 
   <!-- Empty Trash bar (only shown when viewing trash folder with messages, not in search mode) -->
   {#if folderType === 'trash' && totalCount > 0 && !isSearchMode}
@@ -1437,6 +1511,17 @@
           </div>
         {/if}
       {/if}
+    {:else if conversations.length === 0 && filterMode}
+      <div class="flex flex-col items-center justify-center h-full text-muted-foreground">
+        <Icon icon="mdi:filter-off-outline" class="w-12 h-12 mb-2" />
+        <p>{$_('messageList.noFilteredMessages')}</p>
+        <button
+          class="mt-2 text-sm text-primary hover:underline"
+          onclick={() => setFilter('')}
+        >
+          {$_('messageList.filterAll')}
+        </button>
+      </div>
     {:else if conversations.length === 0}
       <div class="flex flex-col items-center justify-center h-full text-muted-foreground">
         <Icon icon="mdi:inbox-outline" class="w-12 h-12 mb-2" />

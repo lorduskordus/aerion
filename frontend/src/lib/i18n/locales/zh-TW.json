@@ -70,7 +70,14 @@
     "showingOldest": "顯示最舊優先",
     "foundIn": "在 {folder} 中找到",
     "encryptedContent": "(加密內容)",
-    "noContent": "(無內容)"
+    "noContent": "(無內容)",
+    "filter": "篩選",
+    "filterLabel": "篩選",
+    "filterAll": "所有郵件",
+    "filterUnread": "未讀",
+    "filterStarred": "已加星號",
+    "filterAttachments": "有附件",
+    "noFilteredMessages": "沒有符合目前篩選條件的郵件"
   },
   "viewer": {
     "selectConversation": "請選擇對話以閱讀",

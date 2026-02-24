@@ -274,7 +274,7 @@ func (a *App) handleNewMailNotification(info sync.NewMailInfo) {
 	inbox, err := a.folderStore.GetByType(info.AccountID, folder.TypeInbox)
 	if err == nil && inbox != nil {
 		// Get the most recent conversation (sorted by newest first)
-		conversations, err := a.messageStore.ListConversationsByFolder(info.FolderID, 0, 1, "newest")
+		conversations, err := a.messageStore.ListConversationsByFolder(info.FolderID, 0, 1, "newest", "")
 		if err == nil && len(conversations) > 0 {
 			conv := conversations[0]
 			subject = conv.Subject

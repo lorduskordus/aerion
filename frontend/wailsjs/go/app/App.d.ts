@@ -133,9 +133,9 @@ export function GetContext():Promise<context.Context>;
 
 export function GetConversation(arg1:string,arg2:string):Promise<message.Conversation>;
 
-export function GetConversationCount(arg1:string,arg2:string):Promise<number>;
+export function GetConversationCount(arg1:string,arg2:string,arg3:string):Promise<number>;
 
-export function GetConversations(arg1:string,arg2:string,arg3:number,arg4:number,arg5:string):Promise<Array<message.Conversation>>;
+export function GetConversations(arg1:string,arg2:string,arg3:number,arg4:number,arg5:string,arg6:string):Promise<Array<message.Conversation>>;
 
 export function GetDraft(arg1:string):Promise<smtp.ComposeMessage>;
 
@@ -199,9 +199,9 @@ export function GetSMIMEEncryptPolicy(arg1:string):Promise<string>;
 
 export function GetSMIMESignPolicy(arg1:string):Promise<string>;
 
-export function GetSearchCount(arg1:string,arg2:string,arg3:string):Promise<number>;
+export function GetSearchCount(arg1:string,arg2:string,arg3:string,arg4:string):Promise<number>;
 
-export function GetSearchCountUnifiedInbox(arg1:string):Promise<number>;
+export function GetSearchCountUnifiedInbox(arg1:string,arg2:string):Promise<number>;
 
 export function GetShowTitleBar():Promise<boolean>;
 
@@ -225,9 +225,9 @@ export function GetUIState():Promise<appstate.UIState>;
 
 export function GetUndoDescription():Promise<string>;
 
-export function GetUnifiedInboxConversations(arg1:number,arg2:number,arg3:string):Promise<Array<message.Conversation>>;
+export function GetUnifiedInboxConversations(arg1:number,arg2:number,arg3:string,arg4:string):Promise<Array<message.Conversation>>;
 
-export function GetUnifiedInboxCount():Promise<number>;
+export function GetUnifiedInboxCount(arg1:string):Promise<number>;
 
 export function GetUnifiedInboxUnreadCount():Promise<number>;
 
@@ -359,9 +359,9 @@ export function SaveUIState(arg1:appstate.UIState):Promise<void>;
 
 export function SearchContacts(arg1:string,arg2:number):Promise<Array<contact.Contact>>;
 
-export function SearchConversations(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number):Promise<Array<message.ConversationSearchResult>>;
+export function SearchConversations(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number,arg6:string):Promise<Array<message.ConversationSearchResult>>;
 
-export function SearchUnifiedInbox(arg1:string,arg2:number,arg3:number):Promise<Array<message.ConversationSearchResult>>;
+export function SearchUnifiedInbox(arg1:string,arg2:number,arg3:number,arg4:string):Promise<Array<message.ConversationSearchResult>>;
 
 export function SendMessage(arg1:string,arg2:smtp.ComposeMessage):Promise<void>;
 

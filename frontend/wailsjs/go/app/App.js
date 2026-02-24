@@ -234,12 +234,12 @@ export function GetConversation(arg1, arg2) {
   return window['go']['app']['App']['GetConversation'](arg1, arg2);
 }
 
-export function GetConversationCount(arg1, arg2) {
-  return window['go']['app']['App']['GetConversationCount'](arg1, arg2);
+export function GetConversationCount(arg1, arg2, arg3) {
+  return window['go']['app']['App']['GetConversationCount'](arg1, arg2, arg3);
 }
 
-export function GetConversations(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['app']['App']['GetConversations'](arg1, arg2, arg3, arg4, arg5);
+export function GetConversations(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['app']['App']['GetConversations'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function GetDraft(arg1) {
@@ -366,12 +366,12 @@ export function GetSMIMESignPolicy(arg1) {
   return window['go']['app']['App']['GetSMIMESignPolicy'](arg1);
 }
 
-export function GetSearchCount(arg1, arg2, arg3) {
-  return window['go']['app']['App']['GetSearchCount'](arg1, arg2, arg3);
+export function GetSearchCount(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['GetSearchCount'](arg1, arg2, arg3, arg4);
 }
 
-export function GetSearchCountUnifiedInbox(arg1) {
-  return window['go']['app']['App']['GetSearchCountUnifiedInbox'](arg1);
+export function GetSearchCountUnifiedInbox(arg1, arg2) {
+  return window['go']['app']['App']['GetSearchCountUnifiedInbox'](arg1, arg2);
 }
 
 export function GetShowTitleBar() {
@@ -418,12 +418,12 @@ export function GetUndoDescription() {
   return window['go']['app']['App']['GetUndoDescription']();
 }
 
-export function GetUnifiedInboxConversations(arg1, arg2, arg3) {
-  return window['go']['app']['App']['GetUnifiedInboxConversations'](arg1, arg2, arg3);
+export function GetUnifiedInboxConversations(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['GetUnifiedInboxConversations'](arg1, arg2, arg3, arg4);
 }
 
-export function GetUnifiedInboxCount() {
-  return window['go']['app']['App']['GetUnifiedInboxCount']();
+export function GetUnifiedInboxCount(arg1) {
+  return window['go']['app']['App']['GetUnifiedInboxCount'](arg1);
 }
 
 export function GetUnifiedInboxUnreadCount() {
@@ -686,12 +686,12 @@ export function SearchContacts(arg1, arg2) {
   return window['go']['app']['App']['SearchContacts'](arg1, arg2);
 }
 
-export function SearchConversations(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['app']['App']['SearchConversations'](arg1, arg2, arg3, arg4, arg5);
+export function SearchConversations(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['app']['App']['SearchConversations'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
-export function SearchUnifiedInbox(arg1, arg2, arg3) {
-  return window['go']['app']['App']['SearchUnifiedInbox'](arg1, arg2, arg3);
+export function SearchUnifiedInbox(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['SearchUnifiedInbox'](arg1, arg2, arg3, arg4);
 }
 
 export function SendMessage(arg1, arg2) {

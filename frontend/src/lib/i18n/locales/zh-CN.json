@@ -70,7 +70,14 @@
     "showingOldest": "显示最旧优先",
     "foundIn": "在 {folder} 中找到",
     "encryptedContent": "(加密内容)",
-    "noContent": "(无内容)"
+    "noContent": "(无内容)",
+    "filter": "筛选",
+    "filterLabel": "筛选",
+    "filterAll": "所有邮件",
+    "filterUnread": "未读",
+    "filterStarred": "已加星标",
+    "filterAttachments": "有附件",
+    "noFilteredMessages": "没有符合当前筛选条件的邮件"
   },
   "viewer": {
     "selectConversation": "请选择会话以阅读",

@@ -128,6 +128,18 @@
   </provides>
 
   <releases>
+    <release version="0.1.28" date="2026-02-24">
+      <description>
+        <ul>
+          <li>Slight visual adjustments to the message list checkboxes</li>
+          <li>Always show checkboxes on message list when in vertical mobile layout - #30</li>
+          <li>Added per folder filters for unread, starred, and attachments - #37</li>
+          <li>Refactored MessageList.svelte for better maintainability and performance</li>
+          <li>Resuming Flathub submission</li>
+        </ul>
+        <p>NOTE: A massive amount of features and fixes were in v0.1.25 - v0.1.27 which were not released in Flathub. Check the Release Page (https://github.com/hkdb/aerion/releases) to see these changes.</p>
+      </description>
+    </release>
     <release version="0.1.27" date="2026-02-23">
       <description>
         <ul>

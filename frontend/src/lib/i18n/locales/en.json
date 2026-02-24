@@ -70,7 +70,14 @@
     "showingOldest": "Showing oldest first",
     "foundIn": "Found in {folder}",
     "encryptedContent": "(Encrypted content)",
-    "noContent": "(No content)"
+    "noContent": "(No content)",
+    "filter": "Filter",
+    "filterLabel": "Filter",
+    "filterAll": "All messages",
+    "filterUnread": "Unread",
+    "filterStarred": "Starred",
+    "filterAttachments": "Has attachments",
+    "noFilteredMessages": "No messages match the current filter"
   },
   "viewer": {
     "selectConversation": "Select a conversation to read",

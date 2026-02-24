@@ -1,5 +1,18 @@
 # CHANGELOG
 
+
+**v0.1.28 - 02-24-2026**
+---
+
+- Slight visual adjustments to the message list checkboxes
+- Always show checkboxes on message list when in vertical mobile layout - [#30](https://github.com/hkdb/aerion/issues/30)
+- Added per folder filters for unread, starred, and attachments - [#37](https://github.com/hkdb/aerion/issues/37)
+- Refactored MessageList.svelte for better maintainability and performance
+- Resuming Flathub submission
+
+**Note** to **Flathub** users: A massive amount of features and fixes were in v0.1.25 - v0.1.27 which were not released to Flathub. Check the [Release Page](https://github.com/hkdb/aerion/releases) to see these changes.
+
+
 **v0.1.27 - 02-23-2026**
 ---
 

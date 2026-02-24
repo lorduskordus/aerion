@@ -29,6 +29,36 @@ func NewStore(db *database.DB) *Store {
 	}
 }
 
+// filterHavingClause returns a HAVING clause for conversation-level filtering.
+// prefix should be "" for single-table queries or "m." for joined queries.
+func filterHavingClause(filter, prefix string) string {
+	switch filter {
+	case "unread":
+		return fmt.Sprintf(" HAVING SUM(CASE WHEN %sis_read = 0 THEN 1 ELSE 0 END) > 0", prefix)
+	case "starred":
+		return fmt.Sprintf(" HAVING MAX(CASE WHEN %sis_starred = 1 THEN 1 ELSE 0 END) = 1", prefix)
+	case "attachments":
+		return fmt.Sprintf(" HAVING MAX(CASE WHEN %shas_attachments = 1 THEN 1 ELSE 0 END) = 1", prefix)
+	default:
+		return ""
+	}
+}
+
+// filterWhereClause returns a WHERE condition for count queries.
+// prefix should be "" for single-table queries or "m." for joined queries.
+func filterWhereClause(filter, prefix string) string {
+	switch filter {
+	case "unread":
+		return fmt.Sprintf(" AND %sis_read = 0", prefix)
+	case "starred":
+		return fmt.Sprintf(" AND %sis_starred = 1", prefix)
+	case "attachments":
+		return fmt.Sprintf(" AND %shas_attachments = 1", prefix)
+	default:
+		return ""
+	}
+}
+
 // ListByFolder returns message headers for a folder with pagination
 func (s *Store) ListByFolder(folderID string, offset, limit int) ([]*MessageHeader, error) {
 	query := `
@@ -77,7 +107,7 @@ func (s *Store) ListByFolder(folderID string, offset, limit int) ([]*MessageHead
 
 // ListConversationsUnifiedInbox returns conversations from all inbox folders across all accounts
 // This is used for the unified inbox view
-func (s *Store) ListConversationsUnifiedInbox(offset, limit int, sortOrder string) ([]*Conversation, error) {
+func (s *Store) ListConversationsUnifiedInbox(offset, limit int, sortOrder, filter string) ([]*Conversation, error) {
 	// Determine sort direction
 	orderClause := "ORDER BY latest_date DESC"
 	if sortOrder == "oldest" {
@@ -104,7 +134,8 @@ func (s *Store) ListConversationsUnifiedInbox(offset, limit int, sortOrder strin
 		FROM messages m
 		INNER JOIN folders f ON m.folder_id = f.id AND f.folder_type = 'inbox'
 		INNER JOIN accounts a ON f.account_id = a.id AND a.enabled = 1
-		GROUP BY COALESCE(m.thread_id, m.id), a.id
+		GROUP BY COALESCE(m.thread_id, m.id), a.id` +
+		filterHavingClause(filter, "m.") + `
 		` + orderClause + `
 		LIMIT ? OFFSET ?
 	`
@@ -201,13 +232,19 @@ func (s *Store) getConversationParticipantsUnified(threadID, accountID string) (
 }
 
 // CountConversationsUnifiedInbox returns the total count of conversations across all inbox folders
-func (s *Store) CountConversationsUnifiedInbox() (int, error) {
+func (s *Store) CountConversationsUnifiedInbox(filter string) (int, error) {
+	filterCond := filterWhereClause(filter, "m.")
+	wherePart := ""
+	if filterCond != "" {
+		wherePart = " WHERE" + filterCond[len(" AND"):]
+	}
+
 	query := `
 		SELECT COUNT(DISTINCT COALESCE(m.thread_id, m.id) || '-' || a.id)
 		FROM messages m
 		INNER JOIN folders f ON m.folder_id = f.id AND f.folder_type = 'inbox'
 		INNER JOIN accounts a ON f.account_id = a.id AND a.enabled = 1
-	`
+	` + wherePart
 
 	var count int
 	err := s.db.QueryRow(query).Scan(&count)
@@ -1166,7 +1203,7 @@ func parseTimeString(s string) time.Time {
 
 // ListConversationsByFolder returns conversations (grouped by thread) for a folder with pagination
 // sortOrder can be "newest" (default) or "oldest"
-func (s *Store) ListConversationsByFolder(folderID string, offset, limit int, sortOrder string) ([]*Conversation, error) {
+func (s *Store) ListConversationsByFolder(folderID string, offset, limit int, sortOrder, filter string) ([]*Conversation, error) {
 	// Determine sort direction
 	orderClause := "ORDER BY latest_date DESC"
 	if sortOrder == "oldest" {
@@ -1189,7 +1226,8 @@ func (s *Store) ListConversationsByFolder(folderID string, offset, limit int, so
 			MAX(CASE WHEN smime_encrypted = 1 OR pgp_encrypted = 1 THEN 1 ELSE 0 END) as is_encrypted
 		FROM messages
 		WHERE folder_id = ?
-		GROUP BY COALESCE(thread_id, id)
+		GROUP BY COALESCE(thread_id, id)` +
+		filterHavingClause(filter, "") + `
 		` + orderClause + `
 		LIMIT ? OFFSET ?
 	`
@@ -1281,12 +1319,12 @@ func (s *Store) getConversationParticipants(threadID, folderID string) ([]Addres
 }
 
 // CountConversationsByFolder returns the count of conversations in a folder
-func (s *Store) CountConversationsByFolder(folderID string) (int, error) {
+func (s *Store) CountConversationsByFolder(folderID, filter string) (int, error) {
 	query := `
 		SELECT COUNT(DISTINCT COALESCE(thread_id, id))
 		FROM messages
 		WHERE folder_id = ?
-	`
+	` + filterWhereClause(filter, "")
 
 	var count int
 	err := s.db.QueryRow(query, folderID).Scan(&count)
@@ -1927,7 +1965,7 @@ func (s *Store) GetByIDs(ids []string) ([]*Message, error) {
 
 // SearchConversations searches for conversations in a folder using FTS5
 // Returns conversations with highlighted text and the total count
-func (s *Store) SearchConversations(folderID, query string, offset, limit int) ([]*ConversationSearchResult, int, error) {
+func (s *Store) SearchConversations(folderID, query string, offset, limit int, filter string) ([]*ConversationSearchResult, int, error) {
 	if query == "" {
 		return nil, 0, nil
 	}
@@ -1941,7 +1979,7 @@ func (s *Store) SearchConversations(folderID, query string, offset, limit int) (
 		FROM messages m
 		JOIN messages_fts fts ON m.rowid = fts.rowid
 		WHERE m.folder_id = ? AND messages_fts MATCH ?
-	`
+	` + filterWhereClause(filter, "m.")
 	var totalCount int
 	err := s.db.QueryRow(countQuery, folderID, ftsQuery).Scan(&totalCount)
 	if err != nil {
@@ -1977,7 +2015,8 @@ func (s *Store) SearchConversations(folderID, query string, offset, limit int) (
 		FROM messages m
 		JOIN messages_fts fts ON m.rowid = fts.rowid
 		WHERE m.folder_id = ? AND messages_fts MATCH ?
-		GROUP BY COALESCE(m.thread_id, m.id)
+		GROUP BY COALESCE(m.thread_id, m.id)` +
+		filterHavingClause(filter, "m.") + `
 		ORDER BY latest_date DESC
 		LIMIT ? OFFSET ?
 	`
@@ -2045,7 +2084,7 @@ func (s *Store) SearchConversations(folderID, query string, offset, limit int) (
 }
 
 // SearchConversationsUnifiedInbox searches across all inbox folders for all accounts
-func (s *Store) SearchConversationsUnifiedInbox(query string, offset, limit int) ([]*ConversationSearchResult, int, error) {
+func (s *Store) SearchConversationsUnifiedInbox(query string, offset, limit int, filter string) ([]*ConversationSearchResult, int, error) {
 	if query == "" {
 		return nil, 0, nil
 	}
@@ -2060,7 +2099,7 @@ func (s *Store) SearchConversationsUnifiedInbox(query string, offset, limit int)
 		INNER JOIN folders f ON m.folder_id = f.id AND f.folder_type = 'inbox'
 		INNER JOIN accounts a ON f.account_id = a.id AND a.enabled = 1
 		WHERE messages_fts MATCH ?
-	`
+	` + filterWhereClause(filter, "m.")
 	var totalCount int
 	err := s.db.QueryRow(countQuery, ftsQuery).Scan(&totalCount)
 	if err != nil {
@@ -2096,7 +2135,8 @@ func (s *Store) SearchConversationsUnifiedInbox(query string, offset, limit int)
 		INNER JOIN folders f ON m.folder_id = f.id AND f.folder_type = 'inbox'
 		INNER JOIN accounts a ON f.account_id = a.id AND a.enabled = 1
 		WHERE messages_fts MATCH ?
-		GROUP BY COALESCE(m.thread_id, m.id), a.id
+		GROUP BY COALESCE(m.thread_id, m.id), a.id` +
+		filterHavingClause(filter, "m.") + `
 		ORDER BY latest_date DESC
 		LIMIT ? OFFSET ?
 	`

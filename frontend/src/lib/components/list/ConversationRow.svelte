@@ -260,7 +260,7 @@
     <div
       class="{densityClasses.checkbox[density]} flex-shrink-0 flex items-center justify-center self-center {checked
         ? 'opacity-100'
-        : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-200"
+        : 'opacity-0 group-hover:opacity-40 hover:!opacity-100 max-[767px]:opacity-40 max-[767px]:active:opacity-100'} transition-opacity duration-200"
     >
       <button
         class="{densityClasses.checkboxInner[density]} rounded border {checked

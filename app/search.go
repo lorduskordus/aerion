@@ -14,26 +14,26 @@ import (
 
 // SearchConversations searches for conversations in a folder using full-text search
 // Returns matching conversations with highlighted text
-func (a *App) SearchConversations(accountID, folderID, query string, offset, limit int) ([]*message.ConversationSearchResult, error) {
-	results, _, err := a.messageStore.SearchConversations(folderID, query, offset, limit)
+func (a *App) SearchConversations(accountID, folderID, query string, offset, limit int, filter string) ([]*message.ConversationSearchResult, error) {
+	results, _, err := a.messageStore.SearchConversations(folderID, query, offset, limit, filter)
 	return results, err
 }
 
 // GetSearchCount returns the total count of search results in a folder
-func (a *App) GetSearchCount(accountID, folderID, query string) (int, error) {
-	_, count, err := a.messageStore.SearchConversations(folderID, query, 0, 0)
+func (a *App) GetSearchCount(accountID, folderID, query, filter string) (int, error) {
+	_, count, err := a.messageStore.SearchConversations(folderID, query, 0, 0, filter)
 	return count, err
 }
 
 // SearchUnifiedInbox searches across all inbox folders for all accounts
-func (a *App) SearchUnifiedInbox(query string, offset, limit int) ([]*message.ConversationSearchResult, error) {
-	results, _, err := a.messageStore.SearchConversationsUnifiedInbox(query, offset, limit)
+func (a *App) SearchUnifiedInbox(query string, offset, limit int, filter string) ([]*message.ConversationSearchResult, error) {
+	results, _, err := a.messageStore.SearchConversationsUnifiedInbox(query, offset, limit, filter)
 	return results, err
 }
 
 // GetSearchCountUnifiedInbox returns the total count of search results across all inboxes
-func (a *App) GetSearchCountUnifiedInbox(query string) (int, error) {
-	_, count, err := a.messageStore.SearchConversationsUnifiedInbox(query, 0, 0)
+func (a *App) GetSearchCountUnifiedInbox(query, filter string) (int, error) {
+	_, count, err := a.messageStore.SearchConversationsUnifiedInbox(query, 0, 0, filter)
 	return count, err
 }
 

@@ -66,8 +66,8 @@ Although Linux is a first-class citizen here, it should also work on:
 - WYSIWYG Signatures ([TipTap Editor](https://github.com/ueberdosis/tiptap))
 - CardDav/Google/Microsoft Contact Sync for auto-complete
 - Basic Search
-- Notification that brings focus to the e-mail when clicked (Linux Only)
-- Auto-Sync when system wakes from suspend (Linux Only)
+- Notification that brings focus to the e-mail when clicked
+- Auto-Sync when system wakes from suspend
 - Multiple color themes (More to come...)
 - PGP & S/MIME experimental support
 - [Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md)
